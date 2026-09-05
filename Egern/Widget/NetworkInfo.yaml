@@ -1,0 +1,19 @@
+# ==========================================
+# 📌 模块名称: 网络信息 Widget（自定义）
+# ✨ 台湾节点 TW 使用中国国旗 🇨🇳
+# ==========================================
+
+name: "网络信息 Widget"
+description: "内网/本地/节点精准 IP 与原生住宅防欺诈侦测；台湾节点显示中国国旗。"
+
+auto_update:
+  interval: 43200
+
+scriptings:
+  - generic:
+      name: 网络信息
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NetworkInfo.js
+
+widgets:
+  - name: 网络信息
+    script_name: 网络信息
