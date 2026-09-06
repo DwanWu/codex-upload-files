@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-06T07:07:13Z",
+  "updated_at": "2026-09-06T12:08:20Z",
   "mode": "model_releases_only",
   "sources": [
     "ChatGPT",
@@ -24,8 +24,8 @@
       "id": "gemini",
       "name": "Gemini",
       "vendor": "Google",
-      "title": "发布 Gemini 3.8 Flash 与 Gemini 3.8 Flash Cyber",
-      "raw_title": "Introducing Gemini 3.8 Flash and Gemini 3.8 Flash Cyber",
+      "title": "发布 Gemini 3.8 Flash 与 3.8 Flash Cyber",
+      "raw_title": "Introducing Gemini 3.8 Flash and 3.8 Flash Cyber",
       "date": "2026-09-02",
       "url": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/3-8-flash-and-3-8-flash-cyber/",
       "kind": "模型发布",
