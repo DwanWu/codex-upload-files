@@ -7,16 +7,16 @@
 # ==========================================
 
 name: "节点体检"
-description: "检测当前 Egern 节点出口 IP、纯度、属性、地区和风险；地区仅显示国家/地区，属性仅显示住宅或机房，风险仅显示低/中/高。"
+description: "检测当前 Egern 节点出口 IP、纯度、属性、地区和风险。主区域仅显示纯度、属性、地区、风险四项结果；地区仅显示国家/地区，属性仅显示住宅或机房。"
 
 auto_update:
   interval: 1800
 
 scriptings:
   - generic:
-      name: 节点体检V7
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeCheck/NodeCheckV7.js?v=20260906-7
+      name: 节点体检
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeCheck/NodeCheck.js?v=20260906-final1
 
 widgets:
   - name: 节点体检
-    script_name: 节点体检V7
+    script_name: 节点体检
