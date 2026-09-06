@@ -1,22 +1,21 @@
 # ==========================================
 # 📌 模块名称: 节点体检
-# ✨ 功能: 出口 IP、醒目纯净度、住宅/机房属性、中文地区、AI 访问状态、VPN/Proxy/Tor 风险
+# ✨ 功能: 出口 IP、纯净度、网络属性、中文地区、风险等级
 # 🌐 IP 数据源: IPPure + IPQuery + ip-api.com
-# 🤖 AI 检测: ChatGPT + Claude + Gemini + Grok
-# ♊ Gemini: 网页入口 + 官方 API 双通道检测
+# 🎨 布局: 参考“广东油价”卡片式面板
 # ==========================================
 
 name: "节点体检"
-description: "检测当前 Egern 节点出口 IP，判断住宅/机房属性并突出显示纯净度；显示中文地区、风险信号，并检测 ChatGPT、Claude、Gemini、Grok 的网络访问状态。Gemini 使用网页入口与官方 API 双通道判定。"
+description: "检测当前 Egern 节点出口 IP、纯净度、住宅/机房属性、中文地区和风险等级；采用类似广东油价的四卡片布局。已移除 AI 可达性检测。"
 
 auto_update:
   interval: 1800
 
 scriptings:
   - generic:
-      name: 节点体检V4
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeCheck/NodeCheckV4.js?v=20260906-4
+      name: 节点体检V5
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeCheck/NodeCheckV5.js?v=20260906-5
 
 widgets:
   - name: 节点体检
-    script_name: 节点体检V4
+    script_name: 节点体检V5
