@@ -1,12 +1,12 @@
 # ==========================================
 # 📌 模块名称: 发布雷达 Widget
-# ✨ 追踪对象: Codex / Claude / Gemini / Grok
+# ✨ 追踪对象: ChatGPT / Claude / Gemini / Grok
 # 🔄 数据更新: GitHub Actions 每 2 小时抓取官方发布源
 # 🌐 展示语言: 中文
 # ==========================================
 
 name: "发布雷达 Widget"
-description: "追踪 Codex、Claude、Gemini、Grok 的最新模型、版本和重大功能发布；仅使用官方来源，中文展示。"
+description: "追踪 ChatGPT、Claude、Gemini、Grok 的最新模型、版本和重大功能发布；仅使用官方来源，中文展示。"
 
 auto_update:
   interval: 21600
