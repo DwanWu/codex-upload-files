@@ -24,7 +24,7 @@ jobs:
         run: pip install --disable-pip-version-check requests beautifulsoup4 feedparser
 
       - name: Update release data
-        run: python scripts/update_ai_releases.py
+        run: python scripts/update_ai_releases_top4.py
 
       - name: Commit changes
         run: |
