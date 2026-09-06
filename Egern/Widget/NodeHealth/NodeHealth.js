@@ -1,6 +1,7 @@
 /**
  * 节点体检
- * 显示：纯度 / 属性 / 地区 / 风险 + 内网 IP / 出口 IP
+ * 顶部：节点体检 + 地区（绿色）
+ * 显示：内网 IP / 出口 IP / 纯度 / 属性 / 风险
  * 不包含 AI 检测。
  */
 
@@ -17,7 +18,6 @@ export default async function (ctx) {
     green:   { light: '#1E7E44', dark: '#30D158' },
     gold:    { light: '#B07C1A', dark: '#FFD60A' },
     red:     { light: '#C0392B', dark: '#FF453A' },
-    blue:    { light: '#2C5F8A', dark: '#5E9ED6' },
     purple:  { light: '#7C3AED', dark: '#A78BFA' }
   };
 
@@ -31,9 +31,6 @@ export default async function (ctx) {
   });
   const row = (children, gap = 4, opts = {}) => ({
     type: 'stack', direction: 'row', alignItems: 'center', gap, children, ...opts
-  });
-  const col = (children, gap = 4, opts = {}) => ({
-    type: 'stack', direction: 'column', gap, children, ...opts
   });
   const icon = (name, color, size) => ({
     type: 'image', src: `sf-symbol:${name}`, color, width: size, height: size
@@ -114,7 +111,6 @@ export default async function (ctx) {
   const cards = [
     { label: '纯度', value: purity == null ? '--' : String(purity), color: purityColor },
     { label: '属性', value: property, color: propertyColor },
-    { label: '地区', value: country, color: C.blue },
     { label: '风险', value: riskLevel, color: riskColor }
   ];
 
@@ -130,9 +126,12 @@ export default async function (ctx) {
     ]
   });
 
-  const header = (iconSize, titleSize) => row([
-    icon('checkmark.shield.fill', C.green, iconSize), spacer(4),
-    text('节点体检', titleSize, 'heavy', C.main)
+  const header = (iconSize, titleSize, regionSize) => row([
+    icon('checkmark.shield.fill', C.green, iconSize),
+    spacer(4),
+    text('节点体检', titleSize, 'heavy', C.main),
+    spacer(),
+    text(country, regionSize, 'heavy', C.green, { maxLines: 1, minScale: 0.65 })
   ], 0);
 
   const ipLine = (label, value, labelSize, valueSize) => row([
@@ -142,56 +141,50 @@ export default async function (ctx) {
   ], 0);
 
   if (isSmall) {
-    const cfg = { radius: 10, padding: [5, 2, 5, 2], labelSize: 9, valueSize: 15, gap: 2 };
+    const cfg = { radius: 10, padding: [7, 2, 7, 2], labelSize: 9, valueSize: 15, gap: 3 };
     return {
       type: 'widget', padding: [11, 11, 9, 11], backgroundGradient: bg,
       children: [
-        header(14, 13),
-        spacer(5),
+        header(14, 13, 10),
+        spacer(6),
         ipLine('内网', internalIP, 8, 9),
         spacer(2),
         ipLine('出口', exitIP, 8, 9),
-        spacer(6),
-        col([
-          row(cards.slice(0, 2).map(x => buildCard(x, cfg)), 6, { flex: 1 }),
-          row(cards.slice(2, 4).map(x => buildCard(x, cfg)), 6, { flex: 1 })
-        ], 6, { flex: 1 })
+        spacer(8),
+        row(cards.map(x => buildCard(x, cfg)), 6, { flex: 1 })
       ]
     };
   }
 
   if (isLarge) {
-    const cfg = { radius: 14, padding: [14, 4, 14, 4], labelSize: 14, valueSize: 29, gap: 7 };
+    const cfg = { radius: 14, padding: [18, 4, 18, 4], labelSize: 14, valueSize: 30, gap: 8 };
     return {
       type: 'widget', padding: [16, 16, 16, 16], backgroundGradient: bg,
       children: [
-        header(18, 17),
-        spacer(9),
-        row([
-          col([ipLine('内网 IP', internalIP, 11, 12), ipLine('出口 IP', exitIP, 11, 12)], 5, { flex: 1 })
-        ], 0),
-        spacer(12),
-        col([
-          row(cards.slice(0, 2).map(x => buildCard(x, cfg)), 12, { flex: 1 }),
-          row(cards.slice(2, 4).map(x => buildCard(x, cfg)), 12, { flex: 1 })
-        ], 12, { flex: 1 })
+        header(18, 17, 14),
+        spacer(10),
+        ipLine('内网 IP', internalIP, 11, 12),
+        spacer(5),
+        ipLine('出口 IP', exitIP, 11, 12),
+        spacer(18),
+        row(cards.map(x => buildCard(x, cfg)), 12, { flex: 1 })
       ]
     };
   }
 
-  const cfg = { radius: 13, padding: [12, 6, 12, 6], labelSize: 11, valueSize: 21, gap: 5 };
+  const cfg = { radius: 13, padding: [14, 6, 14, 6], labelSize: 11, valueSize: 22, gap: 5 };
   return {
     type: 'widget', padding: [10, 12, 9, 12], backgroundGradient: bg,
     children: [
-      header(16, 15),
-      spacer(7),
+      header(16, 15, 12),
+      spacer(8),
       row([
         ipLine('内网 IP', internalIP, 9, 10),
-        spacer(12),
+        spacer(14),
         ipLine('出口 IP', exitIP, 9, 10)
       ], 0),
-      spacer(16),
-      row(cards.map(x => buildCard(x, cfg)), 6)
+      spacer(18),
+      row(cards.map(x => buildCard(x, cfg)), 8)
     ]
   };
 }
