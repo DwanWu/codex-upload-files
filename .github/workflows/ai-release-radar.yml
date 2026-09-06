@@ -24,7 +24,7 @@ jobs:
         run: pip install --disable-pip-version-check requests beautifulsoup4 feedparser
 
       - name: Update release data
-        run: python scripts/update_ai_releases_top4.py
+        run: python scripts/update_ai_releases.py
 
       - name: Commit changes
         run: |
@@ -35,5 +35,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Egern/Widget/AIReleaseRadar.json
-          git commit -m "chore: update AI release radar"
+          git commit -m "chore: update release radar"
           git push
