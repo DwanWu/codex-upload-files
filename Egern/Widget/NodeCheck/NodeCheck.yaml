@@ -1,21 +1,22 @@
 # ==========================================
 # 📌 模块名称: 节点体检
-# ✨ 功能: 出口 IP、纯净度、网络属性、中文地区、风险等级
+# ✨ 功能: 出口 IP、纯度、属性、地区、风险
 # 🌐 IP 数据源: IPPure + IPQuery + ip-api.com
 # 🎨 布局: 参考“广东油价”卡片式面板
+# 🟢 图标: 绿色节点体检
 # ==========================================
 
 name: "节点体检"
-description: "检测当前 Egern 节点出口 IP、纯净度、住宅/机房属性、中文地区和风险等级；采用类似广东油价的四卡片布局。已移除 AI 可达性检测。"
+description: "检测当前 Egern 节点出口 IP、纯度、属性、地区和风险；采用类似广东油价的四卡片布局。地区仅显示国家/地区，属性仅显示住宅或机房。"
 
 auto_update:
   interval: 1800
 
 scriptings:
   - generic:
-      name: 节点体检V5
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeCheck/NodeCheckV5.js?v=20260906-5
+      name: 节点体检V6
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeCheck/NodeCheckV6.js?v=20260906-6
 
 widgets:
   - name: 节点体检
-    script_name: 节点体检V5
+    script_name: 节点体检V6
