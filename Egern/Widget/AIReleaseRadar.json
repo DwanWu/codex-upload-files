@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-06T02:07:44Z",
+  "updated_at": "2026-09-06T07:07:13Z",
   "mode": "model_releases_only",
   "sources": [
     "ChatGPT",
@@ -17,19 +17,19 @@
       "date": "2026-09-03",
       "url": "https://openai.com/products/release-notes/",
       "kind": "模型发布",
-      "summary": "OpenAI 发布 GPT-6 Astra，重点提升编码、研究、计算机使用和复杂多步骤工作能力。",
+      "summary": "OpenAI 最新 GPT/o 系列模型发布；仅记录模型版本，不记录 ChatGPT 一般功能更新。",
       "source": "OpenAI 官方"
     },
     {
       "id": "gemini",
       "name": "Gemini",
       "vendor": "Google",
-      "title": "发布 Gemini 3.8 Flash 与 Gemini 3.8 Flash Cyber",
-      "raw_title": "Introducing Gemini 3.8 Flash and Gemini 3.8 Flash Cyber",
+      "title": "发布 Gemini 3.8 Flash 与 3.8 Flash Cyber",
+      "raw_title": "Introducing Gemini 3.8 Flash and 3.8 Flash Cyber",
       "date": "2026-09-02",
       "url": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/3-8-flash-and-3-8-flash-cyber/",
       "kind": "模型发布",
-      "summary": "Google 发布 Gemini 3.8 Flash 与 3.8 Flash Cyber，面向智能体工作流、编码与网络安全。",
+      "summary": "Google 最新 Gemini 模型发布；不记录 Gemini App 一般功能更新。",
       "source": "Google 官方"
     },
     {
@@ -48,14 +48,16 @@
       "id": "grok",
       "name": "Grok",
       "vendor": "xAI",
-      "title": "发布 Grok 4.6",
-      "raw_title": "Introducing Grok 4.6",
+      "title": "发布 Grok 4.6 Grok 4.6 builds on Grok 4.5 with a particular focus on long-running agents 与 more ambitious interactive 与 visual work. Aug 1…",
+      "raw_title": "Introducing Grok 4.6 Grok 4.6 builds on Grok 4.5 with a particular focus on long-running agents and more ambitious interactive and visual work. Aug 1…",
       "date": "2026-08-12",
       "url": "https://x.ai/news/grok-4-6",
       "kind": "模型发布",
-      "summary": "xAI 发布 Grok 4.6，重点强化长时间运行智能体、编码、交互和视觉工作。",
+      "summary": "xAI 最新 Grok 模型发布；不记录平台集成、Bot 或应用功能更新。",
       "source": "xAI 官方"
     }
   ],
-  "errors": []
+  "errors": [
+    "claude: Anthropic 官方发布页未找到 Claude 模型发布"
+  ]
 }
