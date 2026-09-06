@@ -1,12 +1,12 @@
 # ==========================================
 # 📌 模块名称: 节点体检
 # 🟢 图标: 绿色盾牌
-# ✨ 显示: 纯度 / 属性 / 地区 / 风险
-# 🌐 数据源: IPPure + IPQuery
+# ✨ 显示: 内网 IP / 出口 IP / 纯度 / 属性 / 地区 / 风险
+# 🌐 数据源: Egern 设备网络 + IPPure + IPQuery
 # ==========================================
 
 name: "节点体检"
-description: "节点体检全新地址版，仅显示纯度、属性、地区、风险四项结果。"
+description: "节点体检新地址版，显示内网 IP、出口 IP、纯度、属性、地区和风险。"
 
 auto_update:
   interval: 1800
@@ -14,7 +14,7 @@ auto_update:
 scriptings:
   - generic:
       name: 节点体检新地址版
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeHealth/NodeHealth.js?v=20260906-newpath1
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeHealth/NodeHealth.js?v=20260906-ip2
 
 widgets:
   - name: 节点体检
