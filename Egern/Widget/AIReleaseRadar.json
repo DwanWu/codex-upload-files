@@ -11,45 +11,45 @@
       "id": "codex",
       "name": "Codex",
       "vendor": "OpenAI",
-      "title": "More control over browser and computer use",
+      "title": "增强浏览器与电脑操作控制",
       "date": "2026-09-03",
       "url": "https://openai.com/products/release-notes/",
-      "kind": "GA",
+      "kind": "正式发布",
       "summary": "Codex 新增浏览器与原生应用策略控制，强化企业端权限和审批管理。",
-      "source": "OpenAI"
+      "source": "OpenAI 官方"
     },
     {
       "id": "gemini",
       "name": "Gemini",
       "vendor": "Google",
-      "title": "Introducing Gemini 3.8 Flash and 3.8 Flash Cyber",
+      "title": "发布 Gemini 3.8 Flash 与 3.8 Flash Cyber",
       "date": "2026-09-02",
       "url": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/3-8-flash-and-3-8-flash-cyber/",
-      "kind": "模型",
+      "kind": "模型发布",
       "summary": "Google 发布 Gemini 3.8 Flash 与 3.8 Flash Cyber，面向智能体工作流、编码与网络安全。",
-      "source": "Google"
+      "source": "Google 官方"
     },
     {
       "id": "claude",
       "name": "Claude",
       "vendor": "Anthropic",
-      "title": "Introducing Claude Fable 5.1 and Claude Mythos 5.1",
+      "title": "发布 Claude Fable 5.1 与 Claude Mythos 5.1",
       "date": "2026-09-01",
       "url": "https://www.anthropic.com/news",
-      "kind": "模型",
+      "kind": "模型发布",
       "summary": "Anthropic 发布 Claude Fable 5.1 与 Mythos 5.1，重点提升编码、知识工作与研究能力。",
-      "source": "Anthropic"
+      "source": "Anthropic 官方"
     },
     {
       "id": "grok",
       "name": "Grok",
       "vendor": "xAI",
-      "title": "Introducing Grok 4.6",
+      "title": "发布 Grok 4.6",
       "date": "2026-08-12",
       "url": "https://x.ai/news/grok-4-6",
-      "kind": "模型",
+      "kind": "模型发布",
       "summary": "Grok 4.6 强化长时间运行的智能体、编码、交互和视觉工作。",
-      "source": "xAI"
+      "source": "xAI 官方"
     }
   ],
   "errors": []
