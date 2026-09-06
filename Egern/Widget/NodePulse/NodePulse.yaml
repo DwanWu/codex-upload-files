@@ -5,10 +5,11 @@
 # ✨ 中间: 纯度 / 属性 / 风险 居中卡片
 # ✨ 底部: 左侧内网 IP / 右侧出口 IP
 # 🎨 布局: 参考广东油价
+# 🎯 颜色: 纯度>=90绿、80-89粉、<80红；机房红；风险中粉、高红
 # ==========================================
 
 name: "节点体检"
-description: "节点体检新布局：参考广东油价，结果卡片居中；地区与标题同排绿色显示；内网 IP 与出口 IP 固定在底部左右两侧。"
+description: "节点体检新布局：参考广东油价，结果卡片居中；地区与标题同排绿色显示；内网 IP 与出口 IP 固定在底部左右两侧。纯度、属性、风险结果按阈值动态着色。"
 
 auto_update:
   interval: 1800
@@ -16,7 +17,7 @@ auto_update:
 scriptings:
   - generic:
       name: 节点体检
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodePulse/NodePulse.js?v=20260906-1
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodePulse/NodePulse.js?v=20260906-2
 
 widgets:
   - name: 节点体检
