@@ -1,12 +1,12 @@
 /**
  * 发布雷达 Widget
- * 仅追踪：Codex / Claude / Gemini / Grok
+ * 仅追踪：ChatGPT / Claude / Gemini / Grok
  * 数据由 GitHub Actions 每 2 小时从官方来源更新。
  * 面板统一中文显示。
  */
 
 const DATA_URL = 'https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/AIReleaseRadar.json';
-const ALLOWED = new Set(['codex', 'claude', 'gemini', 'grok']);
+const ALLOWED = new Set(['chatgpt', 'claude', 'gemini', 'grok']);
 
 export default async function (ctx) {
   const family = (ctx.widgetFamily || 'systemMedium').toLowerCase();
@@ -27,10 +27,10 @@ export default async function (ctx) {
   };
 
   const BRAND = {
-    codex:  { name: 'Codex',  vendor: 'OpenAI',    icon: 'chevron.left.forwardslash.chevron.right', color: C.green },
-    claude: { name: 'Claude', vendor: 'Anthropic', icon: 'brain.head.profile', color: C.orange },
-    gemini: { name: 'Gemini', vendor: 'Google',    icon: 'sparkles', color: C.blue },
-    grok:   { name: 'Grok',   vendor: 'xAI',       icon: 'bolt.fill', color: C.purple }
+    chatgpt: { name: 'ChatGPT', vendor: 'OpenAI',    icon: 'bubble.left.and.bubble.right.fill', color: C.green },
+    claude:  { name: 'Claude',  vendor: 'Anthropic', icon: 'brain.head.profile', color: C.orange },
+    gemini:  { name: 'Gemini',  vendor: 'Google',    icon: 'sparkles', color: C.blue },
+    grok:    { name: 'Grok',    vendor: 'xAI',       icon: 'bolt.fill', color: C.purple }
   };
 
   const mkText = (text, size, weight, color, opts = {}) => ({
@@ -68,17 +68,17 @@ export default async function (ctx) {
     if (!raw) return `${r?.name || 'AI'} 官方发布新版本或重大功能更新`;
     if (/[一-鿿]/.test(raw)) return raw;
 
+    const exact = {
+      'Share ChatGPT Sites with people outside your workspace': 'ChatGPT Sites 现支持与工作区外人员共享'
+    };
+    if (exact[raw]) return exact[raw];
+
     let m = raw.match(/^Introducing\s+(.+)$/i);
     if (m) return `发布 ${m[1].replace(/\band\b/gi, '与')}`;
     m = raw.match(/^Announcing\s+(.+)$/i);
     if (m) return `发布 ${m[1].replace(/\band\b/gi, '与')}`;
     m = raw.match(/^(.+?)\s+is now available/i);
     if (m) return `${m[1]} 现已发布`;
-
-    const exact = {
-      'More control over browser and computer use': '增强浏览器与电脑操作控制'
-    };
-    if (exact[raw]) return exact[raw];
 
     const id = String(r?.id || '').toLowerCase();
     const name = BRAND[id]?.name || r?.name || 'AI';
@@ -117,7 +117,7 @@ export default async function (ctx) {
         mkSpacer(10),
         mkText(error ? '数据暂时加载失败' : '等待首次数据更新', 12, 'medium', C.sub),
         mkSpacer(4),
-        mkText(error || 'Codex · Claude · Gemini · Grok', 10, 'medium', C.muted, { maxLines: 3 })
+        mkText(error || 'ChatGPT · Claude · Gemini · Grok', 10, 'medium', C.muted, { maxLines: 3 })
       ]
     };
   }
@@ -130,7 +130,7 @@ export default async function (ctx) {
     const tag = badge(r.date);
     return mkRow([
       mkIcon(b.icon, b.color, fontSize + 1),
-      mkText(b.name, fontSize, 'heavy', b.color, { width: isSmall ? 48 : 54, maxLines: 1 }),
+      mkText(b.name, fontSize, 'heavy', b.color, { width: isSmall ? 56 : 62, maxLines: 1, minScale: 0.75 }),
       mkText(r.titleZh, fontSize, 'medium', C.sub, { flex: 1, maxLines: 1, minScale: 0.65 }),
       mkText(tag.text, fontSize - 1, 'bold', tag.color, { maxLines: 1 })
     ], 5);
@@ -149,7 +149,7 @@ export default async function (ctx) {
         mkSpacer(12),
         { type: 'stack', direction: 'column', gap: 10, children: releases.slice(0, 3).map(r => buildCompactRow(r, 10)) },
         mkSpacer(),
-        mkText('Codex · Claude · Gemini · Grok', 9, 'medium', C.muted, { maxLines: 1, minScale: 0.7 })
+        mkText('ChatGPT · Claude · Gemini · Grok', 9, 'medium', C.muted, { maxLines: 1, minScale: 0.65 })
       ]
     };
   }
