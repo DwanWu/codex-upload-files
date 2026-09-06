@@ -1,20 +1,21 @@
 # ==========================================
-# 📌 模块名称: AI 发布雷达 Widget
+# 📌 模块名称: 发布雷达 Widget
 # ✨ 追踪对象: Codex / Claude / Gemini / Grok
 # 🔄 数据更新: GitHub Actions 每 2 小时抓取官方发布源
+# 🌐 展示语言: 中文
 # ==========================================
 
-name: "AI 发布雷达 Widget"
-description: "追踪 Codex、Claude、Gemini、Grok 的最新模型、版本和重大功能发布；仅使用官方来源生成数据。"
+name: "发布雷达 Widget"
+description: "追踪 Codex、Claude、Gemini、Grok 的最新模型、版本和重大功能发布；仅使用官方来源，中文展示。"
 
 auto_update:
   interval: 21600
 
 scriptings:
   - generic:
-      name: AI 发布雷达
+      name: 发布雷达
       script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/AIReleaseRadar.js
 
 widgets:
-  - name: AI 发布雷达
-    script_name: AI 发布雷达
+  - name: 发布雷达
+    script_name: 发布雷达
