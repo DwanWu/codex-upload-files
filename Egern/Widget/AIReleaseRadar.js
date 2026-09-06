@@ -1,7 +1,8 @@
 /**
- * AI 发布雷达 Widget
+ * 发布雷达 Widget
  * 仅追踪：Codex / Claude / Gemini / Grok
  * 数据由 GitHub Actions 每 2 小时从官方来源更新。
+ * 面板统一中文显示。
  */
 
 const DATA_URL = 'https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/AIReleaseRadar.json';
@@ -56,10 +57,40 @@ export default async function (ctx) {
 
   const badge = (dateStr) => {
     const d = ageDays(dateStr);
-    if (d <= 1) return { text: 'NEW', color: C.red };
+    if (d <= 1) return { text: '最新', color: C.red };
     if (d <= 7) return { text: '本周', color: C.orange };
     if (d <= 30) return { text: '近期', color: C.blue };
     return { text: String(dateStr || '').slice(5).replace('-', '.'), color: C.muted };
+  };
+
+  const zhTitle = (r) => {
+    const raw = String(r?.title || '').trim();
+    if (!raw) return `${r?.name || 'AI'} 官方发布新版本或重大功能更新`;
+    if (/[一-鿿]/.test(raw)) return raw;
+
+    let m = raw.match(/^Introducing\s+(.+)$/i);
+    if (m) return `发布 ${m[1].replace(/\band\b/gi, '与')}`;
+    m = raw.match(/^Announcing\s+(.+)$/i);
+    if (m) return `发布 ${m[1].replace(/\band\b/gi, '与')}`;
+    m = raw.match(/^(.+?)\s+is now available/i);
+    if (m) return `${m[1]} 现已发布`;
+
+    const exact = {
+      'More control over browser and computer use': '增强浏览器与电脑操作控制'
+    };
+    if (exact[raw]) return exact[raw];
+
+    const id = String(r?.id || '').toLowerCase();
+    const name = BRAND[id]?.name || r?.name || 'AI';
+    return `${name} 官方发布新版本或重大功能更新`;
+  };
+
+  const zhSummary = (r) => {
+    const raw = String(r?.summary || '').trim();
+    if (raw && /[一-鿿]/.test(raw)) return raw;
+    const id = String(r?.id || '').toLowerCase();
+    const name = BRAND[id]?.name || r?.name || 'AI';
+    return `${name} 官方发布信息，点击组件可查看原始公告。`;
   };
 
   let data = null;
@@ -75,13 +106,14 @@ export default async function (ctx) {
 
   const releases = (data?.releases || [])
     .filter(x => ALLOWED.has(String(x.id || '').toLowerCase()))
+    .map(x => ({ ...x, titleZh: zhTitle(x), summaryZh: zhSummary(x) }))
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
 
   if (!releases.length) {
     return {
       type: 'widget', padding: 14, backgroundGradient: bg,
       children: [
-        mkRow([mkIcon('antenna.radiowaves.left.and.right', C.red, 15), mkText('AI 发布雷达', 15, 'heavy', C.main)], 6),
+        mkRow([mkIcon('antenna.radiowaves.left.and.right', C.red, 15), mkText('发布雷达', 15, 'heavy', C.main)], 6),
         mkSpacer(10),
         mkText(error ? '数据暂时加载失败' : '等待首次数据更新', 12, 'medium', C.sub),
         mkSpacer(4),
@@ -99,7 +131,7 @@ export default async function (ctx) {
     return mkRow([
       mkIcon(b.icon, b.color, fontSize + 1),
       mkText(b.name, fontSize, 'heavy', b.color, { width: isSmall ? 48 : 54, maxLines: 1 }),
-      mkText(r.title || '暂无标题', fontSize, 'medium', C.sub, { flex: 1, maxLines: 1, minScale: 0.65 }),
+      mkText(r.titleZh, fontSize, 'medium', C.sub, { flex: 1, maxLines: 1, minScale: 0.65 }),
       mkText(tag.text, fontSize - 1, 'bold', tag.color, { maxLines: 1 })
     ], 5);
   };
@@ -110,7 +142,7 @@ export default async function (ctx) {
       children: [
         mkRow([
           mkIcon('antenna.radiowaves.left.and.right', C.main, 13),
-          mkText('AI 发布雷达', 13, 'heavy', C.main),
+          mkText('发布雷达', 13, 'heavy', C.main),
           mkSpacer(),
           mkText(refresh, 9, 'bold', C.muted)
         ], 5),
@@ -138,8 +170,8 @@ export default async function (ctx) {
             mkText(r.date || '', 11, 'bold', C.muted),
             mkText(tag.text, 10, 'bold', tag.color)
           ], 5),
-          mkText(r.title || '暂无标题', 13, 'medium', C.main, { maxLines: 2, minScale: 0.75 }),
-          ...(r.summary ? [mkText(r.summary, 11, 'medium', C.muted, { maxLines: 1, minScale: 0.75 })] : []),
+          mkText(r.titleZh, 13, 'medium', C.main, { maxLines: 2, minScale: 0.75 }),
+          mkText(r.summaryZh, 11, 'medium', C.muted, { maxLines: 1, minScale: 0.75 }),
           { type: 'stack', height: 0.5, backgroundColor: C.divider, children: [] }
         ]
       };
@@ -150,7 +182,7 @@ export default async function (ctx) {
       children: [
         mkRow([
           mkIcon('antenna.radiowaves.left.and.right', C.main, 17),
-          mkText('AI 发布雷达', 17, 'heavy', C.main),
+          mkText('发布雷达', 17, 'heavy', C.main),
           mkSpacer(),
           mkText('官方源', 10, 'bold', C.green),
           mkText(refresh, 10, 'bold', C.muted)
@@ -166,7 +198,7 @@ export default async function (ctx) {
     children: [
       mkRow([
         mkIcon('antenna.radiowaves.left.and.right', C.main, 15),
-        mkText('AI 发布雷达', 15, 'heavy', C.main),
+        mkText('发布雷达', 15, 'heavy', C.main),
         mkSpacer(),
         mkText('官方源', 10, 'bold', C.green),
         mkText(refresh, 9, 'bold', C.muted)
@@ -174,7 +206,7 @@ export default async function (ctx) {
       mkSpacer(12),
       { type: 'stack', direction: 'column', gap: 10, flex: 1, children: releases.slice(0, 4).map(r => buildCompactRow(r, 11)) },
       mkSpacer(6),
-      mkText('按发布日期排序 · 自动每 2 小时抓取', 9, 'medium', C.muted, { maxLines: 1 })
+      mkText('按发布日期排序 · 每 2 小时自动更新', 9, 'medium', C.muted, { maxLines: 1 })
     ]
   };
 }
