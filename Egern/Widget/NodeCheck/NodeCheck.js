@@ -1,7 +1,8 @@
 /**
- * 节点体检 Widget
- * 检测当前 Egern 节点出口 IP 的住宅/机房属性、纯度、ASN、地区和匿名网络风险。
- * 数据源：IPPure + IPQuery + ip-api.com（三源降级/交叉验证）
+ * 节点体检 Widget v2
+ * 当前节点：出口 IP、住宅/机房属性、纯度、中文地区、运营商、风险信号、AI 可达性。
+ * IP 情报：IPPure + IPQuery + ip-api.com
+ * AI 可达：ChatGPT / Claude / Gemini / Grok（仅表示网络层可达，不代表账号权限）
  */
 
 export default async function (ctx) {
@@ -28,28 +29,21 @@ export default async function (ctx) {
   const text = (t, size, weight, color, opts = {}) => ({
     type: 'text', text: String(t ?? ''), font: { size, weight }, textColor: color, ...opts
   });
-  const row = (children, gap = 5, opts = {}) => ({
-    type: 'stack', direction: 'row', alignItems: 'center', gap, children, ...opts
-  });
-  const col = (children, gap = 5, opts = {}) => ({
-    type: 'stack', direction: 'column', gap, children, ...opts
-  });
-  const icon = (name, color, size = 13) => ({
-    type: 'image', src: `sf-symbol:${name}`, color, width: size, height: size
-  });
+  const row = (children, gap = 5, opts = {}) => ({ type: 'stack', direction: 'row', alignItems: 'center', gap, children, ...opts });
+  const col = (children, gap = 5, opts = {}) => ({ type: 'stack', direction: 'column', gap, children, ...opts });
+  const icon = (name, color, size = 13) => ({ type: 'image', src: `sf-symbol:${name}`, color, width: size, height: size });
   const spacer = (length) => length == null ? { type: 'spacer' } : { type: 'spacer', length };
   const chip = (label, color) => ({
     type: 'stack', direction: 'row', padding: [3, 6, 3, 6], backgroundColor: C.chip,
     children: [text(label, 9, 'bold', color, { maxLines: 1 })]
   });
 
-  const timeout = 5500;
+  const timeout = 5200;
   const getJson = async (url) => {
     try {
       const started = Date.now();
       const resp = await ctx.http.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout });
-      const raw = await resp.text();
-      return { ok: true, data: JSON.parse(raw), ms: Date.now() - started };
+      return { ok: true, data: JSON.parse(await resp.text()), ms: Date.now() - started };
     } catch (e) {
       return { ok: false, data: {}, ms: 0, error: e?.message || String(e) };
     }
@@ -62,8 +56,32 @@ export default async function (ctx) {
       return { ok: false, data: '', error: e?.message || String(e) };
     }
   };
+  const reach = async (url) => {
+    try {
+      const started = Date.now();
+      const resp = await ctx.http.get(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; Safari)' }, timeout: 4500
+      });
+      const status = Number(resp?.status ?? resp?.statusCode ?? 200);
+      try { await resp.text(); } catch (_) {}
+      return { ok: status >= 200 && status < 500, status, ms: Date.now() - started };
+    } catch (e) {
+      return { ok: false, status: 0, ms: 0 };
+    }
+  };
+
   const clamp = (n, min = 0, max = 100) => Math.max(min, Math.min(max, Number(n) || 0));
   const bool = v => v === true;
+
+  const COUNTRY_ZH = {
+    US: '美国', CA: '加拿大', GB: '英国', DE: '德国', FR: '法国', NL: '荷兰',
+    JP: '日本', KR: '韩国', SG: '新加坡', HK: '中国香港', MO: '中国澳门', TW: '中国台湾',
+    CN: '中国', AU: '澳大利亚', NZ: '新西兰', IN: '印度', MY: '马来西亚', TH: '泰国',
+    VN: '越南', PH: '菲律宾', ID: '印度尼西亚', RU: '俄罗斯', UA: '乌克兰',
+    CH: '瑞士', SE: '瑞典', NO: '挪威', FI: '芬兰', DK: '丹麦', IT: '意大利',
+    ES: '西班牙', PT: '葡萄牙', PL: '波兰', IE: '爱尔兰', AE: '阿联酋', TR: '土耳其',
+    BR: '巴西', MX: '墨西哥', AR: '阿根廷', CL: '智利', ZA: '南非', IL: '以色列'
+  };
 
   const flag = (cc) => {
     const s = String(cc || '').toUpperCase();
@@ -86,20 +104,63 @@ export default async function (ctx) {
     } catch (_) { return ''; }
   };
 
-  try {
-    // IPPure 直接检测当前请求出口，优先作为主 IP 来源。
-    const pureResp = await getJson('https://my.ippure.com/v1/info');
-    let ip = String(pureResp.data?.ip || '').trim();
+  const cleanPart = s => String(s || '').replace(/\s+/g, ' ').trim();
+  const makeLocation = (cc, countryRaw, regionRaw, cityRaw) => {
+    const code = String(cc || '').toUpperCase();
+    let country = COUNTRY_ZH[code] || cleanPart(countryRaw);
+    let region = cleanPart(regionRaw);
+    let city = cleanPart(cityRaw);
 
-    // IPPure 不可用时，用 IPQuery 当前 IP 接口兜底。
+    if (code === 'TW') {
+      country = '中国台湾';
+      if (/^(台湾|Taiwan)$/i.test(region)) region = '';
+    }
+
+    const parts = [];
+    const add = value => {
+      const v = cleanPart(value);
+      if (!v) return;
+      const key = v.toLowerCase().replace(/[\s·,，-]/g, '');
+      if (parts.some(x => {
+        const k = x.toLowerCase().replace(/[\s·,，-]/g, '');
+        return k === key || k.includes(key) || key.includes(k);
+      })) return;
+      parts.push(v);
+    };
+    add(country); add(region); add(city);
+    return [flag(code), ...parts].filter(Boolean).join(' ');
+  };
+
+  const formatOrg = raw => {
+    const s = cleanPart(raw);
+    if (!s) return '未知运营商';
+    const low = s.toLowerCase();
+    if (/china mobile international/.test(low)) return '中国移动国际';
+    if (/china mobile|cmcc|cmi|中国移动/.test(low)) return '中国移动';
+    if (/china telecom|chinanet|ctgnet|中国电信/.test(low)) return '中国电信';
+    if (/china unicom|cucc|联通/.test(low)) return '中国联通';
+    return s.replace(/^AS\d+\s*/i, '').trim() || s;
+  };
+
+  try {
+    const pureResp = await getJson('https://my.ippure.com/v1/info');
+    let ip = cleanPart(pureResp.data?.ip);
     if (!ip) {
       const ipResp = await getText('https://api.ipquery.io/');
       ip = String(ipResp.data || '').replace(/[\"'\s]/g, '');
     }
 
-    const [queryResp, apiResp] = await Promise.all([
+    const aiPromise = Promise.all([
+      reach('https://chatgpt.com/'),
+      reach('https://claude.ai/'),
+      reach('https://gemini.google.com/'),
+      reach('https://grok.com/')
+    ]);
+
+    const [queryResp, apiResp, aiResults] = await Promise.all([
       ip ? getJson(`https://api.ipquery.io/${encodeURIComponent(ip)}`) : Promise.resolve({ ok: false, data: {}, ms: 0 }),
-      ip ? getJson(`http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN&fields=status,message,query,country,countryCode,regionName,city,isp,org,as,asname,mobile,proxy,hosting`) : Promise.resolve({ ok: false, data: {}, ms: 0 })
+      ip ? getJson(`http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN&fields=status,message,query,country,countryCode,regionName,city,isp,org,asname,mobile,proxy,hosting`) : Promise.resolve({ ok: false, data: {}, ms: 0 }),
+      aiPromise
     ]);
 
     const pure = pureResp.data || {};
@@ -109,8 +170,7 @@ export default async function (ctx) {
 
     const residential = pure.isResidential === true;
     const dataCenterSignals = [pure.isDataCenter === true, risk.is_datacenter === true, ia.hosting === true];
-    const dcCount = dataCenterSignals.filter(Boolean).length;
-    const datacenter = dcCount > 0;
+    const datacenter = dataCenterSignals.some(Boolean);
     const mobile = bool(risk.is_mobile) || bool(ia.mobile);
     const vpn = bool(risk.is_vpn);
     const tor = bool(risk.is_tor);
@@ -132,8 +192,6 @@ export default async function (ctx) {
       if (mobile) purity -= 5;
       purity = clamp(purity);
     }
-
-    // 多源强风险信号用于保守封顶，避免单一 fraudScore 与风险标记冲突。
     if (tor) purity = Math.min(purity, 20);
     else if (vpn && proxy) purity = Math.min(purity, 35);
     else if (datacenter && (vpn || proxy)) purity = Math.min(purity, 45);
@@ -159,15 +217,18 @@ export default async function (ctx) {
     let confidence = sourceCount >= 3 ? '高' : sourceCount === 2 ? '中' : '低';
     if (conflict) confidence = '需复核';
 
-    const country = pure.country || iq.location?.country || ia.country || '';
-    const cc = pure.countryCode || iq.location?.country_code || ia.countryCode || '';
-    const region = pure.region || iq.location?.state || ia.regionName || '';
-    const city = pure.city || iq.location?.city || ia.city || '';
-    const location = [flag(cc), country, region, city].filter(Boolean).join(' ');
+    const cc = ia.countryCode || pure.countryCode || iq.location?.country_code || '';
+    const location = makeLocation(
+      cc,
+      ia.country || pure.country || iq.location?.country || '',
+      ia.regionName || pure.region || iq.location?.state || '',
+      ia.city || pure.city || iq.location?.city || ''
+    );
 
-    const asn = pure.asn ? `AS${String(pure.asn).replace(/^AS/i, '')}`
-      : iq.isp?.asn || (ia.as ? String(ia.as).split(' ')[0] : '') || '';
-    const isp = pure.asOrganization || iq.isp?.isp || iq.isp?.org || ia.isp || ia.org || ia.asname || '未知运营商';
+    const isp = formatOrg(ia.isp || iq.isp?.isp || pure.asOrganization || ia.org || iq.isp?.org || ia.asname);
+    const orgRaw = formatOrg(ia.org || iq.isp?.org || pure.asOrganization || ia.asname || isp);
+    const org = orgRaw === isp ? '' : orgRaw;
+    const provider = [isp, org].filter(Boolean).join(' · ');
     const protocol = getProxyProtocol();
 
     const riskFlags = [];
@@ -178,9 +239,24 @@ export default async function (ctx) {
     if (mobile) riskFlags.push({ t: '移动', c: C.cyan });
     if (!riskFlags.length) riskFlags.push({ t: '未见高风险标记', c: C.green });
 
+    const ai = [
+      { name: 'ChatGPT', ...aiResults[0] },
+      { name: 'Claude', ...aiResults[1] },
+      { name: 'Gemini', ...aiResults[2] },
+      { name: 'Grok', ...aiResults[3] }
+    ];
+    const aiCount = ai.filter(x => x.ok).length;
+    const aiChip = x => chip(`${x.name}${x.ok ? ' ✓' : ' ×'}`, x.ok ? C.green : C.red);
+
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');
     const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+    const labelRow = (label, value, color = C.sub, ico = null) => row([
+      ...(ico ? [icon(ico, color, 12)] : []),
+      text(label, 11, 'bold', C.muted, { width: 58, maxLines: 1 }),
+      text(value, 12, 'medium', color, { flex: 1, maxLines: 1, minScale: 0.62 })
+    ], 6);
 
     if (isSmall) {
       return {
@@ -192,13 +268,14 @@ export default async function (ctx) {
             spacer(),
             text(`${Math.round(purity)}分`, 12, 'heavy', purityInfo.color)
           ]),
-          spacer(11),
+          spacer(10),
           col([
-            row([icon('network', C.blue, 11), text(ip || '未获取出口 IP', 11, 'medium', C.sub, { maxLines: 1, flex: 1 })], 6),
+            row([icon('network', C.blue, 11), text([ip || '未获取出口 IP', protocol].filter(Boolean).join(' / '), 10, 'medium', C.sub, { maxLines: 1, flex: 1 })], 6),
             row([icon('house.and.flag.fill', typeColor, 11), text(netType, 11, 'heavy', typeColor, { maxLines: 1, flex: 1 })], 6),
-            row([icon('location.fill', C.cyan, 11), text(location || '位置未知', 10, 'medium', C.sub, { maxLines: 1, flex: 1, minScale: 0.7 })], 6),
-            row([icon('building.2.fill', C.purple, 11), text([asn, isp].filter(Boolean).join(' · '), 10, 'medium', C.sub, { maxLines: 1, flex: 1, minScale: 0.65 })], 6)
-          ], 8),
+            row([icon('location.fill', C.cyan, 11), text(location || '位置未知', 10, 'medium', C.sub, { maxLines: 1, flex: 1, minScale: 0.68 })], 6),
+            row([icon('building.2.fill', C.purple, 11), text(provider || '未知运营商', 10, 'medium', C.sub, { maxLines: 1, flex: 1, minScale: 0.62 })], 6),
+            row([icon('sparkles', aiCount === 4 ? C.green : C.orange, 11), text(`AI 可达 ${aiCount}/4`, 10, 'heavy', aiCount === 4 ? C.green : C.orange, { maxLines: 1, flex: 1 })], 6)
+          ], 7),
           spacer(),
           row([
             text(`${purityInfo.label} · 置信度${confidence}`, 9, 'bold', purityInfo.color),
@@ -208,12 +285,6 @@ export default async function (ctx) {
         ]
       };
     }
-
-    const labelRow = (label, value, color = C.sub, ico = null) => row([
-      ...(ico ? [icon(ico, color, 12)] : []),
-      text(label, 11, 'bold', C.muted, { width: 58, maxLines: 1 }),
-      text(value, 12, 'medium', color, { flex: 1, maxLines: 1, minScale: 0.65 })
-    ], 6);
 
     if (isLarge) {
       return {
@@ -225,34 +296,28 @@ export default async function (ctx) {
             spacer(),
             chip(`${Math.round(purity)} · ${purityInfo.label}`, purityInfo.color)
           ]),
-          spacer(13),
+          spacer(12),
           labelRow('出口 IP', [ip || '未知', protocol].filter(Boolean).join(' / '), C.main, 'network'),
           spacer(7),
           labelRow('网络属性', netType, typeColor, 'house.and.flag.fill'),
           spacer(7),
           labelRow('地区', location || '未知', C.sub, 'location.fill'),
           spacer(7),
-          labelRow('ASN', [asn, isp].filter(Boolean).join(' · '), C.sub, 'building.2.fill'),
+          labelRow('运营商', provider || '未知', C.sub, 'building.2.fill'),
           spacer(10),
           { type: 'stack', height: 0.5, backgroundColor: C.divider, children: [] },
-          spacer(10),
-          row([
-            text('风险信号', 11, 'bold', C.muted),
-            spacer(),
-            ...riskFlags.slice(0, 4).map(x => chip(x.t, x.c))
-          ], 5),
           spacer(9),
-          labelRow('IPPure', pureRisk == null ? '无数据' : `风险 ${Math.round(pureRisk)} / 100 · ${residential ? '住宅' : datacenter ? '非住宅' : '属性未定'}`, pureRisk != null && pureRisk >= 60 ? C.red : C.sub),
+          row([text('AI 可用', 11, 'bold', C.muted), spacer(), ...ai.map(aiChip)], 5),
+          spacer(9),
+          row([text('风险信号', 11, 'bold', C.muted), spacer(), ...riskFlags.slice(0, 4).map(x => chip(x.t, x.c))], 5),
+          spacer(9),
+          labelRow('IPPure', pureRisk == null ? '无数据' : `风险 ${Math.round(pureRisk)}/100 · ${residential ? '住宅' : datacenter ? '非住宅' : '属性未定'}`, pureRisk != null && pureRisk >= 60 ? C.red : C.sub),
           spacer(7),
-          labelRow('IPQuery', iqRisk == null ? '无数据' : `风险 ${Math.round(iqRisk)} / 100 · ${risk.is_datacenter ? '机房' : '非机房'}`, iqRisk != null && iqRisk >= 60 ? C.red : C.sub),
+          labelRow('IPQuery', iqRisk == null ? '无数据' : `风险 ${Math.round(iqRisk)}/100 · ${risk.is_datacenter ? '机房' : '非机房'}`, iqRisk != null && iqRisk >= 60 ? C.red : C.sub),
           spacer(7),
-          labelRow('ip-api', apiResp.ok ? `${ia.hosting ? 'Hosting' : '非Hosting'} · ${ia.proxy ? 'Proxy/VPN' : '无代理标记'}` : '无数据', ia.proxy ? C.orange : C.sub),
+          labelRow('ip-api', apiResp.ok ? `${ia.hosting ? 'Hosting' : '非Hosting'} · ${ia.proxy ? '代理标记' : '无代理标记'}` : '无数据', ia.proxy ? C.orange : C.sub),
           spacer(),
-          row([
-            text(`三源交叉验证 · 置信度 ${confidence}`, 9, 'bold', confidence === '需复核' ? C.orange : C.muted),
-            spacer(),
-            text(`更新 ${timeStr}`, 9, 'bold', C.muted)
-          ])
+          row([text(`三源置信度：${confidence}`, 9, 'bold', confidence === '需复核' ? C.orange : C.muted), spacer(), text(`更新于 ${timeStr}`, 9, 'bold', C.muted)])
         ]
       };
     }
@@ -264,36 +329,35 @@ export default async function (ctx) {
           icon('shield.checkered', purityInfo.color, 15),
           text('节点体检', 15, 'heavy', C.main),
           spacer(),
-          text(`${Math.round(purity)}分`, 14, 'heavy', purityInfo.color),
-          text(purityInfo.label, 10, 'bold', purityInfo.color)
+          chip(`${Math.round(purity)} · ${purityInfo.label}`, purityInfo.color)
         ]),
-        spacer(12),
+        spacer(10),
         labelRow('出口 IP', [ip || '未知', protocol].filter(Boolean).join(' / '), C.main, 'network'),
-        spacer(8),
+        spacer(6),
         labelRow('网络属性', netType, typeColor, 'house.and.flag.fill'),
-        spacer(8),
+        spacer(6),
         labelRow('地区', location || '未知', C.sub, 'location.fill'),
+        spacer(6),
+        labelRow('运营商', provider || '未知', C.sub, 'building.2.fill'),
         spacer(8),
-        labelRow('ASN', [asn, isp].filter(Boolean).join(' · '), C.sub, 'building.2.fill'),
-        spacer(9),
-        row([
-          ...riskFlags.slice(0, 3).map(x => chip(x.t, x.c)),
-          spacer(),
-          text(`置信度 ${confidence}`, 9, 'bold', confidence === '需复核' ? C.orange : C.muted)
-        ], 5),
+        row([text('AI', 10, 'bold', C.muted, { width: 58 }), ...ai.map(aiChip)], 4),
         spacer(),
-        row([spacer(), text(`IPPure · IPQuery · ip-api  ${timeStr}`, 9, 'medium', C.muted)])
+        row([
+          text(riskFlags.map(x => x.t).join(' · '), 9, 'bold', riskFlags.some(x => x.c === C.red) ? C.red : C.muted, { maxLines: 1, minScale: 0.7 }),
+          spacer(),
+          text(`置信度${confidence} · ${timeStr}`, 9, 'bold', C.muted)
+        ])
       ]
     };
   } catch (e) {
     return {
       type: 'widget', padding: 14, backgroundGradient: bg,
       children: [
-        row([icon('exclamationmark.shield.fill', C.red, 15), text('节点体检', 15, 'heavy', C.main)], 6),
+        row([icon('exclamationmark.triangle.fill', C.red, 14), text('节点体检', 14, 'heavy', C.main)]),
         spacer(10),
-        text('节点信息获取失败', 12, 'heavy', C.red),
-        spacer(5),
-        text(e?.message || String(e), 10, 'medium', C.muted, { maxLines: 3 })
+        text('检测失败，请稍后刷新', 12, 'medium', C.sub),
+        spacer(4),
+        text(e?.message || String(e), 9, 'medium', C.muted, { maxLines: 4 })
       ]
     };
   }
