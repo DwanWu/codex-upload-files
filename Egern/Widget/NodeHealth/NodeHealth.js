@@ -1,7 +1,7 @@
 /**
- * 节点体检 - 全新地址重建版
- * 只显示四项：纯度 / 属性 / 地区 / 风险
- * 不显示 AI、IP、协议、时间、说明文字。
+ * 节点体检
+ * 显示：纯度 / 属性 / 地区 / 风险 + 内网 IP / 出口 IP
+ * 不包含 AI 检测。
  */
 
 export default async function (ctx) {
@@ -64,15 +64,21 @@ export default async function (ctx) {
     TR:'土耳其', BR:'巴西', MX:'墨西哥', AR:'阿根廷', CL:'智利', ZA:'南非', IL:'以色列'
   };
 
+  const device = ctx.device || {};
+  const internalIP = clean(device.ipv4?.address) || '未连接';
+
   const pureResp = await getJson('https://my.ippure.com/v1/info');
-  let ip = clean(pureResp.data?.ip);
-  if (!ip) {
+  let exitIP = clean(pureResp.data?.ip);
+  if (!exitIP) {
     const ipResp = await getJson('https://api64.ipify.org?format=json');
-    ip = clean(ipResp.data?.ip);
+    exitIP = clean(ipResp.data?.ip);
   }
+  if (!exitIP) exitIP = '获取失败';
 
   let queryResp = { ok: false, data: {} };
-  if (ip) queryResp = await getJson(`https://api.ipquery.io/${encodeURIComponent(ip)}`);
+  if (exitIP !== '获取失败') {
+    queryResp = await getJson(`https://api.ipquery.io/${encodeURIComponent(exitIP)}`);
+  }
 
   const pure = pureResp.data || {};
   const query = queryResp.data || {};
@@ -129,26 +135,42 @@ export default async function (ctx) {
     text('节点体检', titleSize, 'heavy', C.main)
   ], 0);
 
+  const ipLine = (label, value, labelSize, valueSize) => row([
+    text(label, labelSize, 'bold', C.muted),
+    spacer(4),
+    text(value, valueSize, 'bold', C.main, { maxLines: 1, minScale: 0.58, flex: 1 })
+  ], 0);
+
   if (isSmall) {
-    const cfg = { radius: 10, padding: [7, 2, 7, 2], labelSize: 10, valueSize: 17, gap: 3 };
+    const cfg = { radius: 10, padding: [5, 2, 5, 2], labelSize: 9, valueSize: 15, gap: 2 };
     return {
-      type: 'widget', padding: [12, 12, 10, 12], backgroundGradient: bg,
+      type: 'widget', padding: [11, 11, 9, 11], backgroundGradient: bg,
       children: [
-        header(14, 13), spacer(8),
+        header(14, 13),
+        spacer(5),
+        ipLine('内网', internalIP, 8, 9),
+        spacer(2),
+        ipLine('出口', exitIP, 8, 9),
+        spacer(6),
         col([
           row(cards.slice(0, 2).map(x => buildCard(x, cfg)), 6, { flex: 1 }),
           row(cards.slice(2, 4).map(x => buildCard(x, cfg)), 6, { flex: 1 })
-        ], 8, { flex: 1 })
+        ], 6, { flex: 1 })
       ]
     };
   }
 
   if (isLarge) {
-    const cfg = { radius: 14, padding: [15, 4, 15, 4], labelSize: 14, valueSize: 30, gap: 7 };
+    const cfg = { radius: 14, padding: [14, 4, 14, 4], labelSize: 14, valueSize: 29, gap: 7 };
     return {
       type: 'widget', padding: [16, 16, 16, 16], backgroundGradient: bg,
       children: [
-        header(18, 17), spacer(14),
+        header(18, 17),
+        spacer(9),
+        row([
+          col([ipLine('内网 IP', internalIP, 11, 12), ipLine('出口 IP', exitIP, 11, 12)], 5, { flex: 1 })
+        ], 0),
+        spacer(12),
         col([
           row(cards.slice(0, 2).map(x => buildCard(x, cfg)), 12, { flex: 1 }),
           row(cards.slice(2, 4).map(x => buildCard(x, cfg)), 12, { flex: 1 })
@@ -157,11 +179,18 @@ export default async function (ctx) {
     };
   }
 
-  const cfg = { radius: 13, padding: [14, 6, 14, 6], labelSize: 11, valueSize: 22, gap: 5 };
+  const cfg = { radius: 13, padding: [12, 6, 12, 6], labelSize: 11, valueSize: 21, gap: 5 };
   return {
-    type: 'widget', padding: [10, 12, 10, 12], backgroundGradient: bg,
+    type: 'widget', padding: [10, 12, 9, 12], backgroundGradient: bg,
     children: [
-      header(16, 15), spacer(24),
+      header(16, 15),
+      spacer(7),
+      row([
+        ipLine('内网 IP', internalIP, 9, 10),
+        spacer(12),
+        ipLine('出口 IP', exitIP, 9, 10)
+      ], 0),
+      spacer(16),
       row(cards.map(x => buildCard(x, cfg)), 6)
     ]
   };
