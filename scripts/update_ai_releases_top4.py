@@ -3,10 +3,10 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from update_ai_releases import fetch_codex, fetch_claude, fetch_gemini, fetch_grok
+from update_ai_releases import fetch_chatgpt, fetch_claude, fetch_gemini, fetch_grok
 
 OUT = Path("Egern/Widget/AIReleaseRadar.json")
-ALLOWED = {"codex", "claude", "gemini", "grok"}
+ALLOWED = {"chatgpt", "claude", "gemini", "grok"}
 
 
 def main():
@@ -23,7 +23,7 @@ def main():
         if x.get("id") in ALLOWED
     }
 
-    fetchers = [fetch_codex, fetch_claude, fetch_gemini, fetch_grok]
+    fetchers = [fetch_chatgpt, fetch_claude, fetch_gemini, fetch_grok]
     releases = []
     errors = []
 
@@ -32,7 +32,7 @@ def main():
         try:
             r = fn()
             if not r.get("date"):
-                raise RuntimeError("missing date")
+                raise RuntimeError("缺少发布日期")
             releases.append(r)
             print(f"OK {r['name']}: {r['date']} {r['title']}")
         except Exception as e:
@@ -48,7 +48,7 @@ def main():
 
     data = {
         "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-        "sources": ["Codex", "Claude", "Gemini", "Grok"],
+        "sources": ["ChatGPT", "Claude", "Gemini", "Grok"],
         "releases": releases,
         "errors": errors,
     }
