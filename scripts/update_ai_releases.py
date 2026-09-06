@@ -10,10 +10,10 @@ import requests
 from bs4 import BeautifulSoup
 
 OUT = Path("Egern/Widget/AIReleaseRadar.json")
-UA = "Mozilla/5.0 (AIReleaseRadar/2.0; +https://github.com/DwanWu/codex-upload-files)"
+UA = "Mozilla/5.0 (AIReleaseRadar/3.0; +https://github.com/DwanWu/codex-upload-files)"
 HEADERS = {"User-Agent": UA, "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.7"}
 MONTHS = {m: i for i, m in enumerate(["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], 1)}
-ALLOWED = {"codex", "claude", "gemini", "grok"}
+ALLOWED = {"chatgpt", "claude", "gemini", "grok"}
 
 
 def get(url, timeout=25):
@@ -45,11 +45,20 @@ def iso_date(text):
     return None
 
 
+def looks_like_date(text):
+    s = str(text or "").strip()
+    return bool(
+        re.fullmatch(r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, 20\d{2}", s)
+        or re.fullmatch(r"20\d{2}年\d{1,2}月\d{1,2}日", s)
+        or re.fullmatch(r"20\d{2}-\d{1,2}-\d{1,2}", s)
+    )
+
+
 def zh_title(pid, raw):
     raw = clean(raw, 140)
     if not raw:
         return {
-            "codex": "Codex 官方发布新版本或重大功能更新",
+            "chatgpt": "ChatGPT 官方发布新版本或重大功能更新",
             "claude": "Claude 官方发布新模型或重大功能更新",
             "gemini": "Gemini 官方发布新模型或重大功能更新",
             "grok": "Grok 官方发布新模型或重大功能更新",
@@ -58,7 +67,8 @@ def zh_title(pid, raw):
         return raw
 
     exact = {
-        "More control over browser and computer use": "增强浏览器与电脑操作控制",
+        "Share ChatGPT Sites with people outside your workspace": "ChatGPT Sites 现支持与工作区外人员共享",
+        "Healthcare plugins for ChatGPT and Codex": "ChatGPT 与 Codex 新增医疗保健插件",
     }
     if raw in exact:
         return exact[raw]
@@ -75,7 +85,7 @@ def zh_title(pid, raw):
     if m:
         return f"推出新的 {m.group(1)}"
 
-    names = {"codex": "Codex", "claude": "Claude", "gemini": "Gemini", "grok": "Grok"}
+    names = {"chatgpt": "ChatGPT", "claude": "Claude", "gemini": "Gemini", "grok": "Grok"}
     return f"{names.get(pid, 'AI')} 官方发布新版本或重大功能更新"
 
 
@@ -109,43 +119,54 @@ def _parent_date(a):
     return None
 
 
-def fetch_codex():
-    url = "https://openai.com/products/release-notes/"
+def fetch_chatgpt():
+    url = "https://openai.com/zh-Hans-CN/products/release-notes/"
     soup = BeautifulSoup(get(url).text, "html.parser")
     strings = [clean(x, 260) for x in soup.stripped_strings]
-    date_re = re.compile(r"^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, 20\d{2}$")
-    skip = {"Codex", "GA", "Preview", "Beta", "Alpha", "Sunset", "View source", "Help center"}
+    skip = {
+        "ChatGPT", "GA", "Preview", "Beta", "Alpha", "Sunset",
+        "通用可用性", "全面开放", "预览", "测试版", "早期测试", "停止支持",
+        "View source", "Help center", "Platform docs", "查看来源", "帮助中心", "平台文档"
+    }
+
     for i, s in enumerate(strings):
-        if s != "Codex":
+        if s != "ChatGPT":
             continue
         d = None
         di = None
-        for j in range(i + 1, min(i + 8, len(strings))):
-            if date_re.match(strings[j]):
+        for j in range(i + 1, min(i + 9, len(strings))):
+            if looks_like_date(strings[j]):
                 d, di = iso_date(strings[j]), j
                 break
         if not d:
             continue
+
         title = None
-        kind = "Codex 更新"
-        for j in range(di + 1, min(di + 10, len(strings))):
+        kind = "ChatGPT 更新"
+        for j in range(di + 1, min(di + 12, len(strings))):
             t = strings[j]
-            if t in {"GA", "Preview", "Beta", "Alpha", "Sunset"}:
-                kind = {"GA": "正式发布", "Preview": "预览版", "Beta": "测试版", "Alpha": "早期测试", "Sunset": "停止支持"}[t]
+            if t in {"GA", "通用可用性", "全面开放"}:
+                kind = "正式发布"
+                continue
+            if t in {"Preview", "预览"}:
+                kind = "预览版"
+                continue
+            if t in {"Beta", "测试版"}:
+                kind = "测试版"
                 continue
             if t in skip or len(t) < 5:
                 continue
             title = t
             break
-        if title:
-            return item("codex", "Codex", "OpenAI", title, d, url, kind,
-                        "OpenAI 官方 Codex 发布记录，涵盖模型、客户端、智能体与工具能力更新。", "OpenAI 官方")
 
-    gh = get("https://api.github.com/repos/openai/codex/releases/latest").json()
-    d = (gh.get("published_at") or "")[:10]
-    title = gh.get("name") or gh.get("tag_name") or "Codex latest release"
-    return item("codex", "Codex", "OpenAI", title, d, gh.get("html_url") or url, "CLI 更新",
-                "Codex 官方 GitHub 最新版本发布。", "OpenAI GitHub 官方")
+        if title:
+            return item(
+                "chatgpt", "ChatGPT", "OpenAI", title, d, url, kind,
+                "OpenAI 官方 ChatGPT 发布记录，涵盖模型、应用、工具与产品功能更新。",
+                "OpenAI 官方"
+            )
+
+    raise RuntimeError("OpenAI ChatGPT 官方发布页解析失败")
 
 
 def fetch_claude():
@@ -246,7 +267,7 @@ def main():
 
     releases = []
     errors = []
-    for fn in [fetch_codex, fetch_claude, fetch_gemini, fetch_grok]:
+    for fn in [fetch_chatgpt, fetch_claude, fetch_gemini, fetch_grok]:
         pid = fn.__name__.replace("fetch_", "")
         try:
             r = fn()
@@ -267,7 +288,7 @@ def main():
 
     data = {
         "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-        "sources": ["Codex", "Claude", "Gemini", "Grok"],
+        "sources": ["ChatGPT", "Claude", "Gemini", "Grok"],
         "releases": releases,
         "errors": errors,
     }
