@@ -1,0 +1,23 @@
+# ==========================================
+# 📌 模块名称: 节点体检
+# 🟢 图标: 绿色盾牌
+# ✨ 顶部: 节点体检 + 地区（绿色）
+# ✨ 中间: 纯度 / 属性 / 风险 居中卡片
+# ✨ 底部: 左侧内网 IP / 右侧出口 IP
+# 🎨 布局: 参考广东油价
+# ==========================================
+
+name: "节点体检"
+description: "节点体检新布局：参考广东油价，结果卡片居中；地区与标题同排绿色显示；内网 IP 与出口 IP 固定在底部左右两侧。"
+
+auto_update:
+  interval: 1800
+
+scriptings:
+  - generic:
+      name: 节点体检
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodePulse/NodePulse.js?v=20260906-1
+
+widgets:
+  - name: 节点体检
+    script_name: 节点体检
