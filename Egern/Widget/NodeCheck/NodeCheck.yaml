@@ -1,20 +1,21 @@
 # ==========================================
 # 📌 模块名称: 节点体检
-# ✨ 功能: 检测当前节点出口 IP、纯度、住宅/机房属性、ASN、地区与 VPN/Proxy/Tor 风险
-# 🌐 数据源: IPPure + IPQuery + ip-api.com
+# ✨ 功能: 出口 IP、纯度、住宅/机房属性、中文地区、运营商、AI 可达、VPN/Proxy/Tor 风险
+# 🌐 IP 数据源: IPPure + IPQuery + ip-api.com
+# 🤖 AI 检测: ChatGPT + Claude + Gemini + Grok
 # ==========================================
 
 name: "节点体检"
-description: "检测当前 Egern 节点出口 IP，判断原生住宅、ISP/住宅倾向、移动网络或机房/数据中心，并显示纯度、风险、ASN、地区及 VPN/代理/Tor 标记。"
+description: "检测当前 Egern 节点出口 IP，判断原生住宅、ISP/住宅倾向、移动网络或机房/数据中心；显示纯度、中文地区、运营商、风险信号，并检测 ChatGPT、Claude、Gemini、Grok 网络可达性。"
 
 auto_update:
-  interval: 21600
+  interval: 1800
 
 scriptings:
   - generic:
-      name: 节点体检
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeCheck/NodeCheck.js
+      name: 节点体检V2
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeCheck/NodeCheck.js?v=20260906-2
 
 widgets:
   - name: 节点体检
-    script_name: 节点体检
+    script_name: 节点体检V2
