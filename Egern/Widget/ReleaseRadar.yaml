@@ -3,21 +3,21 @@
 # 🔵 图标: 蓝色发布雷达
 # ✨ 追踪对象: ChatGPT / Claude / Gemini / Grok
 # 🎯 仅显示: 新模型 / 模型版本发布
-# 📅 日期显示: 具体发布日期
+# 📅 日期显示: 紧跟品牌名显示具体发布日期
 # 🔄 数据更新: GitHub Actions 每 2 小时抓取官方发布源
 # ==========================================
 
 name: "发布雷达"
-description: "仅追踪 ChatGPT、Claude、Gemini、Grok 的最新模型和模型版本发布；四家固定显示，并显示具体发布日期。"
+description: "仅追踪 ChatGPT、Claude、Gemini、Grok 的最新模型和模型版本发布；日期紧跟品牌名显示，避免在小/中尺寸右侧被裁切。"
 
 auto_update:
   interval: 21600
 
 scriptings:
   - generic:
-      name: 发布雷达V4
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/AIReleaseRadarV4.js?v=20260906-4
+      name: 发布雷达V5
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/AIReleaseRadarV5.js?v=20260906-5
 
 widgets:
   - name: 发布雷达
-    script_name: 发布雷达V4
+    script_name: 发布雷达V5
