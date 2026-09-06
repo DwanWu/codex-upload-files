@@ -1,0 +1,21 @@
+# ==========================================
+# 📌 模块名称: 节点体检
+# 🟢 图标: 绿色盾牌
+# ✨ 显示: 纯度 / 属性 / 地区 / 风险
+# 🌐 数据源: IPPure + IPQuery
+# ==========================================
+
+name: "节点体检"
+description: "节点体检全新地址版，仅显示纯度、属性、地区、风险四项结果。"
+
+auto_update:
+  interval: 1800
+
+scriptings:
+  - generic:
+      name: 节点体检新地址版
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeHealth/NodeHealth.js?v=20260906-newpath1
+
+widgets:
+  - name: 节点体检
+    script_name: 节点体检新地址版
