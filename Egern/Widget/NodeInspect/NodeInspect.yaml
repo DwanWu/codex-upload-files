@@ -1,0 +1,22 @@
+# ==========================================
+# 📌 模块名称: 节点体检
+# 🟢 图标: 绿色盾牌
+# ✨ 顶部显示: 节点体检 + 地区（绿色）
+# ✨ 内容显示: 内网 IP / 出口 IP / 纯度 / 属性 / 风险
+# 🌐 数据源: Egern 设备网络 + IPPure + IPQuery
+# ==========================================
+
+name: "节点体检"
+description: "节点体检全新订阅地址。地区与标题同排绿色显示，并显示内网 IP、出口 IP、纯度、属性和风险。"
+
+auto_update:
+  interval: 1800
+
+scriptings:
+  - generic:
+      name: 节点体检
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeInspect/NodeInspect.js?v=20260906-1
+
+widgets:
+  - name: 节点体检
+    script_name: 节点体检
