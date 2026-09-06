@@ -2,6 +2,7 @@
  * 节点体检 - NodePulse
  * 布局参考“广东油价”：标题 -> 居中结果卡 -> 分隔线 -> 底部左右 IP。
  * 顶部地区绿色显示；底部左内网 IP、右出口 IP。
+ * 颜色规则：纯度>=90绿色，80-89粉色，<80红色；机房红色；风险中粉色、高红色。
  */
 
 export default async function (ctx) {
@@ -15,9 +16,8 @@ export default async function (ctx) {
     main: { light: '#1C1C1E', dark: '#F2F2F7' },
     muted: { light: '#8E8E93', dark: '#8E8E93' },
     green: { light: '#1E7E44', dark: '#30D158' },
-    gold: { light: '#B07C1A', dark: '#FFD60A' },
+    pink: { light: '#DB2777', dark: '#F472B6' },
     red: { light: '#C0392B', dark: '#FF453A' },
-    purple: { light: '#7C3AED', dark: '#A78BFA' },
     divider: { light: '#E5E5EA', dark: '#38383A' }
   };
 
@@ -100,9 +100,9 @@ export default async function (ctx) {
   if (tor || (vpn && proxy) || (purity != null && purity < 35)) riskLevel = '高';
   else if (datacenter || vpn || proxy || (purity != null && purity < 75)) riskLevel = '中';
 
-  const purityColor = purity == null ? C.muted : purity >= 75 ? C.green : purity >= 50 ? C.gold : C.red;
-  const propertyColor = property === '住宅' ? C.green : C.purple;
-  const riskColor = riskLevel === '低' ? C.green : riskLevel === '中' ? C.gold : C.red;
+  const purityColor = purity == null ? C.muted : purity >= 90 ? C.green : purity >= 80 ? C.pink : C.red;
+  const propertyColor = property === '机房' ? C.red : C.green;
+  const riskColor = riskLevel === '高' ? C.red : riskLevel === '中' ? C.pink : C.green;
 
   const cards = [
     { label: '纯度', value: purity == null ? '--' : String(purity), color: purityColor },
@@ -117,7 +117,7 @@ export default async function (ctx) {
       spacer(),
       text(item.label, cfg.labelSize, 'bold', item.color, { maxLines: 1 }),
       spacer(cfg.gap),
-      text(item.value, cfg.valueSize, 'heavy', C.main, { maxLines: 1, minScale: 0.55 }),
+      text(item.value, cfg.valueSize, 'heavy', item.color, { maxLines: 1, minScale: 0.55 }),
       spacer()
     ]
   });
