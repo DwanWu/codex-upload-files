@@ -10,7 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 
 OUT = Path("Egern/Widget/AIReleaseRadar.json")
-UA = "Mozilla/5.0 (AIReleaseRadar/4.0; +https://github.com/DwanWu/codex-upload-files)"
+UA = "Mozilla/5.0 (AIReleaseRadar/4.1; +https://github.com/DwanWu/codex-upload-files)"
 HEADERS = {"User-Agent": UA, "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.7"}
 ALLOWED = {"chatgpt", "claude", "gemini", "grok"}
 
@@ -70,6 +70,20 @@ def parent_date(a):
     return None
 
 
+def normalize_model_title(pid, raw):
+    raw = clean(raw, 200)
+    if pid == "grok":
+        # xAI 新闻卡片常把“标题 + 摘要 + 日期”全部放进同一个 <a>。
+        # 这里只保留明确的模型发布标题，避免整段摘要进入面板。
+        m = re.search(r"\bIntroducing\s+(Grok\s+\d+(?:\.\d+)?)\b", raw, re.I)
+        if m:
+            return f"Introducing {m.group(1)}"
+        m = re.search(r"\b(Grok\s+\d+(?:\.\d+)?)\b", raw, re.I)
+        if m:
+            return f"Introducing {m.group(1)}"
+    return raw
+
+
 def zh_title(raw):
     raw = clean(raw, 150)
     if not raw:
@@ -86,6 +100,7 @@ def zh_title(raw):
 
 
 def item(pid, name, vendor, raw_title, date, url, summary, source):
+    raw_title = normalize_model_title(pid, raw_title)
     return {
         "id": pid,
         "name": name,
@@ -101,8 +116,6 @@ def item(pid, name, vendor, raw_title, date, url, summary, source):
 
 
 def fetch_chatgpt():
-    # OpenAI 的最新 GPT 模型可能出现在 API 分类，而不是 ChatGPT 分类，
-    # 因此直接在官方 Release Notes 中筛选明确的 GPT/o 系列模型发布标题。
     url = "https://openai.com/products/release-notes/"
     soup = BeautifulSoup(get(url).text, "html.parser")
     strings = [clean(x, 260) for x in soup.stripped_strings]
@@ -194,10 +207,15 @@ def fetch_grok():
     soup = BeautifulSoup(get(base + "/news").text, "html.parser")
     candidates = []
     for a in soup.find_all("a", href=True):
-        raw = clean(a.get_text(" ", strip=True), 200)
-        low = raw.lower()
-        if not re.match(r"^introducing\s+grok\s+\d", low):
+        card_raw = clean(a.get_text(" ", strip=True), 260)
+        if not re.search(r"\bIntroducing\s+Grok\s+\d", card_raw, re.I):
             continue
+
+        # 优先读取卡片中的标题节点；若页面结构变化，再由 normalize_model_title 截取。
+        heading = a.find(["h1", "h2", "h3", "h4", "h5"])
+        raw = clean(heading.get_text(" ", strip=True), 160) if heading else normalize_model_title("grok", card_raw)
+        raw = normalize_model_title("grok", raw)
+
         href = urljoin(base, a.get("href"))
         if "/news/" not in href:
             continue
@@ -223,8 +241,6 @@ def main():
         except Exception:
             old = {}
 
-    # 只有旧数据本身已经是模型发布时才允许作为抓取失败的回退，
-    # 防止旧的功能更新再次混入模型雷达。
     old_map = {
         x.get("id"): x
         for x in old.get("releases", [])
@@ -244,7 +260,11 @@ def main():
         except Exception as e:
             errors.append(f"{pid}: {e}")
             if pid in old_map:
-                releases.append(old_map[pid])
+                fallback = dict(old_map[pid])
+                if pid == "grok":
+                    fallback["raw_title"] = normalize_model_title("grok", fallback.get("raw_title") or fallback.get("title"))
+                    fallback["title"] = zh_title(fallback["raw_title"])
+                releases.append(fallback)
                 print(f"FALLBACK {pid}: {e}")
             else:
                 print(f"ERROR {pid}: {e}")
