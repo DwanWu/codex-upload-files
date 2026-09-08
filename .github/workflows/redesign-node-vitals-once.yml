@@ -1,0 +1,27 @@
+name: Redesign NodeVitals Once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/redesign-node-vitals-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  redesign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply NodeVitals centered redesign
+        run: python scripts/redesign_node_vitals_once.py
+
+      - name: Commit widget and clean temporary files
+        run: |
+          git rm .github/workflows/redesign-node-vitals-once.yml scripts/redesign_node_vitals_once.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Egern/Widget/NodeVitals/NodeVitals.js Egern/Widget/NodeVitals/NodeVitals.yaml
+          git commit -m "fix: redesign centered NodeVitals layout"
+          git push
