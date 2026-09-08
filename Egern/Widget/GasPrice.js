@@ -364,7 +364,7 @@ export default async function (ctx) {
     return {
       type: 'widget', padding: 16, backgroundGradient,
       children: [
-        mkRow([mkIcon('fuelpump.fill', C.red, 16), mkSpacer(4), mkText('广东油价加载失败', 15, 'heavy', C.main)], 0),
+        mkRow([mkIcon('fuelpump.circle.fill', C.red, 16), mkSpacer(4), mkText('广东油价加载失败', 15, 'heavy', C.main)], 0),
         mkSpacer(8),
         mkText(fetchError, 11, 'medium', C.muted, { maxLines: 3 })
       ]
@@ -380,7 +380,7 @@ export default async function (ctx) {
       type: 'widget', padding: [12, 12, 8, 12], url: BASE, backgroundGradient,
       children: [
         mkRow([
-          mkIcon('fuelpump.fill', C.red, 13), mkSpacer(4),
+          mkIcon('fuelpump.circle.fill', C.red, 13), mkSpacer(4),
           mkText(`${REGION_NAME}油价`, 13, 'heavy', C.main),
           mkSpacer(),
           mkText(shortTimeStr, 9, 'bold', C.muted, { family: 'Menlo' })
@@ -411,7 +411,7 @@ export default async function (ctx) {
       type: 'widget', padding: [16, 16, 14, 16], url: BASE, backgroundGradient,
       children: [
         mkRow([
-          mkIcon('fuelpump.fill', C.red, 17), mkSpacer(4),
+          mkIcon('fuelpump.circle.fill', C.red, 17), mkSpacer(4),
           mkText(`${REGION_NAME}油价`, 16, 'heavy', C.main), mkSpacer(),
           mkText('下轮调价: ', 12, 'medium', infoColor),
           mkText(nextAdjust.dateStr, 12, 'bold', infoColor),
@@ -446,7 +446,7 @@ export default async function (ctx) {
     type: 'widget', padding: [10, 12, 6, 12], url: BASE, backgroundGradient,
     children: [
       mkRow([
-        mkIcon('fuelpump.fill', C.red, 16), mkSpacer(2),
+        mkIcon('fuelpump.circle.fill', C.red, 16), mkSpacer(2),
         mkText(`${REGION_NAME}油价`, 15, 'heavy', C.main), mkSpacer(),
         mkText('下轮调价: ', 11, 'medium', infoColorMed),
         mkText(nextAdjust.dateStr, 11, 'bold', infoColorMed),
