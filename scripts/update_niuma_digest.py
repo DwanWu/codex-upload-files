@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import html
 import json
 import os
 import re
@@ -6,7 +7,7 @@ import time
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -20,20 +21,17 @@ ACCOUNTS = [
     ("OpenAIDevs", "OpenAI Developers"),
 ]
 ACCOUNT_NAMES = {handle.lower(): name for handle, name in ACCOUNTS}
+MAX_FEED = 40
+MAX_X_API_PAGES = 20
 
 RESET_RE = re.compile(
     r"\b(reset|resetting|reseting|banked reset|usage limits?|rate limits?|quota|credits?|extra usage)\b",
     re.I,
 )
-UPDATE_RE = re.compile(
-    r"\b(update|updated|ship|shipped|shipping|release|released|launch|launched|rollout|rolling out|"
-    r"available|landed|lands|new|added|fix|fixed|feature|version|app|cli|extension|browser|plugin|hooks?|"
-    r"improve|improved|improves|improvement|improvements|usage|reasoning effort|reasoning efforts|"
-    r"cost|cheaper|scalable|scalability|performance|quality|subscription|model|agent|agents|desktop|"
-    r"windows|macos|linux|cloud|worktree|review|code review|terminal|ide|vscode)\b",
+CODEX_RE = re.compile(
+    r"\b(codex|chatgpt work|astra|gpt[- ]?5(?:\.\d+)?[- ]?codex(?:[- ]?mini|[- ]?max)?|gpt[- ]?6)\b",
     re.I,
 )
-CODEX_RE = re.compile(r"\b(codex|chatgpt work|astra|gpt[- ]?5[- ]?codex|gpt[- ]?6)\b", re.I)
 CJK_RE = re.compile(r"[\u3400-\u9fff]")
 NEXT_DATA_RE = re.compile(
     r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', re.S
@@ -77,7 +75,8 @@ def parse_dt(value):
 
 
 def normalize_text(value):
-    s = re.sub(r"https?://t\.co/\w+", "", str(value or ""))
+    s = html.unescape(str(value or ""))
+    s = re.sub(r"https?://t\.co/\w+", "", s)
     s = re.sub(r"https?://\S+", "", s)
     return re.sub(r"\s+", " ", s).strip()
 
@@ -96,24 +95,62 @@ def normalize_x_url(url, handle="", tweet_id=""):
 def classify(handle, text):
     if not text:
         return None
-    is_reset = bool(RESET_RE.search(text)) and (
-        bool(CODEX_RE.search(text)) or handle.lower() == "thsottiaux"
-    )
-    if is_reset:
+    if RESET_RE.search(text) and (CODEX_RE.search(text) or handle.lower() == "thsottiaux"):
         return "reset"
-    # 重点账号中，只要明确提及 Codex/Astra/GPT-Codex 就保留，避免漏掉新表达方式。
+    # 所有来源都必须明确提及 Codex/Astra/GPT-Codex/GPT-6，避免 OpenAIDevs 泛 AI 动态混入。
     if CODEX_RE.search(text):
-        return "update"
-    if UPDATE_RE.search(text) and handle.lower() == "openaidevs":
         return "update"
     return None
 
 
+def retry_delay(exc, attempt, default=20):
+    headers = getattr(exc, "headers", None)
+    if headers:
+        reset_at = headers.get("x-rate-limit-reset")
+        if reset_at:
+            try:
+                return max(5, min(int(reset_at) - int(time.time()) + 2, 90))
+            except Exception:
+                pass
+        retry_after = headers.get("Retry-After")
+        if retry_after:
+            try:
+                return max(5, min(int(float(retry_after)), 90))
+            except Exception:
+                pass
+    return min(default * (attempt + 1), 90)
+
+
+def request_json(url, headers, timeout=25, attempts=3):
+    last_error = None
+    for attempt in range(attempts):
+        try:
+            req = Request(url, headers=headers)
+            with urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8", errors="replace"))
+        except HTTPError as exc:
+            last_error = exc
+            retryable = exc.code == 429 or 500 <= exc.code <= 599
+            if not retryable or attempt >= attempts - 1:
+                raise
+            delay = retry_delay(exc, attempt)
+            print(f"http {exc.code}: retry in {delay}s")
+            time.sleep(delay)
+        except (URLError, TimeoutError, OSError) as exc:
+            last_error = exc
+            if attempt >= attempts - 1:
+                raise
+            delay = min(10 * (attempt + 1), 30)
+            print(f"network retry in {delay}s: {type(exc).__name__}")
+            time.sleep(delay)
+    if last_error:
+        raise last_error
+    return {}
+
+
 def translate_zh(text):
     text = normalize_text(text)
-    if not text:
-        return ""
-    if CJK_RE.search(text):
+    if not text or CJK_RE.search(text):
         return text
 
     params = urlencode({
@@ -124,9 +161,12 @@ def translate_zh(text):
         "q": text,
     })
     url = f"https://translate.googleapis.com/translate_a/single?{params}"
-    req = Request(url, headers={"User-Agent": HEADERS["User-Agent"], "Accept": "application/json"})
-    with urlopen(req, timeout=15) as resp:
-        data = json.loads(resp.read().decode("utf-8", errors="replace"))
+    data = request_json(
+        url,
+        {"User-Agent": HEADERS["User-Agent"], "Accept": "application/json"},
+        timeout=15,
+        attempts=2,
+    )
 
     parts = []
     if isinstance(data, list) and data and isinstance(data[0], list):
@@ -162,11 +202,9 @@ def summarize_zh(text, limit=56):
         if m.end() >= 24:
             boundaries.append(m.end())
     if boundaries:
-        cut = boundaries[-1]
-        summary = s[:cut].rstrip(" ，,。；;：:")
+        summary = s[:boundaries[-1]].rstrip(" ，,。；;：:")
         if summary:
             return summary + "…"
-
     return s[: max(1, limit - 1)].rstrip() + "…"
 
 
@@ -178,57 +216,68 @@ def fetch_x_api(old):
         return [], {"status": "not_configured", "posts": 0}, None
 
     handles = " OR ".join(f"from:{handle}" for handle, _ in ACCOUNTS)
-    query = f"({handles}) -is:retweet"
-    params = {
-        "query": query,
+    base_params = {
+        "query": f"({handles}) -is:retweet",
         "max_results": "100",
+        "sort_order": "recency",
         "tweet.fields": "created_at,author_id,public_metrics",
         "expansions": "author_id",
         "user.fields": "username,name",
     }
     since_id = str(old.get("x_api_newest_id") or "").strip()
     if since_id.isdigit():
-        params["since_id"] = since_id
+        base_params["since_id"] = since_id
 
-    url = "https://api.x.com/2/tweets/search/recent?" + urlencode(params)
     headers = {
         "Authorization": f"Bearer {token}",
         "User-Agent": HEADERS["User-Agent"],
         "Accept": "application/json",
     }
 
-    for attempt in range(2):
-        try:
-            req = Request(url, headers=headers)
-            with urlopen(req, timeout=25) as resp:
-                payload = json.loads(resp.read().decode("utf-8", errors="replace"))
-            break
-        except HTTPError as exc:
-            if exc.code != 429 or attempt >= 1:
-                raise
-            reset_at = exc.headers.get("x-rate-limit-reset") if exc.headers else None
-            try:
-                delay = max(10, min(int(reset_at) - int(time.time()) + 2, 90)) if reset_at else 30
-            except Exception:
-                delay = 30
-            print(f"x_api: rate limited; retry in {delay}s")
-            time.sleep(delay)
-    else:
-        payload = {}
-
+    tweets = []
     users = {}
-    for user in payload.get("includes", {}).get("users", []) or []:
-        users[str(user.get("id") or "")] = user
+    next_token = None
+    newest_id = None
+    page_count = 0
+
+    while True:
+        page_count += 1
+        if page_count > MAX_X_API_PAGES:
+            # 不推进游标，宁可回退也不要因为截断分页而永久漏掉消息。
+            raise RuntimeError(f"X API pagination exceeded {MAX_X_API_PAGES} pages")
+
+        params = dict(base_params)
+        if next_token:
+            params["next_token"] = next_token
+        url = "https://api.x.com/2/tweets/search/recent?" + urlencode(params)
+        payload = request_json(url, headers, timeout=25, attempts=3)
+
+        if payload.get("errors") and not payload.get("data"):
+            raise RuntimeError(f"X API returned errors: {payload.get('errors')}")
+
+        for user in payload.get("includes", {}).get("users", []) or []:
+            users[str(user.get("id") or "")] = user
+
+        page_tweets = payload.get("data", []) or []
+        tweets.extend(page_tweets)
+        meta = payload.get("meta") or {}
+        candidate = str(meta.get("newest_id") or "")
+        if candidate.isdigit() and (newest_id is None or int(candidate) > int(newest_id)):
+            newest_id = candidate
+        for tweet in page_tweets:
+            tweet_id = str(tweet.get("id") or "")
+            if tweet_id.isdigit() and (newest_id is None or int(tweet_id) > int(newest_id)):
+                newest_id = tweet_id
+
+        next_token = meta.get("next_token")
+        if not next_token:
+            break
 
     items = []
-    newest_id = None
-    for tweet in payload.get("data", []) or []:
+    for tweet in tweets:
         tweet_id = str(tweet.get("id") or "")
         if not tweet_id:
             continue
-        if newest_id is None or int(tweet_id) > int(newest_id):
-            newest_id = tweet_id
-
         user = users.get(str(tweet.get("author_id") or ""), {})
         handle = str(user.get("username") or "").strip()
         if not handle:
@@ -252,12 +301,12 @@ def fetch_x_api(old):
             "source": "x_api",
         })
 
-    health = {
+    return items, {
         "status": "ok",
         "posts": len(items),
-        "raw_posts": len(payload.get("data", []) or []),
-    }
-    return items, health, newest_id
+        "raw_posts": len(tweets),
+        "pages": page_count,
+    }, newest_id
 
 
 # ---------- 公开 syndication 兜底 ----------
@@ -269,8 +318,8 @@ def fetch_profile(handle, attempts=3):
         req = Request(url, headers=HEADERS)
         try:
             with urlopen(req, timeout=20) as resp:
-                html = resp.read().decode("utf-8", errors="replace")
-            match = NEXT_DATA_RE.search(html)
+                html_text = resp.read().decode("utf-8", errors="replace")
+            match = NEXT_DATA_RE.search(html_text)
             if not match:
                 raise RuntimeError("missing __NEXT_DATA__")
             data = json.loads(match.group(1))
@@ -279,19 +328,16 @@ def fetch_profile(handle, attempts=3):
             last_error = exc
             if exc.code != 429 or attempt >= attempts - 1:
                 raise
-            retry_after = exc.headers.get("Retry-After") if exc.headers else None
-            try:
-                delay = int(retry_after) if retry_after else 30 * (attempt + 1)
-            except Exception:
-                delay = 30 * (attempt + 1)
-            delay = max(20, min(delay, 75))
+            delay = retry_delay(exc, attempt, default=30)
             print(f"{handle}: rate limited; retry in {delay}s")
             time.sleep(delay)
-        except Exception as exc:
+        except (URLError, TimeoutError, OSError, RuntimeError, json.JSONDecodeError) as exc:
             last_error = exc
             if attempt >= attempts - 1:
                 raise
-            time.sleep(10 * (attempt + 1))
+            delay = min(10 * (attempt + 1), 30)
+            print(f"{handle}: retry in {delay}s: {type(exc).__name__}")
+            time.sleep(delay)
     if last_error:
         raise last_error
     return []
@@ -316,8 +362,6 @@ def extract_syndication(handle, fallback_name, entries):
         tweet_id = str(tweet.get("id_str") or tweet.get("id") or "")
         if not tweet_id:
             continue
-        metrics_likes = int(tweet.get("favorite_count") or 0)
-        metrics_reposts = int(tweet.get("retweet_count") or 0)
 
         items.append({
             "id": tweet_id,
@@ -327,8 +371,8 @@ def extract_syndication(handle, fallback_name, entries):
             "created_at": parse_dt(tweet.get("created_at")).astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
             "text": text[:700],
             "url": normalize_x_url(tweet.get("permalink"), screen_name, tweet_id),
-            "likes": metrics_likes,
-            "reposts": metrics_reposts,
+            "likes": int(tweet.get("favorite_count") or 0),
+            "reposts": int(tweet.get("retweet_count") or 0),
             "source": "x_syndication",
         })
     return items
@@ -374,13 +418,12 @@ def merge_feed(old_feed, fetched):
         item["url"] = normalize_x_url(item.get("url"), item.get("handle", ""), item_id)
         previous = merged.get(item_id)
         if previous:
-            # 新数据优先，但保留已经生成的中文全文和摘要。
             if previous.get("text_zh") and not item.get("text_zh"):
                 item["text_zh"] = previous["text_zh"]
             if previous.get("summary_zh") and not item.get("summary_zh"):
                 item["summary_zh"] = previous["summary_zh"]
         merged[item_id] = item
-    return sorted(merged.values(), key=sort_key, reverse=True)[:40]
+    return sorted(merged.values(), key=sort_key, reverse=True)[:MAX_FEED]
 
 
 def enrich_feed(feed):
@@ -413,7 +456,6 @@ def main():
     active_source = ""
     newest_id = old.get("x_api_newest_id")
 
-    # 1) 官方 X API：只要 Secret 已配置就自动成为主源。
     try:
         api_items, api_health, api_newest_id = fetch_x_api(old)
         source_health["x_api"] = api_health
@@ -421,12 +463,14 @@ def main():
             fetched = api_items
             active_source = "x_api"
             newest_id = api_newest_id or newest_id
-            print(f"x_api: ok ({api_health.get('raw_posts', 0)} raw; {len(api_items)} matched)")
+            print(
+                f"x_api: ok ({api_health.get('raw_posts', 0)} raw; "
+                f"{len(api_items)} matched; {api_health.get('pages', 0)} pages)"
+            )
     except Exception as exc:
         source_health["x_api"] = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
         print(f"x_api: {type(exc).__name__}: {exc}")
 
-    # 2) 未配置官方 API 或官方 API 失败时，自动回退公开源。
     if not active_source:
         try:
             synd_items, synd_health = fetch_syndication()
@@ -438,7 +482,7 @@ def main():
             source_health["x_syndication"] = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
             print(f"x_syndication: {type(exc).__name__}: {exc}")
 
-    # 所有来源都失败时，不覆盖健康数据。
+    # 所有来源都失败时保留已有健康数据和消息，不写坏 JSON。
     if not active_source:
         print("All X sources unavailable; preserving existing NiuMaDigest data unchanged")
         return
@@ -452,16 +496,17 @@ def main():
     latest_reset = next((x for x in feed if x.get("kind") == "reset"), None)
     latest_update = next((x for x in feed if x.get("kind") == "update"), None)
 
-    # 兼容组件现有的 accounts_ok，同时增加可诊断的 source_health。
     active_health = source_health.get(active_source, {})
     accounts_ok = (
-        len(ACCOUNTS) if active_source == "x_api"
+        len(ACCOUNTS)
+        if active_source == "x_api"
         else int(active_health.get("accounts_ok") or 0)
     )
 
+    stamp = now_iso()
     payload = {
-        "updated_at": now_iso(),
-        "last_success_at": now_iso(),
+        "updated_at": stamp,
+        "last_success_at": stamp,
         "source": active_source,
         "source_health": source_health,
         "translation": "zh-CN",
@@ -484,9 +529,15 @@ def main():
         for x in feed
     ]
 
-    # 没有内容变化时不制造无意义提交；月度 heartbeat 仍会维持定时任务活性。
-    if old_state == new_state and old.get("x_api_newest_id") == newest_id:
-        print(f"No 牛马消息 content changes; source={active_source}")
+    state_changed = (
+        old_state != new_state
+        or old.get("x_api_newest_id") != newest_id
+        or old.get("source") != active_source
+        or old.get("source_health") != source_health
+        or int(old.get("accounts_ok") or 0) != accounts_ok
+    )
+    if not state_changed:
+        print(f"No 牛马消息 content/health changes; source={active_source}")
         return
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
