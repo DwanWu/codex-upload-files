@@ -1,21 +1,23 @@
 # ==========================================
-# 📌 模块名称: Codex X 雷达
+# 📌 模块名称: 牛马消息
+# 🟣 图标: 紫色
 # ✨ 功能: 跟踪 X 上 Codex 重置/额度与更新/发布信息
+# 🌏 显示: 自动翻译为中文
 # 👥 重点来源: Tibo / Dominik / Nick / OpenAI Developers
 # 🔄 数据更新: GitHub Actions 每小时抓取一次公开 X 时间线
 # ==========================================
 
-name: "Codex X 雷达"
-description: "跟踪 Tibo 等 Codex 团队成员及 OpenAI Developers 在 X 上发布的 Codex 重置、额度、更新和发布信息。"
+name: "牛马消息"
+description: "跟踪 Tibo 等 Codex 团队成员及 OpenAI Developers 在 X 上发布的 Codex 重置、额度、更新和发布信息，并自动翻译成中文。"
 
 auto_update:
   interval: 1800
 
 scriptings:
   - generic:
-      name: Codex X 雷达
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/CodexXRadar/CodexXRadar.js?v=20260908-1
+      name: 牛马消息
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/CodexXRadar/CodexXRadar.js?v=20260908-2
 
 widgets:
-  - name: Codex X 雷达
-    script_name: Codex X 雷达
+  - name: 牛马消息
+    script_name: 牛马消息
