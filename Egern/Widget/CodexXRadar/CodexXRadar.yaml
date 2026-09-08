@@ -4,7 +4,6 @@
 # ✨ 功能: 跟踪 X 上 Codex 重置/额度与更新/发布信息
 # 🌏 显示: 自动翻译为中文
 # 👥 重点来源: Tibo / Dominik / Nick / OpenAI Developers
-# 🔄 数据更新: GitHub Actions 每小时抓取一次公开 X 时间线
 # ==========================================
 
 name: "牛马消息"
@@ -16,7 +15,7 @@ auto_update:
 scriptings:
   - generic:
       name: 牛马消息
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/CodexXRadar/CodexXRadar.js?v=20260908-2
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/CodexXRadar/CodexXRadar.js?v=20260908-3
 
 widgets:
   - name: 牛马消息
