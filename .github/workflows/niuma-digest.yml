@@ -30,16 +30,28 @@ jobs:
       - name: Update 牛马消息 data
         run: python scripts/update_niuma_digest.py
 
+      - name: Refresh monthly heartbeat
+        run: |
+          heartbeat=".github/niuma-digest-heartbeat"
+          current="$(date -u +%Y-%m)"
+          existing="$(cat "$heartbeat" 2>/dev/null || true)"
+          if [ "$existing" != "$current" ]; then
+            printf '%s\n' "$current" > "$heartbeat"
+            echo "Heartbeat refreshed: $current"
+          else
+            echo "Heartbeat current: $current"
+          fi
+
       - name: Commit changes safely
         run: |
-          if git diff --quiet -- Egern/Widget/NiuMaDigest/NiuMaDigest.json; then
+          if git diff --quiet -- Egern/Widget/NiuMaDigest/NiuMaDigest.json .github/niuma-digest-heartbeat; then
             echo "No 牛马消息 changes"
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Egern/Widget/NiuMaDigest/NiuMaDigest.json
+          git add Egern/Widget/NiuMaDigest/NiuMaDigest.json .github/niuma-digest-heartbeat
           git commit -m "chore: update 牛马消息"
 
           for attempt in 1 2 3; do
