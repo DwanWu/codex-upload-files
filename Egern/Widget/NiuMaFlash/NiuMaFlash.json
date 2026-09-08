@@ -1,0 +1,55 @@
+{
+  "updated_at": "2026-09-08T02:50:00Z",
+  "source": "x_syndication",
+  "translation": "zh-CN",
+  "accounts_total": 4,
+  "accounts_ok": 4,
+  "accounts": [
+    {"handle": "thsottiaux", "name": "Tibo"},
+    {"handle": "dkundel", "name": "Dominik"},
+    {"handle": "nickbaumann_", "name": "Nick"},
+    {"handle": "OpenAIDevs", "name": "OpenAI Developers"}
+  ],
+  "latest_reset": {
+    "id": "2096035437299237298",
+    "kind": "reset",
+    "handle": "thsottiaux",
+    "author_name": "Tibo",
+    "created_at": "2026-09-05T00:39:00Z",
+    "text": "Full banked reset announced for Plus, Pro and Business users, landing by end of day.",
+    "text_zh": "已宣布为 Plus、Pro 和 Business 用户进行完整的额度重置，预计当天结束前完成。",
+    "url": "https://x.com/thsottiaux/status/2096035437299237298"
+  },
+  "latest_update": {
+    "id": "2095961185262997556",
+    "kind": "update",
+    "handle": "thsottiaux",
+    "author_name": "Tibo",
+    "created_at": "2026-09-04T20:44:00Z",
+    "text": "Astra rollout progressed through Pro and Business first, with availability appearing across ChatGPT Work and Codex before Plus rollout.",
+    "text_zh": "Astra 先向 Pro 和 Business 用户推进，并在 Plus 推送前陆续出现在 ChatGPT Work 和 Codex 中。",
+    "url": "https://x.com/thsottiaux/status/2095961185262997556"
+  },
+  "feed": [
+    {
+      "id": "2096035437299237298",
+      "kind": "reset",
+      "handle": "thsottiaux",
+      "author_name": "Tibo",
+      "created_at": "2026-09-05T00:39:00Z",
+      "text": "Full banked reset announced for Plus, Pro and Business users, landing by end of day.",
+      "text_zh": "已宣布为 Plus、Pro 和 Business 用户进行完整的额度重置，预计当天结束前完成。",
+      "url": "https://x.com/thsottiaux/status/2096035437299237298"
+    },
+    {
+      "id": "2095961185262997556",
+      "kind": "update",
+      "handle": "thsottiaux",
+      "author_name": "Tibo",
+      "created_at": "2026-09-04T20:44:00Z",
+      "text": "Astra rollout progressed through Pro and Business first, with availability appearing across ChatGPT Work and Codex before Plus rollout.",
+      "text_zh": "Astra 先向 Pro 和 Business 用户推进，并在 Plus 推送前陆续出现在 ChatGPT Work 和 Codex 中。",
+      "url": "https://x.com/thsottiaux/status/2095961185262997556"
+    }
+  ]
+}
