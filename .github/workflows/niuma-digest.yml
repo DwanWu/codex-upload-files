@@ -28,6 +28,8 @@ jobs:
           python-version: "3.12"
 
       - name: Update 牛马消息 data
+        env:
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
         run: python scripts/update_niuma_digest.py
 
       - name: Refresh monthly heartbeat
