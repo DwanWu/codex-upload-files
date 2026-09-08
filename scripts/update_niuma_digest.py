@@ -5,6 +5,7 @@ import time
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -38,6 +39,7 @@ HEADERS = {
                   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
 }
 
 
@@ -50,16 +52,39 @@ def load_old():
         return {}
 
 
-def fetch_profile(handle):
-    url = f"https://syndication.twitter.com/srv/timeline-profile/screen-name/{handle}"
-    req = Request(url, headers=HEADERS)
-    with urlopen(req, timeout=20) as resp:
-        html = resp.read().decode("utf-8", errors="replace")
-    match = NEXT_DATA_RE.search(html)
-    if not match:
-        raise RuntimeError("missing __NEXT_DATA__")
-    data = json.loads(match.group(1))
-    return data.get("props", {}).get("pageProps", {}).get("timeline", {}).get("entries", [])
+def fetch_profile(handle, attempts=2):
+    url = f"https://syndication.twitter.com/srv/timeline-profile/screen-name/{handle}?dnt=true&lang=en"
+    last_error = None
+    for attempt in range(attempts):
+        req = Request(url, headers=HEADERS)
+        try:
+            with urlopen(req, timeout=20) as resp:
+                html = resp.read().decode("utf-8", errors="replace")
+            match = NEXT_DATA_RE.search(html)
+            if not match:
+                raise RuntimeError("missing __NEXT_DATA__")
+            data = json.loads(match.group(1))
+            return data.get("props", {}).get("pageProps", {}).get("timeline", {}).get("entries", [])
+        except HTTPError as exc:
+            last_error = exc
+            if exc.code != 429 or attempt >= attempts - 1:
+                raise
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            try:
+                delay = int(retry_after) if retry_after else 30
+            except Exception:
+                delay = 30
+            delay = max(15, min(delay, 60))
+            print(f"{handle}: rate limited; retry in {delay}s")
+            time.sleep(delay)
+        except Exception as exc:
+            last_error = exc
+            if attempt >= attempts - 1:
+                raise
+            time.sleep(8)
+    if last_error:
+        raise last_error
+    return []
 
 
 def parse_dt(value):
@@ -115,7 +140,6 @@ def summarize_zh(text, limit=52):
     if not s:
         return ""
 
-    # 只做稳定的文字压缩，不改产品名、方案名和数字。
     replacements = [
         ("已经", "已"),
         ("目前正在", "正"),
@@ -132,7 +156,6 @@ def summarize_zh(text, limit=52):
     if len(s) <= limit:
         return s
 
-    # 优先在句号、分号、逗号处收尾，避免截断关键短语。
     boundaries = []
     for m in re.finditer(r"[。；;，,！!？?]", s[:limit + 1]):
         if m.end() >= 24:
@@ -213,6 +236,11 @@ def main():
             print(f"{handle}: {type(exc).__name__}: {exc}")
         if idx < len(ACCOUNTS) - 1:
             time.sleep(20)
+
+    # 所有来源都被限流/失败时，绝不覆盖现有健康数据和摘要。
+    if ok == 0:
+        print("All X sources unavailable; preserving existing NiuMaDigest data unchanged")
+        return
 
     merged = {}
     for item in old_feed + fetched:
