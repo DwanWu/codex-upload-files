@@ -1,7 +1,7 @@
 # ==========================================
 # 📌 模块名称: 广东油价 Widget
 # ✨ 主要功能: 固定显示广东省 92/95/98 号汽油及柴油价格、涨跌和调价倒计时。
-# 🔗 https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/GuangdongOilPrice/GuangdongOilPrice.yaml
+# 🔗 https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/GDFuelPrice/GDFuelPrice.yaml
 # ==========================================
 
 name: "广东油价 Widget"
@@ -13,7 +13,7 @@ auto_update:
 scriptings:
   - generic:
       name: 广东油价
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/GuangdongOilPrice/GuangdongOilPrice.js?v=20260908-4
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/GDFuelPrice/GDFuelPrice.js?v=20260908-1
 
 widgets:
   - name: 广东油价
