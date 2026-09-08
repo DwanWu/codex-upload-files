@@ -1,22 +1,18 @@
 {
-  "updated_at": "2026-09-08T16:18:54.028546Z",
-  "last_success_at": "2026-09-08T16:18:54.028546Z",
+  "updated_at": "2026-09-08T18:52:29.492322Z",
+  "last_success_at": "2026-09-08T18:52:29.492322Z",
   "source": "x_syndication",
   "source_health": {
-    "x_api": {
-      "status": "not_configured",
-      "posts": 0
-    },
     "x_syndication": {
       "status": "partial",
       "accounts_ok": 1,
       "accounts_total": 4,
       "failed_accounts": [
         "thsottiaux",
-        "dkundel",
+        "nickbaumann_",
         "OpenAIDevs"
       ],
-      "posts": 2
+      "posts": 17
     }
   },
   "translation": "zh-CN",
@@ -41,7 +37,6 @@
       "name": "OpenAI Developers"
     }
   ],
-  "x_api_newest_id": null,
   "latest_reset": {
     "id": "2096035437299237298",
     "kind": "reset",
