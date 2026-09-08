@@ -150,7 +150,6 @@ function extractProvinceItems(current, history, targetKeys) {
   let provinceCheck = currentData.provinceCheck || null;
   let provinceData = currentData.provinceData || null;
 
-  // 某些接口响应只返回区域数组时，以广东返回的第一个有效区域作兼容兜底。
   if ((!provinceCheck || !provinceData) && Array.isArray(currentData.area) && currentData.area.length) {
     const fallbackArea = currentData.area.find(a => a?.areaCheck && a?.areaData) || currentData.area[0];
     provinceCheck = provinceCheck || fallbackArea?.areaCheck || null;
@@ -194,7 +193,7 @@ export default async function (ctx) {
   const now = new Date();
   const Y   = now.getFullYear();
   const P   = n => String(n).padStart(2, '0');
-  const updateTimeStr = `${P(now.getMonth()+1)}.${P(now.getDate())} ${P(now.getHours())}:${P(now.getMinutes())}`;
+  const updateTimeStr = `${P(now.getHours())}:${P(now.getMinutes())}`;
   const shortTimeStr = updateTimeStr;
 
   const C = {
@@ -365,7 +364,7 @@ export default async function (ctx) {
     return {
       type: 'widget', padding: 16, backgroundGradient,
       children: [
-        mkRow([mkIcon('fuelpump.circle.fill', C.red, 16), mkSpacer(4), mkText('广东油价加载失败', 15, 'heavy', C.main)], 0),
+        mkRow([mkIcon('fuelpump.fill', C.red, 16), mkSpacer(4), mkText('广东油价加载失败', 15, 'heavy', C.main)], 0),
         mkSpacer(8),
         mkText(fetchError, 11, 'medium', C.muted, { maxLines: 3 })
       ]
@@ -381,10 +380,9 @@ export default async function (ctx) {
       type: 'widget', padding: [12, 12, 8, 12], url: BASE, backgroundGradient,
       children: [
         mkRow([
-          mkIcon('fuelpump.circle.fill', C.main, 13), mkSpacer(4),
+          mkIcon('fuelpump.fill', C.red, 13), mkSpacer(4),
           mkText(`${REGION_NAME}油价`, 13, 'heavy', C.main),
           mkSpacer(),
-          mkIcon('arrow.triangle.2.circlepath', C.muted, 9), mkSpacer(2),
           mkText(shortTimeStr, 9, 'bold', C.muted, { family: 'Menlo' })
         ], 0),
         mkSpacer(7),
@@ -395,8 +393,8 @@ export default async function (ctx) {
         mkSpacer(7),
         mkRow([
           mkSpacer(),
-          mkIcon('clock.fill', nextAdjust.isUrgent ? C.red : C.muted, 9), mkSpacer(3),
-          mkText(`下轮调价: ${nextAdjust.dateStr}`, 9, 'bold', nextAdjust.isUrgent ? C.red : C.muted)
+          mkIcon('clock.fill', C.red, 9), mkSpacer(3),
+          mkText(`下轮调价: ${nextAdjust.dateStr}`, 9, 'bold', C.red)
         ], 0)
       ]
     };
@@ -408,12 +406,12 @@ export default async function (ctx) {
       valFz: 24, innerGap: 4, deltaFz: 12, deltaGap: 2,
       showCurve: true, curveWidth: 84, curveHeight: 26, curveGap: 5
     };
-    const infoColor = nextAdjust.isUrgent ? C.red : C.gold;
+    const infoColor = C.red;
     return {
       type: 'widget', padding: [16, 16, 14, 16], url: BASE, backgroundGradient,
       children: [
         mkRow([
-          mkIcon('fuelpump.circle.fill', C.main, 17), mkSpacer(4),
+          mkIcon('fuelpump.fill', C.red, 17), mkSpacer(4),
           mkText(`${REGION_NAME}油价`, 16, 'heavy', C.main), mkSpacer(),
           mkText('下轮调价: ', 12, 'medium', infoColor),
           mkText(nextAdjust.dateStr, 12, 'bold', infoColor),
@@ -432,7 +430,7 @@ export default async function (ctx) {
             mkRow([mkText(trendLabel, 11, 'medium', C.muted), mkText(trendInfo, 11, 'bold', trendColor, { maxLines: 1 })], 2)
           ] : []),
           mkSpacer(),
-          mkRow([mkIcon('arrow.triangle.2.circlepath', C.muted, 12), mkSpacer(4), mkText(updateTimeStr, 11, 'bold', C.muted, { family: 'Menlo' })], 0)
+          mkText(updateTimeStr, 11, 'bold', C.muted, { family: 'Menlo' })
         ], 0)
       ]
     };
@@ -442,13 +440,13 @@ export default async function (ctx) {
     radius: 13, padding: [12, 6, 12, 6], labelFz: 11, labelWeight: 'bold',
     valFz: 18, innerGap: 4, deltaFz: 11, deltaGap: 2
   };
-  const infoColorMed = nextAdjust.isUrgent ? C.red : C.gold;
+  const infoColorMed = C.red;
 
   return {
     type: 'widget', padding: [10, 12, 6, 12], url: BASE, backgroundGradient,
     children: [
       mkRow([
-        mkIcon('fuelpump.circle.fill', C.main, 16), mkSpacer(2),
+        mkIcon('fuelpump.fill', C.red, 16), mkSpacer(2),
         mkText(`${REGION_NAME}油价`, 15, 'heavy', C.main), mkSpacer(),
         mkText('下轮调价: ', 11, 'medium', infoColorMed),
         mkText(nextAdjust.dateStr, 11, 'bold', infoColorMed),
@@ -464,7 +462,7 @@ export default async function (ctx) {
           mkRow([mkText(trendLabel, 11, 'medium', C.muted), mkText(trendInfo, 11, 'bold', trendColor, { maxLines: 1 })], 2)
         ] : []),
         mkSpacer(),
-        mkRow([mkIcon('arrow.triangle.2.circlepath', C.muted, 11), mkSpacer(4), mkText(updateTimeStr, 10, 'bold', C.muted, { family: 'Menlo' })], 0)
+        mkText(updateTimeStr, 10, 'bold', C.muted, { family: 'Menlo' })
       ], 0)
     ]
   };
