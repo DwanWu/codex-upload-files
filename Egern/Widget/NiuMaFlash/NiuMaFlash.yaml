@@ -3,12 +3,12 @@
 # 🟣 图标: 紫色
 # ✨ 功能: 跟踪 X 上 Codex 重置/额度与更新/发布信息
 # 🌏 显示: 自动翻译为中文
-# 🎯 界面: 极简，只突出最新重点消息
+# 🎯 界面: 两条消息 iOS 后台任务式叠层展示
 # 👥 重点来源: Tibo / Dominik / Nick / OpenAI Developers
 # ==========================================
 
 name: "牛马消息"
-description: "极简显示 Tibo 等 Codex 团队成员及 OpenAI Developers 在 X 上发布的最新重点消息，并自动翻译成中文。"
+description: "以 iOS 后台任务式叠层效果显示最近两条 Codex 重点消息，自动翻译为中文。"
 
 auto_update:
   interval: 1800
@@ -16,7 +16,7 @@ auto_update:
 scriptings:
   - generic:
       name: 牛马消息
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaFlash/NiuMaFlash.js?v=20260908-1
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaFlash/NiuMaFlash.js?v=20260908-2
 
 widgets:
   - name: 牛马消息
