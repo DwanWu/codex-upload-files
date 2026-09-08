@@ -377,7 +377,7 @@ export default async function (ctx) {
       valFz: 14, innerGap: 1, deltaFz: 9, deltaGap: 1
     };
     return {
-      type: 'widget', padding: [12, 12, 8, 12], url: BASE, backgroundGradient,
+      type: 'widget', padding: [8, 12, 8, 12], url: BASE, backgroundGradient,
       children: [
         mkRow([
           mkIcon('fuelpump.circle.fill', C.red, 13), mkSpacer(4),
@@ -408,7 +408,7 @@ export default async function (ctx) {
     };
     const infoColor = C.red;
     return {
-      type: 'widget', padding: [16, 16, 14, 16], url: BASE, backgroundGradient,
+      type: 'widget', padding: [10, 16, 14, 16], url: BASE, backgroundGradient,
       children: [
         mkRow([
           mkIcon('fuelpump.circle.fill', C.red, 17), mkSpacer(4),
@@ -443,7 +443,7 @@ export default async function (ctx) {
   const infoColorMed = C.red;
 
   return {
-    type: 'widget', padding: [10, 12, 6, 12], url: BASE, backgroundGradient,
+    type: 'widget', padding: [4, 12, 6, 12], url: BASE, backgroundGradient,
     children: [
       mkRow([
         mkIcon('fuelpump.circle.fill', C.red, 16), mkSpacer(2),
@@ -452,9 +452,9 @@ export default async function (ctx) {
         mkText(nextAdjust.dateStr, 11, 'bold', infoColorMed),
         mkText(` ${nextAdjust.countdown}`, 11, 'bold', infoColorMed)
       ], 0),
-      mkSpacer(24),
+      mkSpacer(),
       mkRow(PRICE_ITEMS.map(item => buildPriceCard(item, cardCfgMed)), 6),
-      mkSpacer(15),
+      mkSpacer(),
       { type: 'stack', height: 0.5, backgroundColor: C.divider, borderRadius: 1, children: [] },
       mkSpacer(8),
       mkRow([
