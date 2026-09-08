@@ -47,6 +47,15 @@ export default async function (ctx) {
     return `${p(t.getUTCMonth() + 1)}.${p(t.getUTCDate())} ${p(t.getUTCHours())}:${p(t.getUTCMinutes())}`;
   };
 
+  const fmtSyncTime = value => {
+    if (!value) return '--:--';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '--:--';
+    const t = new Date(d.getTime() + 8 * 3600 * 1000);
+    const p = n => String(n).padStart(2, '0');
+    return `${p(t.getUTCHours())}:${p(t.getUTCMinutes())}`;
+  };
+
   const clean = s => String(s || '')
     .replace(/https?:\/\/t\.co\/\w+/g, '')
     .replace(/\s+/g, ' ')
@@ -66,6 +75,7 @@ export default async function (ctx) {
     error = e?.message || String(e);
   }
 
+  const syncTime = fmtSyncTime(data?.updated_at);
   const feed = Array.isArray(data?.feed) ? data.feed : [];
   const reset = data?.latest_reset || feed.find(x => x.kind === 'reset') || null;
   const update = data?.latest_update || feed.find(x => x.kind === 'update') || null;
@@ -80,7 +90,9 @@ export default async function (ctx) {
         spacer(10),
         text('暂未获取到 Codex 动态', 12, 'bold', C.sub),
         spacer(4),
-        text(error || '等待 Tibo 等账号的新消息', 10, 'medium', C.muted, { maxLines: 3 })
+        text(error || '等待 Tibo 等账号的新消息', 10, 'medium', C.muted, { maxLines: 3 }),
+        spacer(),
+        text(`同步时间：${syncTime}`, 9, 'medium', C.muted)
       ]
     };
   }
@@ -121,7 +133,7 @@ export default async function (ctx) {
         spacer(10),
         eventRow(item, kind, true),
         spacer(),
-        text('Tibo 等 · 中文 X 动态', 8, 'medium', C.muted)
+        text(`同步时间：${syncTime}`, 8, 'medium', C.muted)
       ]
     };
   }
@@ -144,7 +156,7 @@ export default async function (ctx) {
         spacer(12),
         col(rows, 9, { flex: 1 }),
         spacer(6),
-        text('重置/额度 · 更新/发布 · 中文翻译 · 每小时同步 X', 9, 'medium', C.muted)
+        text(`同步时间：${syncTime}`, 9, 'medium', C.muted)
       ]
     };
   }
@@ -165,7 +177,7 @@ export default async function (ctx) {
       spacer(9),
       eventRow(update, 'update', false),
       spacer(),
-      text('每小时同步 X · 自动翻译中文 · 点击打开原帖', 9, 'medium', C.muted)
+      text(`同步时间：${syncTime}`, 9, 'medium', C.muted)
     ]
   };
 }
