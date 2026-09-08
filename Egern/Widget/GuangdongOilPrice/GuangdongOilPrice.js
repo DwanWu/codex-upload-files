@@ -376,8 +376,8 @@ export default async function (ctx) {
       radius: 10, padding: [4, 2, 4, 2], labelFz: 10, labelWeight: 'bold',
       valFz: 14, innerGap: 1, deltaFz: 9, deltaGap: 1
     };
-    const content = {
-      type: 'stack', direction: 'column',
+    return {
+      type: 'widget', padding: 12, url: BASE, backgroundGradient,
       children: [
         mkRow([
           mkIcon('fuelpump.circle.fill', C.red, 13), mkSpacer(4),
@@ -386,9 +386,9 @@ export default async function (ctx) {
           mkText(shortTimeStr, 9, 'bold', C.muted, { family: 'Menlo' })
         ], 0),
         mkSpacer(8),
-        { type: 'stack', direction: 'column', gap: 8, children: [
-          mkRow(PRICE_ITEMS.slice(0, 2).map(item => buildPriceCard(item, cardCfg)), 6),
-          mkRow(PRICE_ITEMS.slice(2, 4).map(item => buildPriceCard(item, cardCfg)), 6)
+        { type: 'stack', direction: 'column', gap: 8, flex: 1, children: [
+          mkRow(PRICE_ITEMS.slice(0, 2).map(item => buildPriceCard(item, cardCfg)), 6, { flex: 1 }),
+          mkRow(PRICE_ITEMS.slice(2, 4).map(item => buildPriceCard(item, cardCfg)), 6, { flex: 1 })
         ]},
         mkSpacer(8),
         mkRow([
@@ -397,10 +397,6 @@ export default async function (ctx) {
           mkText(`下轮调价: ${nextAdjust.dateStr}`, 9, 'bold', C.red)
         ], 0)
       ]
-    };
-    return {
-      type: 'widget', padding: [6, 12, 6, 12], url: BASE, backgroundGradient,
-      children: [mkSpacer(), content, mkSpacer()]
     };
   }
 
@@ -411,8 +407,8 @@ export default async function (ctx) {
       showCurve: true, curveWidth: 84, curveHeight: 26, curveGap: 5
     };
     const infoColor = C.red;
-    const content = {
-      type: 'stack', direction: 'column',
+    return {
+      type: 'widget', padding: 16, url: BASE, backgroundGradient,
       children: [
         mkRow([
           mkIcon('fuelpump.circle.fill', C.red, 17), mkSpacer(4),
@@ -421,12 +417,12 @@ export default async function (ctx) {
           mkText(nextAdjust.dateStr, 12, 'bold', infoColor),
           mkText(` ${nextAdjust.countdown}`, 12, 'bold', infoColor)
         ], 0),
-        mkSpacer(14),
-        { type: 'stack', direction: 'column', gap: 12, children: [
-          mkRow(PRICE_ITEMS.slice(0, 2).map(item => buildPriceCard(item, cardCfg)), 12),
-          mkRow(PRICE_ITEMS.slice(2, 4).map(item => buildPriceCard(item, cardCfg)), 12)
-        ]},
         mkSpacer(12),
+        { type: 'stack', direction: 'column', gap: 12, flex: 1, children: [
+          mkRow(PRICE_ITEMS.slice(0, 2).map(item => buildPriceCard(item, cardCfg)), 12, { flex: 1 }),
+          mkRow(PRICE_ITEMS.slice(2, 4).map(item => buildPriceCard(item, cardCfg)), 12, { flex: 1 })
+        ]},
+        mkSpacer(10),
         { type: 'stack', height: 0.5, backgroundColor: C.divider, borderRadius: 1, children: [] },
         mkSpacer(8),
         mkRow([
@@ -438,10 +434,6 @@ export default async function (ctx) {
         ], 0)
       ]
     };
-    return {
-      type: 'widget', padding: [10, 16, 10, 16], url: BASE, backgroundGradient,
-      children: [mkSpacer(), content, mkSpacer()]
-    };
   }
 
   const cardCfgMed = {
@@ -449,8 +441,9 @@ export default async function (ctx) {
     valFz: 18, innerGap: 4, deltaFz: 11, deltaGap: 2
   };
   const infoColorMed = C.red;
-  const content = {
-    type: 'stack', direction: 'column',
+
+  return {
+    type: 'widget', padding: 13, url: BASE, backgroundGradient,
     children: [
       mkRow([
         mkIcon('fuelpump.circle.fill', C.red, 16), mkSpacer(2),
@@ -459,11 +452,9 @@ export default async function (ctx) {
         mkText(nextAdjust.dateStr, 11, 'bold', infoColorMed),
         mkText(` ${nextAdjust.countdown}`, 11, 'bold', infoColorMed)
       ], 0),
-      mkSpacer(14),
+      mkSpacer(12),
       mkRow(PRICE_ITEMS.map(item => buildPriceCard(item, cardCfgMed)), 6),
-      mkSpacer(14),
-      { type: 'stack', height: 0.5, backgroundColor: C.divider, borderRadius: 1, children: [] },
-      mkSpacer(8),
+      mkSpacer(),
       mkRow([
         ...(hasTrendData ? [
           mkRow([mkText(trendLabel, 11, 'medium', C.muted), mkText(trendInfo, 11, 'bold', trendColor, { maxLines: 1 })], 2)
@@ -472,10 +463,5 @@ export default async function (ctx) {
         mkText(updateTimeStr, 10, 'bold', C.muted, { family: 'Menlo' })
       ], 0)
     ]
-  };
-
-  return {
-    type: 'widget', padding: [6, 12, 6, 12], url: BASE, backgroundGradient,
-    children: [mkSpacer(), content, mkSpacer()]
   };
 }
