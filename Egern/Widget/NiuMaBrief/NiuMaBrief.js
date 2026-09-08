@@ -1,6 +1,6 @@
 /**
  * 牛马消息 - 黄历查询式排版
- * 顶部标题 + Codex + 重置/更新双信息块 + 底部同步时间。
+ * 顶部标题 + Codex + 重置/更新双信息块 + 最新消息发布日期。
  */
 
 const DATA_URL = 'https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaBrief/NiuMaBrief.json';
@@ -13,7 +13,6 @@ export default async function (ctx) {
   const C = {
     bg: [{ light: '#FFFFFF', dark: '#1C1C1E' }, { light: '#F8F7FB', dark: '#111113' }],
     main: { light: '#1C1C1E', dark: '#FFFFFF' },
-    sub: { light: '#48484A', dark: '#D1D1D6' },
     muted: { light: '#8E8E93', dark: '#8E8E93' },
     purple: { light: '#7C3AED', dark: '#A78BFA' },
     pink: { light: '#DB2777', dark: '#F472B6' },
@@ -33,9 +32,6 @@ export default async function (ctx) {
   const row = (children, gap = 5, opts = {}) => ({
     type: 'stack', direction: 'row', alignItems: 'center', gap, children, ...opts
   });
-  const col = (children, gap = 5, opts = {}) => ({
-    type: 'stack', direction: 'column', gap, children, ...opts
-  });
   const icon = (name, color, size = 13) => ({
     type: 'image', src: `sf-symbol:${name}`, color, width: size, height: size
   });
@@ -52,15 +48,13 @@ export default async function (ctx) {
 
   const displayText = item => clean(item?.text_zh || item?.translation || item?.text || item?.summary || '暂无消息');
 
-  const fmt = (value, mode = 'full') => {
-    if (!value) return mode === 'time' ? '--:--' : '--.-- --:--';
+  const fmtDate = value => {
+    if (!value) return '--.--';
     const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return mode === 'time' ? '--:--' : '--.-- --:--';
+    if (Number.isNaN(d.getTime())) return '--.--';
     const t = new Date(d.getTime() + 8 * 3600 * 1000);
     const p = n => String(n).padStart(2, '0');
-    if (mode === 'time') return `${p(t.getUTCHours())}:${p(t.getUTCMinutes())}`;
-    if (mode === 'date') return `${p(t.getUTCMonth() + 1)}.${p(t.getUTCDate())}`;
-    return `${p(t.getUTCMonth() + 1)}.${p(t.getUTCDate())} ${p(t.getUTCHours())}:${p(t.getUTCMinutes())}`;
+    return `${p(t.getUTCMonth() + 1)}.${p(t.getUTCDate())}`;
   };
 
   let data = null;
@@ -81,7 +75,7 @@ export default async function (ctx) {
   const latest = [reset, update].filter(Boolean)
     .sort((a, b) => new Date(b?.created_at || 0) - new Date(a?.created_at || 0))[0] || null;
 
-  const syncTime = fmt(data?.updated_at, 'time');
+  const latestDate = fmtDate(latest?.created_at);
   const latestUrl = latest?.url || 'https://x.com/thsottiaux';
 
   const header = size => row([
@@ -92,20 +86,15 @@ export default async function (ctx) {
   ], 6);
 
   const messageBlock = (label, item, color, ico, maxLines, fontSize) => ({
-    type: 'stack', direction: 'row', alignItems: 'start', gap: 7,
+    type: 'stack', direction: 'row', alignItems: 'start', gap: 8,
     children: [
       {
         type: 'stack', direction: 'row', alignItems: 'center', gap: 3, width: 48,
         children: [icon(ico, color, 13), text(label, 12, 'heavy', color)]
       },
-      col([
-        text(item ? displayText(item) : '暂无消息', fontSize, 'medium', item ? color : C.muted, {
-          flex: 1, maxLines, minScale: 0.68
-        }),
-        ...(item ? [text(`${item.author_name || item.handle || 'X'} · ${fmt(item.created_at)}`, 8, 'medium', C.muted, {
-          maxLines: 1, minScale: 0.72
-        })] : [])
-      ], 4, { flex: 1 })
+      text(item ? displayText(item) : '暂无消息', fontSize, 'medium', item ? color : C.muted, {
+        flex: 1, maxLines, minScale: 0.68
+      })
     ]
   });
 
@@ -117,11 +106,11 @@ export default async function (ctx) {
         spacer(12),
         text('Codex', 15, 'heavy', C.main),
         spacer(8),
-        text('暂无新消息', 13, 'heavy', C.main),
+        text('暂无新消息', 14, 'heavy', C.main),
         spacer(5),
-        text(error || '等待下一次数据同步', 10, 'medium', C.muted, { maxLines: 2 }),
+        text(error || '等待下一次数据同步', 11, 'medium', C.muted, { maxLines: 2 }),
         spacer(),
-        row([text('Tibo 等', 9, 'bold', C.muted), spacer(), text(syncTime, 9, 'bold', C.muted)])
+        row([text('Tibo 等', 9, 'bold', C.muted), spacer(), text(latestDate, 9, 'bold', C.muted)])
       ]
     };
   }
@@ -137,20 +126,20 @@ export default async function (ctx) {
         row([
           icon('arrow.clockwise.circle.fill', C.pink, 11),
           text('重置', 10, 'heavy', C.pink),
-          text(reset ? displayText(reset) : '暂无消息', 9, 'medium', reset ? C.pink : C.muted, {
-            flex: 1, maxLines: 1, minScale: 0.58
+          text(reset ? displayText(reset) : '暂无消息', 10, 'medium', reset ? C.pink : C.muted, {
+            flex: 1, maxLines: 2, minScale: 0.58
           })
         ], 5),
         spacer(8),
         row([
           icon('sparkles', C.blue, 11),
           text('更新', 10, 'heavy', C.blue),
-          text(update ? displayText(update) : '暂无消息', 9, 'medium', update ? C.blue : C.muted, {
-            flex: 1, maxLines: 1, minScale: 0.58
+          text(update ? displayText(update) : '暂无消息', 10, 'medium', update ? C.blue : C.muted, {
+            flex: 1, maxLines: 2, minScale: 0.58
           })
         ], 5),
         spacer(),
-        row([text('Tibo 等', 8, 'bold', C.muted), spacer(), text(syncTime, 8, 'bold', C.muted)])
+        row([text('Tibo 等', 8, 'bold', C.muted), spacer(), text(latestDate, 8, 'bold', C.muted)])
       ]
     };
   }
@@ -165,14 +154,14 @@ export default async function (ctx) {
         spacer(10),
         { type: 'stack', height: 0.5, backgroundColor: C.divider, children: [] },
         spacer(12),
-        messageBlock('重置', reset, C.pink, 'arrow.clockwise.circle.fill', 4, 14),
-        spacer(16),
-        messageBlock('更新', update, C.blue, 'sparkles', 4, 14),
+        messageBlock('重置', reset, C.pink, 'arrow.clockwise.circle.fill', 5, 16),
+        spacer(18),
+        messageBlock('更新', update, C.blue, 'sparkles', 5, 16),
         spacer(),
         row([
           text('Tibo · Dominik · Nick · OpenAI Developers', 9, 'medium', C.muted, { maxLines: 1, minScale: 0.72 }),
           spacer(),
-          text(syncTime, 9, 'bold', C.muted)
+          text(latestDate, 10, 'bold', C.muted)
         ])
       ]
     };
@@ -185,14 +174,14 @@ export default async function (ctx) {
       spacer(9),
       text('Codex', 15, 'heavy', C.main),
       spacer(10),
-      messageBlock('重置', reset, C.pink, 'arrow.clockwise.circle.fill', 2, 12),
-      spacer(11),
-      messageBlock('更新', update, C.blue, 'sparkles', 2, 12),
+      messageBlock('重置', reset, C.pink, 'arrow.clockwise.circle.fill', 3, 14),
+      spacer(13),
+      messageBlock('更新', update, C.blue, 'sparkles', 3, 14),
       spacer(),
       row([
         text('Tibo 等', 9, 'bold', C.muted),
         spacer(),
-        text(syncTime, 9, 'bold', C.muted)
+        text(latestDate, 10, 'bold', C.muted)
       ])
     ]
   };
