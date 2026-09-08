@@ -1,6 +1,6 @@
 {
-  "updated_at": "2026-09-08T15:44:09.401010Z",
-  "last_success_at": "2026-09-08T15:44:09.401032Z",
+  "updated_at": "2026-09-08T15:56:47.970413Z",
+  "last_success_at": "2026-09-08T15:56:47.970413Z",
   "source": "x_syndication",
   "source_health": {
     "x_api": {
@@ -8,17 +8,20 @@
       "posts": 0
     },
     "x_syndication": {
-      "status": "ok",
-      "accounts_ok": 4,
+      "status": "partial",
+      "accounts_ok": 2,
       "accounts_total": 4,
-      "failed_accounts": [],
-      "posts": 163
+      "failed_accounts": [
+        "thsottiaux",
+        "dkundel"
+      ],
+      "posts": 18
     }
   },
   "translation": "zh-CN",
   "summary": "zh-CN-compact",
   "accounts_total": 4,
-  "accounts_ok": 4,
+  "accounts_ok": 2,
   "accounts": [
     {
       "handle": "thsottiaux",
