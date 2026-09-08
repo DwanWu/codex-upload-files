@@ -341,11 +341,11 @@ export default async function (ctx) {
       backgroundColor: C.card, borderRadius: config.radius, padding: config.padding,
       children: [
         mkSpacer(),
-        mkText(item.label, config.labelFz, config.labelWeight, item.color),
+        mkText(item.label, config.labelFz, config.labelWeight, item.color, { maxLines: 1, minScale: 0.78 }),
         mkSpacer(config.innerGap),
-        mkText(item.val, config.valFz, 'heavy', C.main),
+        mkText(item.val, config.valFz, 'heavy', C.main, { maxLines: 1, minScale: 0.74 }),
         mkSpacer(config.deltaGap ?? 2),
-        delta ? mkText(delta.text, config.deltaFz, 'bold', delta.color) : mkText(' ', config.deltaFz, 'bold', C.muted),
+        delta ? mkText(delta.text, config.deltaFz, 'bold', delta.color, { maxLines: 1, minScale: 0.74 }) : mkText(' ', config.deltaFz, 'bold', C.muted, { maxLines: 1 }),
         ...(svgUrl ? [
           mkSpacer(config.curveGap ?? 6),
           { type: 'image', src: svgUrl, width: config.curveWidth, height: config.curveHeight, resizable: true, resizeMode: 'contain' }
@@ -437,30 +437,38 @@ export default async function (ctx) {
   }
 
   const cardCfgMed = {
-    radius: 13, padding: [12, 6, 12, 6], labelFz: 11, labelWeight: 'bold',
-    valFz: 18, innerGap: 4, deltaFz: 11, deltaGap: 2
+    radius: 12, padding: [10, 4, 10, 4], labelFz: 11, labelWeight: 'bold',
+    valFz: 17, innerGap: 3, deltaFz: 10, deltaGap: 2
   };
   const infoColorMed = C.red;
+  const adjustText = `下轮调价 ${nextAdjust.dateStr}${nextAdjust.countdown ? ` ${nextAdjust.countdown}` : ''}`;
 
   return {
     type: 'widget', padding: 13, url: BASE, backgroundGradient,
     children: [
       mkRow([
-        mkIcon('fuelpump.circle.fill', C.red, 16), mkSpacer(2),
-        mkText(`${REGION_NAME}油价`, 15, 'heavy', C.main), mkSpacer(),
-        mkText('下轮调价: ', 11, 'medium', infoColorMed),
-        mkText(nextAdjust.dateStr, 11, 'bold', infoColorMed),
-        mkText(` ${nextAdjust.countdown}`, 11, 'bold', infoColorMed)
+        mkIcon('fuelpump.circle.fill', C.red, 16), mkSpacer(4),
+        mkText(`${REGION_NAME}油价`, 15, 'heavy', C.main, { maxLines: 1 }),
+        mkSpacer(),
+        mkText(adjustText, 10, 'bold', infoColorMed, { maxLines: 1, minScale: 0.72 })
       ], 0),
-      mkSpacer(12),
-      mkRow(PRICE_ITEMS.map(item => buildPriceCard(item, cardCfgMed)), 6),
-      mkSpacer(),
+      {
+        type: 'stack', direction: 'column', flex: 1,
+        children: [
+          mkSpacer(),
+          mkRow(PRICE_ITEMS.map(item => buildPriceCard(item, cardCfgMed)), 7, { height: 82 }),
+          mkSpacer()
+        ]
+      },
       mkRow([
         ...(hasTrendData ? [
-          mkRow([mkText(trendLabel, 11, 'medium', C.muted), mkText(trendInfo, 11, 'bold', trendColor, { maxLines: 1 })], 2)
+          mkRow([
+            mkText(trendLabel, 10, 'medium', C.muted, { maxLines: 1, minScale: 0.8 }),
+            mkText(trendInfo, 10, 'bold', trendColor, { maxLines: 1, minScale: 0.8 })
+          ], 2)
         ] : []),
         mkSpacer(),
-        mkText(updateTimeStr, 10, 'bold', C.muted, { family: 'Menlo' })
+        mkText(updateTimeStr, 10, 'bold', C.muted, { family: 'Menlo', maxLines: 1 })
       ], 0)
     ]
   };
