@@ -7,7 +7,7 @@
 # ==========================================
 
 name: "节点体检"
-description: "节点体检居中布局：顶部标题固定，中间纯度/属性/风险结果在可用区域垂直居中，底部固定显示内网 IP 与出口 IP。"
+description: "节点体检居中布局：顶部标题固定，中间纯度/属性/风险结果在可用区域垂直居中，底部将内网 IP 与出口 IP 合并为同一行显示。"
 
 auto_update:
   interval: 1800
@@ -15,7 +15,7 @@ auto_update:
 scriptings:
   - generic:
       name: 节点体检
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeVitals/NodeVitals.js?v=20260908-1
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeVitals/NodeVitals.js?v=20260908-2
 
 widgets:
   - name: 节点体检

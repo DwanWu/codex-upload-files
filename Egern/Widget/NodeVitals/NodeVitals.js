@@ -130,11 +130,18 @@ export default async function (ctx) {
     text(country, regionSize, 'heavy', C.green, { maxLines: 1, minScale: 0.65 })
   ], 0);
 
-  const ipItem = (label, value, labelSize, valueSize, align = 'start') => ({
-    type: 'stack', direction: 'column', alignItems: align, children: [
-      text(label, labelSize, 'medium', C.muted, { maxLines: 1 }),
-      spacer(2),
-      text(value, valueSize, 'bold', C.main, { maxLines: 1, minScale: 0.48 })
+  const ipInline = (label, value, size) => row([
+    text(label, size, 'medium', C.muted, { maxLines: 1 }),
+    spacer(4),
+    text(value, size, 'bold', C.main, { maxLines: 1, minScale: 0.58 })
+  ], 0);
+
+  const centeredBody = (cfg, gap, height) => ({
+    type: 'stack', direction: 'column', flex: 1,
+    children: [
+      spacer(),
+      row(cards.map(x => buildCard(x, cfg)), gap, { height }),
+      spacer()
     ]
   });
 
@@ -144,69 +151,42 @@ export default async function (ctx) {
       type: 'widget', padding: 12, backgroundGradient,
       children: [
         header(14, 13, 10),
-        {
-          type: 'stack', direction: 'column', flex: 1,
-          children: [
-            spacer(),
-            row(cards.map(x => buildCard(x, cfg)), 6, { height: 64 }),
-            spacer()
-          ]
-        },
-        divider(),
-        spacer(7),
+        centeredBody(cfg, 6, 62),
         row([
-          ipItem('内网 IP', internalIP, 7, 8, 'start'),
+          ipInline('内网 IP', internalIP, 7),
           spacer(),
-          ipItem('出口 IP', exitIP, 7, 8, 'end')
+          ipInline('出口 IP', exitIP, 7)
         ], 0)
       ]
     };
   }
 
   if (isLarge) {
-    const cfg = { radius: 14, padding: [18, 6, 18, 6], labelSize: 14, valueSize: 28, gap: 8 };
+    const cfg = { radius: 14, padding: [16, 6, 16, 6], labelSize: 14, valueSize: 28, gap: 8 };
     return {
       type: 'widget', padding: 16, backgroundGradient,
       children: [
         header(18, 17, 14),
-        {
-          type: 'stack', direction: 'column', flex: 1,
-          children: [
-            spacer(),
-            row(cards.map(x => buildCard(x, cfg)), 12, { height: 150 }),
-            spacer()
-          ]
-        },
-        divider(),
-        spacer(10),
+        centeredBody(cfg, 12, 140),
         row([
-          ipItem('内网 IP', internalIP, 10, 12, 'start'),
+          ipInline('内网 IP', internalIP, 11),
           spacer(),
-          ipItem('出口 IP', exitIP, 10, 12, 'end')
+          ipInline('出口 IP', exitIP, 11)
         ], 0)
       ]
     };
   }
 
-  const cfg = { radius: 12, padding: [12, 5, 12, 5], labelSize: 11, valueSize: 21, gap: 4 };
+  const cfg = { radius: 12, padding: [11, 5, 11, 5], labelSize: 11, valueSize: 21, gap: 4 };
   return {
     type: 'widget', padding: 13, backgroundGradient,
     children: [
       header(16, 15, 12),
-      {
-        type: 'stack', direction: 'column', flex: 1,
-        children: [
-          spacer(),
-          row(cards.map(x => buildCard(x, cfg)), 8, { height: 82 }),
-          spacer()
-        ]
-      },
-      divider(),
-      spacer(8),
+      centeredBody(cfg, 8, 78),
       row([
-        ipItem('内网 IP', internalIP, 9, 10, 'start'),
+        ipInline('内网 IP', internalIP, 9),
         spacer(),
-        ipItem('出口 IP', exitIP, 9, 10, 'end')
+        ipInline('出口 IP', exitIP, 9)
       ], 0)
     ]
   };
