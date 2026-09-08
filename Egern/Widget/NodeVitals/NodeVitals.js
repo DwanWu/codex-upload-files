@@ -115,7 +115,7 @@ export default async function (ctx) {
     backgroundColor: C.card, borderRadius: cfg.radius, padding: cfg.padding,
     children: [
       spacer(),
-      text(item.label, cfg.labelSize, 'bold', item.color, { maxLines: 1 }),
+      text(item.label, cfg.labelSize, 'bold', item.color, { maxLines: 1, minScale: 0.75 }),
       spacer(cfg.gap),
       text(item.value, cfg.valueSize, 'heavy', item.color, { maxLines: 1, minScale: 0.55 }),
       spacer()
@@ -134,19 +134,24 @@ export default async function (ctx) {
     type: 'stack', direction: 'column', alignItems: align, children: [
       text(label, labelSize, 'medium', C.muted, { maxLines: 1 }),
       spacer(2),
-      text(value, valueSize, 'bold', C.main, { maxLines: 1, minScale: 0.55 })
+      text(value, valueSize, 'bold', C.main, { maxLines: 1, minScale: 0.48 })
     ]
   });
 
   if (isSmall) {
-    const cfg = { radius: 10, padding: [7, 2, 7, 2], labelSize: 9, valueSize: 15, gap: 3 };
+    const cfg = { radius: 10, padding: [7, 2, 7, 2], labelSize: 9, valueSize: 14, gap: 3 };
     return {
-      type: 'widget', padding: [11, 11, 8, 11], backgroundGradient,
+      type: 'widget', padding: 12, backgroundGradient,
       children: [
         header(14, 13, 10),
-        spacer(14),
-        row(cards.map(x => buildCard(x, cfg)), 6, { flex: 1 }),
-        spacer(10),
+        {
+          type: 'stack', direction: 'column', flex: 1,
+          children: [
+            spacer(),
+            row(cards.map(x => buildCard(x, cfg)), 6, { height: 64 }),
+            spacer()
+          ]
+        },
         divider(),
         spacer(7),
         row([
@@ -159,14 +164,19 @@ export default async function (ctx) {
   }
 
   if (isLarge) {
-    const cfg = { radius: 14, padding: [22, 6, 22, 6], labelSize: 14, valueSize: 30, gap: 8 };
+    const cfg = { radius: 14, padding: [18, 6, 18, 6], labelSize: 14, valueSize: 28, gap: 8 };
     return {
-      type: 'widget', padding: [16, 16, 12, 16], backgroundGradient,
+      type: 'widget', padding: 16, backgroundGradient,
       children: [
         header(18, 17, 14),
-        spacer(28),
-        row(cards.map(x => buildCard(x, cfg)), 12, { flex: 1 }),
-        spacer(22),
+        {
+          type: 'stack', direction: 'column', flex: 1,
+          children: [
+            spacer(),
+            row(cards.map(x => buildCard(x, cfg)), 12, { height: 150 }),
+            spacer()
+          ]
+        },
         divider(),
         spacer(10),
         row([
@@ -178,14 +188,19 @@ export default async function (ctx) {
     };
   }
 
-  const cfg = { radius: 13, padding: [14, 6, 14, 6], labelSize: 11, valueSize: 22, gap: 5 };
+  const cfg = { radius: 12, padding: [12, 5, 12, 5], labelSize: 11, valueSize: 21, gap: 4 };
   return {
-    type: 'widget', padding: [10, 12, 6, 12], backgroundGradient,
+    type: 'widget', padding: 13, backgroundGradient,
     children: [
       header(16, 15, 12),
-      spacer(24),
-      row(cards.map(x => buildCard(x, cfg)), 8),
-      spacer(15),
+      {
+        type: 'stack', direction: 'column', flex: 1,
+        children: [
+          spacer(),
+          row(cards.map(x => buildCard(x, cfg)), 8, { height: 82 }),
+          spacer()
+        ]
+      },
       divider(),
       spacer(8),
       row([
