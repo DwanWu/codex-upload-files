@@ -5,6 +5,7 @@ import time
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,7 @@ UPDATE_RE = re.compile(
     re.I,
 )
 CODEX_RE = re.compile(r"\b(codex|chatgpt work|astra)\b", re.I)
+CJK_RE = re.compile(r"[\u3400-\u9fff]")
 NEXT_DATA_RE = re.compile(
     r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', re.S
 )
@@ -78,6 +80,33 @@ def parse_dt(value):
 def normalize_text(value):
     s = re.sub(r"https?://t\.co/\w+", "", str(value or ""))
     return re.sub(r"\s+", " ", s).strip()
+
+
+def translate_zh(text):
+    text = normalize_text(text)
+    if not text:
+        return ""
+    if CJK_RE.search(text):
+        return text
+
+    params = urlencode({
+        "client": "gtx",
+        "sl": "auto",
+        "tl": "zh-CN",
+        "dt": "t",
+        "q": text,
+    })
+    url = f"https://translate.googleapis.com/translate_a/single?{params}"
+    req = Request(url, headers={"User-Agent": HEADERS["User-Agent"], "Accept": "application/json"})
+    with urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read().decode("utf-8", errors="replace"))
+
+    parts = []
+    if isinstance(data, list) and data and isinstance(data[0], list):
+        for seg in data[0]:
+            if isinstance(seg, list) and seg and seg[0]:
+                parts.append(str(seg[0]))
+    return normalize_text("".join(parts))
 
 
 def classify(handle, text):
@@ -151,10 +180,30 @@ def main():
     merged = {}
     for item in old_feed + fetched:
         item_id = str(item.get("id") or "")
-        if item_id:
-            merged[item_id] = item
+        if not item_id:
+            continue
+        previous = merged.get(item_id)
+        if previous and previous.get("text") == item.get("text") and previous.get("text_zh") and not item.get("text_zh"):
+            item = dict(item)
+            item["text_zh"] = previous["text_zh"]
+        merged[item_id] = item
 
     feed = sorted(merged.values(), key=sort_key, reverse=True)[:30]
+
+    translated = 0
+    for item in feed:
+        if item.get("text_zh"):
+            continue
+        try:
+            zh = translate_zh(item.get("text", ""))
+            if zh:
+                item["text_zh"] = zh[:420]
+                translated += 1
+                print(f"translated: {item.get('id')} -> {item['text_zh'][:60]}")
+        except Exception as exc:
+            print(f"translate {item.get('id')}: {type(exc).__name__}: {exc}")
+        time.sleep(0.6)
+
     latest_reset = next((x for x in feed if x.get("kind") == "reset"), None)
     latest_update = next((x for x in feed if x.get("kind") == "update"), None)
 
@@ -166,6 +215,7 @@ def main():
     payload = {
         "updated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "source": "x_syndication",
+        "translation": "zh-CN",
         "accounts_total": len(ACCOUNTS),
         "accounts_ok": ok,
         "accounts": accounts,
@@ -174,16 +224,16 @@ def main():
         "feed": feed,
     }
 
-    old_ids = [(x.get("id"), x.get("kind"), x.get("text")) for x in old_feed]
-    new_ids = [(x.get("id"), x.get("kind"), x.get("text")) for x in feed]
+    old_state = [(x.get("id"), x.get("kind"), x.get("text"), x.get("text_zh")) for x in old_feed]
+    new_state = [(x.get("id"), x.get("kind"), x.get("text"), x.get("text_zh")) for x in feed]
     old_ok = old.get("accounts_ok")
-    if old_ids == new_ids and old_ok == ok:
+    if old_state == new_state and old_ok == ok and old.get("translation") == "zh-CN":
         print("No Codex X content changes")
         return
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"Updated {OUT} with {len(feed)} posts; {ok}/{len(ACCOUNTS)} sources available")
+    print(f"Updated {OUT} with {len(feed)} posts; {translated} translated; {ok}/{len(ACCOUNTS)} sources available")
 
 
 if __name__ == "__main__":
