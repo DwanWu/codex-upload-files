@@ -3,14 +3,19 @@ name: Update 牛马消息
 on:
   workflow_dispatch:
   schedule:
-    - cron: "11 * * * *"
+    - cron: "37 * * * *"
 
 permissions:
   contents: write
 
+concurrency:
+  group: niuma-digest-update
+  cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
       - name: Checkout
         uses: actions/checkout@v4
