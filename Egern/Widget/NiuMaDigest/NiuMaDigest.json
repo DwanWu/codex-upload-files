@@ -1,15 +1,27 @@
 {
-  "updated_at": "2026-09-08T02:50:00Z",
+  "updated_at": "2026-09-08T14:57:36.126843Z",
   "source": "x_syndication",
   "translation": "zh-CN",
   "summary": "zh-CN-compact",
   "accounts_total": 4,
-  "accounts_ok": 4,
+  "accounts_ok": 2,
   "accounts": [
-    {"handle": "thsottiaux", "name": "Tibo"},
-    {"handle": "dkundel", "name": "Dominik"},
-    {"handle": "nickbaumann_", "name": "Nick"},
-    {"handle": "OpenAIDevs", "name": "OpenAI Developers"}
+    {
+      "handle": "thsottiaux",
+      "name": "Tibo"
+    },
+    {
+      "handle": "dkundel",
+      "name": "Dominik"
+    },
+    {
+      "handle": "nickbaumann_",
+      "name": "Nick"
+    },
+    {
+      "handle": "OpenAIDevs",
+      "name": "OpenAI Developers"
+    }
   ],
   "latest_reset": {
     "id": "2096035437299237298",
@@ -19,7 +31,7 @@
     "created_at": "2026-09-05T00:39:00Z",
     "text": "Full banked reset announced for Plus, Pro and Business users, landing by end of day.",
     "text_zh": "已宣布为 Plus、Pro 和 Business 用户进行完整的额度重置，预计当天结束前完成。",
-    "summary_zh": "Plus、Pro 和 Business 用户将进行完整额度重置，预计当天结束前完成。",
+    "summary_zh": "已宣布为 Plus、Pro 和 Business 用户进行完整额度重置，预计当天结束前完成",
     "url": "https://x.com/thsottiaux/status/2096035437299237298"
   },
   "latest_update": {
@@ -30,7 +42,7 @@
     "created_at": "2026-09-04T20:44:00Z",
     "text": "Astra rollout progressed through Pro and Business first, with availability appearing across ChatGPT Work and Codex before Plus rollout.",
     "text_zh": "Astra 先向 Pro 和 Business 用户推进，并在 Plus 推送前陆续出现在 ChatGPT Work 和 Codex 中。",
-    "summary_zh": "Astra 先向 Pro 和 Business 推送，并逐步上线 ChatGPT Work 和 Codex。",
+    "summary_zh": "Astra 先向 Pro 和 Business 用户推进…",
     "url": "https://x.com/thsottiaux/status/2095961185262997556"
   },
   "feed": [
@@ -42,7 +54,7 @@
       "created_at": "2026-09-05T00:39:00Z",
       "text": "Full banked reset announced for Plus, Pro and Business users, landing by end of day.",
       "text_zh": "已宣布为 Plus、Pro 和 Business 用户进行完整的额度重置，预计当天结束前完成。",
-      "summary_zh": "Plus、Pro 和 Business 用户将进行完整额度重置，预计当天结束前完成。",
+      "summary_zh": "已宣布为 Plus、Pro 和 Business 用户进行完整额度重置，预计当天结束前完成",
       "url": "https://x.com/thsottiaux/status/2096035437299237298"
     },
     {
@@ -53,8 +65,164 @@
       "created_at": "2026-09-04T20:44:00Z",
       "text": "Astra rollout progressed through Pro and Business first, with availability appearing across ChatGPT Work and Codex before Plus rollout.",
       "text_zh": "Astra 先向 Pro 和 Business 用户推进，并在 Plus 推送前陆续出现在 ChatGPT Work 和 Codex 中。",
-      "summary_zh": "Astra 先向 Pro 和 Business 推送，并逐步上线 ChatGPT Work 和 Codex。",
+      "summary_zh": "Astra 先向 Pro 和 Business 用户推进…",
       "url": "https://x.com/thsottiaux/status/2095961185262997556"
+    },
+    {
+      "id": "1989099942099763592",
+      "kind": "update",
+      "handle": "nickbaumann_",
+      "author_name": "Nick",
+      "created_at": "2025-11-13T22:35:56Z",
+      "text": "gpt-5-codex is my new driver in Cline",
+      "url": "/nickbaumann_/status/1989099942099763592",
+      "likes": 59,
+      "reposts": 3,
+      "text_zh": "gpt-5-codex 是我在 Cline 中的新驱动程序",
+      "summary_zh": "gpt-5-codex 是我在 Cline 中的新驱动程序"
+    },
+    {
+      "id": "1986861734619947305",
+      "kind": "reset",
+      "handle": "OpenAIDevs",
+      "author_name": "OpenAI Developers",
+      "created_at": "2025-11-07T18:22:06Z",
+      "text": "You can now get more Codex usage from your plan and credits with three updates today: 1️⃣ GPT-5-Codex-Mini — a more compact and cost-efficient version of GPT-5-Codex 2️⃣ 50% higher rate limits for ChatGPT Plus, Business, and Edu 3️⃣ Priority processing for ChatGPT Pro and",
+      "url": "/OpenAIDevs/status/1986861734619947305",
+      "likes": 1824,
+      "reposts": 182,
+      "text_zh": "现在，您可以通过今天的三项更新从计划和积分中获得更多 Codex 使用量： 1️⃣ GPT-5-Codex-Mini — GPT-5-Codex 的更紧凑且更具成本效益的版本 2️⃣ ChatGPT Plus、Business 和 Edu 的速率限制提高 50% 3️⃣ ChatGPT Pro 和 Edu 的优先处理",
+      "summary_zh": "现在，您可以通过今天的三项更新从计划和积分中获得更多 Codex 使用量： 1️⃣ GPT-5-Cod…"
+    },
+    {
+      "id": "1983956896852988014",
+      "kind": "reset",
+      "handle": "OpenAIDevs",
+      "author_name": "OpenAI Developers",
+      "created_at": "2025-10-30T17:59:19Z",
+      "text": "You’ve asked for more flexible ways to get more Codex usage: Introducing credits for Codex on ChatGPT Plus and Pro. Credits give you more usage beyond what’s included in your plan, kicking in when you hit limits. As a bonus, we also reset Codex rate limits for everyone. Enjoy!",
+      "url": "/OpenAIDevs/status/1983956896852988014",
+      "likes": 1621,
+      "reposts": 133,
+      "text_zh": "您要求更灵活的方式来获得更多 Codex 使用：在 ChatGPT Plus 和 Pro 上引入 Codex 积分。积分可以为您提供超出计划中的更多使用量，并在您达到限制时开始使用。作为奖励，我们还为每个人重置了 Codex 速率限制。享受！",
+      "summary_zh": "您要求更灵活的方式来获得更多 Codex 使用：在 ChatGPT Plus 和 Pro 上引入 Co…"
+    },
+    {
+      "id": "1970535239048159237",
+      "kind": "update",
+      "handle": "OpenAIDevs",
+      "author_name": "OpenAI Developers",
+      "created_at": "2025-09-23T17:06:26Z",
+      "text": "GPT-5-Codex is live in the Responses API. If you use the Codex CLI via API key, you can now also use GPT-5-Codex.",
+      "url": "/OpenAIDevs/status/1970535239048159237",
+      "likes": 1327,
+      "reposts": 118,
+      "text_zh": "GPT-5-Codex 已在响应 API 中上线。如果您通过 API 密钥使用 Codex CLI，现在还可以使用 GPT-5-Codex。",
+      "summary_zh": "GPT-5-Codex 已在响应 API 中上线。如果您通过 API 密钥使用 Codex CLI…"
+    },
+    {
+      "id": "1965487117242626183",
+      "kind": "update",
+      "handle": "OpenAIDevs",
+      "author_name": "OpenAI Developers",
+      "created_at": "2025-09-09T18:47:00Z",
+      "text": "You can now use Codex CLI to quickly upgrade from Chat Completions to Responses! This toolkit: • Finds legacy usage in your repo • Proposes and applies edits • Updates import/request shapes • Runs tests/lints • Makes a clean branch + PR",
+      "url": "/OpenAIDevs/status/1965487117242626183",
+      "likes": 1490,
+      "reposts": 114,
+      "text_zh": "您现在可以使用 Codex CLI 快速从聊天完成升级到响应！该工具包： • 查找存储库中的旧用法 • 建议并应用编辑 • 更新导入/请求形状 • 运行测试/lints • 创建干净的分支 + PR",
+      "summary_zh": "您现在可以使用 Codex CLI 快速从聊天完成升级到响应！…"
+    },
+    {
+      "id": "1960809814596182163",
+      "kind": "update",
+      "handle": "OpenAIDevs",
+      "author_name": "OpenAI Developers",
+      "created_at": "2025-08-27T21:01:04Z",
+      "text": "We’re releasing new Codex features to make it a more effective coding collaborator: - A new IDE extension - Easily move tasks between the cloud and your local environment - Code reviews in GitHub - Revamped Codex CLI Powered by GPT-5 and available through your ChatGPT plan.",
+      "url": "/OpenAIDevs/status/1960809814596182163",
+      "likes": 6339,
+      "reposts": 617,
+      "text_zh": "我们将发布新的 Codex 功能，使其成为更有效的编码协作者： - 新的 IDE 扩展 - 在云和本地环境之间轻松移动任务 - GitHub 中的代码审查 - 改进的 Codex CLI 由 GPT-5 提供支持，可通过 ChatGPT 计划使用。",
+      "summary_zh": "我们将发布新的 Codex 功能，使其成为更有效的编码协作者： - 新的 IDE 扩展 - 在云和本地…"
+    },
+    {
+      "id": "1953559797883891735",
+      "kind": "update",
+      "handle": "OpenAIDevs",
+      "author_name": "OpenAI Developers",
+      "created_at": "2025-08-07T20:52:05Z",
+      "text": "We’re also releasing v0.16 of the Codex CLI today. - GPT-5 is now the default model - Use with your ChatGPT plan - A new, refreshed terminal UI `npm i -g @openai/codex` to update",
+      "url": "/OpenAIDevs/status/1953559797883891735",
+      "likes": 2124,
+      "reposts": 355,
+      "text_zh": "我们今天还发布了 Codex CLI v0.16。 - GPT-5 现在是默认模型 - 与您的 ChatGPT 计划一起使用 - 更新的新终端 UI `npm i -g @openai/codex`",
+      "summary_zh": "我们今天还发布了 Codex CLI v0.16…"
+    },
+    {
+      "id": "1933617093938692164",
+      "kind": "update",
+      "handle": "OpenAIDevs",
+      "author_name": "OpenAI Developers",
+      "created_at": "2025-06-13T20:06:54Z",
+      "text": "Codex can now generate multiple responses simultaneously for a single task, helping you quickly explore possible solutions and pick the best approach. Best-of-N is rolling out to Pro, Enterprise, Team, Edu, and Plus users starting today. Here’s Joey, an engineer on Codex",
+      "url": "/OpenAIDevs/status/1933617093938692164",
+      "likes": 1668,
+      "reposts": 183,
+      "text_zh": "Codex 现在可以为单个任务同时生成多个响应，帮助您快速探索可能的解决方案并选择最佳方法。 Best-of-N 从今天开始向 Pro、Enterprise、Team、Edu 和 Plus 用户推出。这是 Joey，Codex 的工程师",
+      "summary_zh": "Codex 现在可以为单个任务同时生成多个响应，帮助您快速探索可能的解决方案并选择最佳方法…"
+    },
+    {
+      "id": "1929956778105811071",
+      "kind": "reset",
+      "handle": "OpenAIDevs",
+      "author_name": "OpenAI Developers",
+      "created_at": "2025-06-03T17:42:07Z",
+      "text": "We’re rolling out a few updates to Codex today: 1. Codex is rolling out to ChatGPT Plus users today. It includes generous usage limits for a limited time, but during periods of high demand, we might set rate limits for Plus users so that Codex remains widely available.",
+      "url": "/OpenAIDevs/status/1929956778105811071",
+      "likes": 2285,
+      "reposts": 264,
+      "text_zh": "我们今天将推出 Codex 的一些更新： 1. Codex 今天向 ChatGPT Plus 用户推出。它包括有限时间内的慷慨使用限制，但在需求旺盛期间，我们可能会为 Plus 用户设置速率限制，以便 Codex 保持广泛可用。",
+      "summary_zh": "我们今天将推出 Codex 的一些更新： 1. Codex 今天向 ChatGPT Plus 用户推出…"
+    },
+    {
+      "id": "1924601527898951914",
+      "kind": "update",
+      "handle": "OpenAIDevs",
+      "author_name": "OpenAI Developers",
+      "created_at": "2025-05-19T23:02:16Z",
+      "text": "Codex is now available in the ChatGPT iOS app! Start new tasks, view diffs, ask for changes, and even push PRs—all on the go. And you can keep tabs on Codex with live activities on your lock screen, or pick things up again when you're back at your computer. 🏃🤳",
+      "url": "/OpenAIDevs/status/1924601527898951914",
+      "likes": 4112,
+      "reposts": 401,
+      "text_zh": "Codex 现已在 ChatGPT iOS 应用程序中可用！开始新任务、查看差异、请求更改，甚至推送 PR——一切都在旅途中。您还可以在锁定屏幕上密切关注 Codex 的实时活动，或者当您回到计算机前时再次查看内容。 🏃🤳",
+      "summary_zh": "Codex 现已在 ChatGPT iOS 应用程序中可用！开始新任务、查看差异、请求更改…"
+    },
+    {
+      "id": "1923520248202002687",
+      "kind": "update",
+      "handle": "OpenAIDevs",
+      "author_name": "OpenAI Developers",
+      "created_at": "2025-05-16T23:25:39Z",
+      "text": "00:00 Introducing Codex 01:38 Setup and kicking off tasks 05:05 Environments 07:20 Guiding Codex with a Markdown file 12:00 The Codex origin story 14:25 Verifying and reviewing Codex tasks 17:28 Using Codex at OpenAI 20:48 Availability via ChatGPT 21:22 Roadmap and Codex CLI",
+      "url": "/OpenAIDevs/status/1923520248202002687",
+      "likes": 5956,
+      "reposts": 901,
+      "text_zh": "00:00 介绍 Codex 01:38 设置和启动任务 05:05 环境 07:20 使用 Markdown 文件指导 Codex 12:00 Codex 起源故事 14:25 验证和审查 Codex 任务 17:28 在 OpenAI 中使用 Codex 20:48 通过 ChatGPT 提供可用性 21:22 路线图和 Codex CLI",
+      "summary_zh": "00:00 介绍 Codex 01:38 设置和启动任务 05:05 环境 07:20 使用 Mark…"
+    },
+    {
+      "id": "1912556874211422572",
+      "kind": "update",
+      "handle": "OpenAIDevs",
+      "author_name": "OpenAI Developers",
+      "created_at": "2025-04-16T17:21:07Z",
+      "text": "Meet Codex CLI—an open-source local coding agent that turns natural language into working code. Tell Codex CLI what to build, fix, or explain, then watch it bring your ideas to life.",
+      "url": "/OpenAIDevs/status/1912556874211422572",
+      "likes": 3026,
+      "reposts": 448,
+      "text_zh": "了解 Codex CLI——一种开源本地编码代理，可将自然语言转换为工作代码。告诉 Codex CLI 要构建、修复或解释什么，然后看着它将您的想法变为现实。",
+      "summary_zh": "了解 Codex CLI——一种开源本地编码代理，可将自然语言转换为工作代码…"
     }
   ]
 }
