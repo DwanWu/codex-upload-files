@@ -8,7 +8,7 @@ on:
       - ".github/workflows/niuma-digest.yml"
       - "scripts/update_niuma_digest.py"
   schedule:
-    - cron: "17,47 * * * *"
+    - cron: "17 */3 * * *"
 
 permissions:
   contents: write
