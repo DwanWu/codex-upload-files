@@ -1,6 +1,6 @@
 /**
  * 牛马消息 - 黄历查询式排版
- * 顶部标题 + 摘要 + 重置/更新双信息块 + 底部同步时间。
+ * 顶部标题 + Codex + 重置/更新双信息块 + 底部同步时间。
  */
 
 const DATA_URL = 'https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaFlash/NiuMaFlash.json';
@@ -83,7 +83,6 @@ export default async function (ctx) {
 
   const syncTime = fmt(data?.updated_at, 'time');
   const latestUrl = latest?.url || 'https://x.com/thsottiaux';
-  const latestDate = fmt(latest?.created_at, 'date');
 
   const header = size => row([
     icon('antenna.radiowaves.left.and.right', C.purple, size + 1),
@@ -116,7 +115,9 @@ export default async function (ctx) {
       children: [
         header(15),
         spacer(12),
-        text('暂无新消息', 15, 'heavy', C.main),
+        text('Codex', 15, 'heavy', C.main),
+        spacer(8),
+        text('暂无新消息', 13, 'heavy', C.main),
         spacer(5),
         text(error || '等待下一次数据同步', 10, 'medium', C.muted, { maxLines: 2 }),
         spacer(),
@@ -131,11 +132,7 @@ export default async function (ctx) {
       children: [
         header(13),
         spacer(8),
-        row([
-          text('Codex', 13, 'heavy', C.main),
-          spacer(),
-          text(latestDate, 9, 'bold', C.purple)
-        ]),
+        text('Codex', 13, 'heavy', C.main),
         spacer(9),
         row([
           icon('arrow.clockwise.circle.fill', C.pink, 11),
@@ -164,13 +161,7 @@ export default async function (ctx) {
       children: [
         header(17),
         spacer(10),
-        row([
-          text('Codex · X 动态', 20, 'heavy', C.main),
-          spacer(),
-          text(latestDate, 11, 'bold', C.purple)
-        ]),
-        spacer(6),
-        text('重置 / 额度 · 更新 / 发布', 11, 'medium', C.muted),
+        text('Codex', 20, 'heavy', C.main),
         spacer(10),
         { type: 'stack', height: 0.5, backgroundColor: C.divider, children: [] },
         spacer(12),
@@ -192,13 +183,7 @@ export default async function (ctx) {
     children: [
       header(15),
       spacer(9),
-      row([
-        text('Codex · X 动态', 15, 'heavy', C.main),
-        spacer(),
-        text(latestDate, 10, 'bold', C.purple)
-      ]),
-      spacer(6),
-      text('重置 / 额度 · 更新 / 发布', 10, 'medium', C.muted, { maxLines: 1 }),
+      text('Codex', 15, 'heavy', C.main),
       spacer(10),
       messageBlock('重置', reset, C.pink, 'arrow.clockwise.circle.fill', 2, 12),
       spacer(11),
