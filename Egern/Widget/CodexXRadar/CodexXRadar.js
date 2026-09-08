@@ -1,7 +1,7 @@
 /**
- * Codex X 雷达
+ * 牛马消息
  * 跟踪 X 上 Codex 的重置/额度与更新/发布消息。
- * 数据由 GitHub Actions 抓取 X 公开时间线后写入 JSON。
+ * 数据由 GitHub Actions 抓取并翻译为中文后写入 JSON。
  */
 
 const DATA_URL = 'https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/CodexXRadar/CodexXRadar.json';
@@ -18,6 +18,7 @@ export default async function (ctx) {
     muted: { light: '#8E8E93', dark: '#8E8E93' },
     green: { light: '#15803D', dark: '#4ADE80' },
     blue: { light: '#2563EB', dark: '#60A5FA' },
+    purple: { light: '#7C3AED', dark: '#A78BFA' },
     pink: { light: '#DB2777', dark: '#F472B6' },
     red: { light: '#C0392B', dark: '#FF453A' },
     divider: { light: '#E5E5EA', dark: '#38383A' }
@@ -51,6 +52,8 @@ export default async function (ctx) {
     .replace(/\s+/g, ' ')
     .trim();
 
+  const displayText = item => clean(item?.text_zh || item?.translation || item?.text || item?.summary || '');
+
   let data = null;
   let error = '';
   try {
@@ -73,9 +76,9 @@ export default async function (ctx) {
     return {
       type: 'widget', padding: 14, url: latestUrl, backgroundGradient: bg,
       children: [
-        row([icon('antenna.radiowaves.left.and.right', C.green, 15), text('Codex X 雷达', 15, 'heavy', C.main)], 6),
+        row([icon('antenna.radiowaves.left.and.right', C.purple, 15), text('牛马消息', 15, 'heavy', C.main)], 6),
         spacer(10),
-        text('暂未获取到 Codex X 动态', 12, 'bold', C.sub),
+        text('暂未获取到 Codex 动态', 12, 'bold', C.sub),
         spacer(4),
         text(error || '等待 Tibo 等账号的新消息', 10, 'medium', C.muted, { maxLines: 3 })
       ]
@@ -99,7 +102,7 @@ export default async function (ctx) {
         spacer(),
         text(fmtDate(item.created_at), compact ? 8 : 9, 'bold', color)
       ], 5),
-      text(clean(item.text || item.summary || ''), compact ? 9 : 11, 'medium', C.sub, { maxLines: compact ? 2 : 2, minScale: 0.68 })
+      text(displayText(item), compact ? 9 : 11, 'medium', C.sub, { maxLines: compact ? 2 : 2, minScale: 0.68 })
     ], compact ? 4 : 5);
   };
 
@@ -110,15 +113,15 @@ export default async function (ctx) {
       type: 'widget', padding: 11, url: item?.url || latestUrl, backgroundGradient: bg,
       children: [
         row([
-          icon('antenna.radiowaves.left.and.right', C.green, 14),
-          text('Codex X', 13, 'heavy', C.main),
+          icon('antenna.radiowaves.left.and.right', C.purple, 14),
+          text('牛马消息', 13, 'heavy', C.main),
           spacer(),
           text(kind === 'reset' ? '重置' : '更新', 9, 'heavy', kind === 'reset' ? C.pink : C.blue)
         ], 5),
         spacer(10),
         eventRow(item, kind, true),
         spacer(),
-        text('Tibo 等 · X 动态', 8, 'medium', C.muted)
+        text('Tibo 等 · 中文 X 动态', 8, 'medium', C.muted)
       ]
     };
   }
@@ -133,15 +136,15 @@ export default async function (ctx) {
       type: 'widget', padding: 16, url: latestUrl, backgroundGradient: bg,
       children: [
         row([
-          icon('antenna.radiowaves.left.and.right', C.green, 18),
-          text('Codex X 雷达', 17, 'heavy', C.main),
+          icon('antenna.radiowaves.left.and.right', C.purple, 18),
+          text('牛马消息', 17, 'heavy', C.main),
           spacer(),
-          text(`${data?.accounts_ok ?? 0}/${data?.accounts_total ?? 4} 源`, 10, 'bold', C.green)
+          text(`${data?.accounts_ok ?? 0}/${data?.accounts_total ?? 4} 源`, 10, 'bold', C.purple)
         ], 6),
         spacer(12),
         col(rows, 9, { flex: 1 }),
         spacer(6),
-        text('重置/额度 · 更新/发布 · 每小时同步 X', 9, 'medium', C.muted)
+        text('重置/额度 · 更新/发布 · 中文翻译 · 每小时同步 X', 9, 'medium', C.muted)
       ]
     };
   }
@@ -150,10 +153,10 @@ export default async function (ctx) {
     type: 'widget', padding: [11, 12, 9, 12], url: latestUrl, backgroundGradient: bg,
     children: [
       row([
-        icon('antenna.radiowaves.left.and.right', C.green, 16),
-        text('Codex X 雷达', 15, 'heavy', C.main),
+        icon('antenna.radiowaves.left.and.right', C.purple, 16),
+        text('牛马消息', 15, 'heavy', C.main),
         spacer(),
-        text('Tibo 等', 10, 'bold', C.green)
+        text('Tibo 等', 10, 'bold', C.purple)
       ], 6),
       spacer(11),
       eventRow(reset, 'reset', false),
@@ -162,7 +165,7 @@ export default async function (ctx) {
       spacer(9),
       eventRow(update, 'update', false),
       spacer(),
-      text('每小时同步 X · 点击打开最新原帖', 9, 'medium', C.muted)
+      text('每小时同步 X · 自动翻译中文 · 点击打开原帖', 9, 'medium', C.muted)
     ]
   };
 }
