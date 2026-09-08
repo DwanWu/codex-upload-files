@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import html
 import json
-import os
 import re
 import time
 from datetime import datetime, timezone
@@ -20,9 +19,7 @@ ACCOUNTS = [
     ("nickbaumann_", "Nick"),
     ("OpenAIDevs", "OpenAI Developers"),
 ]
-ACCOUNT_NAMES = {handle.lower(): name for handle, name in ACCOUNTS}
 MAX_FEED = 40
-MAX_X_API_PAGES = 20
 
 RESET_RE = re.compile(
     r"\b(reset|resetting|reseting|banked reset|usage limits?|rate limits?|quota|credits?|extra usage)\b",
@@ -97,7 +94,6 @@ def classify(handle, text):
         return None
     if RESET_RE.search(text) and (CODEX_RE.search(text) or handle.lower() == "thsottiaux"):
         return "reset"
-    # 所有来源都必须明确提及 Codex/Astra/GPT-Codex/GPT-6，避免 OpenAIDevs 泛 AI 动态混入。
     if CODEX_RE.search(text):
         return "update"
     return None
@@ -208,108 +204,7 @@ def summarize_zh(text, limit=56):
     return s[: max(1, limit - 1)].rstrip() + "…"
 
 
-# ---------- 官方 X API v2 主源 ----------
-
-def fetch_x_api(old):
-    token = os.getenv("X_BEARER_TOKEN", "").strip()
-    if not token:
-        return [], {"status": "not_configured", "posts": 0}, None
-
-    handles = " OR ".join(f"from:{handle}" for handle, _ in ACCOUNTS)
-    base_params = {
-        "query": f"({handles}) -is:retweet",
-        "max_results": "100",
-        "sort_order": "recency",
-        "tweet.fields": "created_at,author_id,public_metrics",
-        "expansions": "author_id",
-        "user.fields": "username,name",
-    }
-    since_id = str(old.get("x_api_newest_id") or "").strip()
-    if since_id.isdigit():
-        base_params["since_id"] = since_id
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "User-Agent": HEADERS["User-Agent"],
-        "Accept": "application/json",
-    }
-
-    tweets = []
-    users = {}
-    next_token = None
-    newest_id = None
-    page_count = 0
-
-    while True:
-        page_count += 1
-        if page_count > MAX_X_API_PAGES:
-            # 不推进游标，宁可回退也不要因为截断分页而永久漏掉消息。
-            raise RuntimeError(f"X API pagination exceeded {MAX_X_API_PAGES} pages")
-
-        params = dict(base_params)
-        if next_token:
-            params["next_token"] = next_token
-        url = "https://api.x.com/2/tweets/search/recent?" + urlencode(params)
-        payload = request_json(url, headers, timeout=25, attempts=3)
-
-        if payload.get("errors") and not payload.get("data"):
-            raise RuntimeError(f"X API returned errors: {payload.get('errors')}")
-
-        for user in payload.get("includes", {}).get("users", []) or []:
-            users[str(user.get("id") or "")] = user
-
-        page_tweets = payload.get("data", []) or []
-        tweets.extend(page_tweets)
-        meta = payload.get("meta") or {}
-        candidate = str(meta.get("newest_id") or "")
-        if candidate.isdigit() and (newest_id is None or int(candidate) > int(newest_id)):
-            newest_id = candidate
-        for tweet in page_tweets:
-            tweet_id = str(tweet.get("id") or "")
-            if tweet_id.isdigit() and (newest_id is None or int(tweet_id) > int(newest_id)):
-                newest_id = tweet_id
-
-        next_token = meta.get("next_token")
-        if not next_token:
-            break
-
-    items = []
-    for tweet in tweets:
-        tweet_id = str(tweet.get("id") or "")
-        if not tweet_id:
-            continue
-        user = users.get(str(tweet.get("author_id") or ""), {})
-        handle = str(user.get("username") or "").strip()
-        if not handle:
-            continue
-        text = normalize_text(tweet.get("text"))
-        kind = classify(handle, text)
-        if not kind:
-            continue
-
-        metrics = tweet.get("public_metrics") or {}
-        items.append({
-            "id": tweet_id,
-            "kind": kind,
-            "handle": handle,
-            "author_name": str(user.get("name") or ACCOUNT_NAMES.get(handle.lower()) or handle),
-            "created_at": parse_dt(tweet.get("created_at")).astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "text": text[:700],
-            "url": f"https://x.com/{handle}/status/{tweet_id}",
-            "likes": int(metrics.get("like_count") or 0),
-            "reposts": int(metrics.get("retweet_count") or 0),
-            "source": "x_api",
-        })
-
-    return items, {
-        "status": "ok",
-        "posts": len(items),
-        "raw_posts": len(tweets),
-        "pages": page_count,
-    }, newest_id
-
-
-# ---------- 公开 syndication 兜底 ----------
+# ---------- 免费公开 X syndication 数据源 ----------
 
 def fetch_profile(handle, attempts=3):
     url = f"https://syndication.twitter.com/srv/timeline-profile/screen-name/{handle}?dnt=true&lang=en"
@@ -451,40 +346,15 @@ def enrich_feed(feed):
 def main():
     old = load_old()
     old_feed = old.get("feed") if isinstance(old.get("feed"), list) else []
-    source_health = {}
-    fetched = []
-    active_source = ""
-    newest_id = old.get("x_api_newest_id")
 
     try:
-        api_items, api_health, api_newest_id = fetch_x_api(old)
-        source_health["x_api"] = api_health
-        if api_health.get("status") == "ok":
-            fetched = api_items
-            active_source = "x_api"
-            newest_id = api_newest_id or newest_id
-            print(
-                f"x_api: ok ({api_health.get('raw_posts', 0)} raw; "
-                f"{len(api_items)} matched; {api_health.get('pages', 0)} pages)"
-            )
+        fetched, health = fetch_syndication()
     except Exception as exc:
-        source_health["x_api"] = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
-        print(f"x_api: {type(exc).__name__}: {exc}")
+        print(f"x_syndication: {type(exc).__name__}: {exc}")
+        return
 
-    if not active_source:
-        try:
-            synd_items, synd_health = fetch_syndication()
-            source_health["x_syndication"] = synd_health
-            if synd_health.get("accounts_ok", 0) > 0:
-                fetched = synd_items
-                active_source = "x_syndication"
-        except Exception as exc:
-            source_health["x_syndication"] = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
-            print(f"x_syndication: {type(exc).__name__}: {exc}")
-
-    # 所有来源都失败时保留已有健康数据和消息，不写坏 JSON。
-    if not active_source:
-        print("All X sources unavailable; preserving existing NiuMaDigest data unchanged")
+    if int(health.get("accounts_ok") or 0) == 0:
+        print("All free X sources unavailable; preserving existing NiuMaDigest data unchanged")
         return
 
     feed = merge_feed(old_feed, fetched)
@@ -495,26 +365,20 @@ def main():
     translated, summarized = enrich_feed(feed)
     latest_reset = next((x for x in feed if x.get("kind") == "reset"), None)
     latest_update = next((x for x in feed if x.get("kind") == "update"), None)
-
-    active_health = source_health.get(active_source, {})
-    accounts_ok = (
-        len(ACCOUNTS)
-        if active_source == "x_api"
-        else int(active_health.get("accounts_ok") or 0)
-    )
+    accounts_ok = int(health.get("accounts_ok") or 0)
 
     stamp = now_iso()
+    source_health = {"x_syndication": health}
     payload = {
         "updated_at": stamp,
         "last_success_at": stamp,
-        "source": active_source,
+        "source": "x_syndication",
         "source_health": source_health,
         "translation": "zh-CN",
         "summary": "zh-CN-compact",
         "accounts_total": len(ACCOUNTS),
         "accounts_ok": accounts_ok,
         "accounts": [{"handle": h, "name": n} for h, n in ACCOUNTS],
-        "x_api_newest_id": newest_id,
         "latest_reset": latest_reset,
         "latest_update": latest_update,
         "feed": feed,
@@ -531,20 +395,20 @@ def main():
 
     state_changed = (
         old_state != new_state
-        or old.get("x_api_newest_id") != newest_id
-        or old.get("source") != active_source
+        or old.get("source") != "x_syndication"
         or old.get("source_health") != source_health
         or int(old.get("accounts_ok") or 0) != accounts_ok
+        or "x_api_newest_id" in old
     )
     if not state_changed:
-        print(f"No 牛马消息 content/health changes; source={active_source}")
+        print("No 牛马消息 content/health changes")
         return
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(
         f"Updated {OUT} with {len(feed)} posts; "
-        f"{translated} translated; {summarized} summarized; source={active_source}"
+        f"{translated} translated; {summarized} summarized; free source=x_syndication"
     )
 
 
