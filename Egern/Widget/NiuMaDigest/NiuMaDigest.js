@@ -1,6 +1,6 @@
 /**
  * 牛马消息
- * 自动摘要 + 详细信息：保留作者、@账号、日期时间、中文正文，并显示精简摘要。
+ * 仅显示分类、时间和精简摘要，不重复显示完整正文，也不显示作者与账号。
  */
 
 const DATA_URL = 'https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaDigest/NiuMaDigest.json';
@@ -13,7 +13,6 @@ export default async function (ctx) {
   const C = {
     bg: [{ light: '#FFFFFF', dark: '#1C1C1E' }, { light: '#F8F7FB', dark: '#111113' }],
     main: { light: '#1C1C1E', dark: '#FFFFFF' },
-    sub: { light: '#48484A', dark: '#D1D1D6' },
     muted: { light: '#8E8E93', dark: '#8E8E93' },
     purple: { light: '#7C3AED', dark: '#A78BFA' },
     pink: { light: '#DB2777', dark: '#F472B6' },
@@ -53,9 +52,6 @@ export default async function (ctx) {
 
   const summaryText = item => clean(
     item?.summary_zh || item?.text_zh || item?.translation || item?.text || item?.summary || '暂无消息'
-  );
-  const fullText = item => clean(
-    item?.text_zh || item?.translation || item?.text || item?.summary_zh || item?.summary || '暂无消息'
   );
 
   const fmtDateTime = value => {
@@ -103,7 +99,7 @@ export default async function (ctx) {
     chip('X 动态', C.purple)
   ], 6);
 
-  const eventBlock = (item, kind, compact = false, showFull = true) => {
+  const eventBlock = (item, kind, compact = false) => {
     const isReset = kind === 'reset';
     const color = isReset ? C.pink : C.blue;
     const label = isReset ? '重置' : '更新';
@@ -111,28 +107,26 @@ export default async function (ctx) {
 
     if (!item) {
       return col([
-        row([icon(ico, color, compact ? 10 : 12), text(label, compact ? 9 : 10, 'heavy', color), spacer(), text('暂无', 9, 'bold', C.muted)], 4),
+        row([
+          icon(ico, color, compact ? 10 : 12),
+          text(label, compact ? 9 : 10, 'heavy', color),
+          spacer(),
+          text('暂无', 9, 'bold', C.muted)
+        ], 4),
         text('等待新的 X 消息', compact ? 9 : 10, 'medium', C.muted, { maxLines: 1 })
       ], 3);
     }
 
     const summary = summaryText(item);
-    const full = fullText(item);
-    const different = full && summary && full !== summary;
 
     return col([
       row([
         icon(ico, color, compact ? 10 : 12),
         text(label, compact ? 9 : 10, 'heavy', color),
-        text(item.author_name || item.handle || 'X', compact ? 9 : 10, 'heavy', C.main, { maxLines: 1 }),
-        text(`@${item.handle || ''}`, compact ? 8 : 9, 'medium', C.muted, { maxLines: 1, minScale: 0.72 }),
         spacer(),
         text(fmtDateTime(item.created_at), compact ? 8 : 9, 'bold', color, { maxLines: 1 })
       ], 4),
-      text(summary, compact ? 10 : 11, 'heavy', color, { maxLines: compact ? 2 : 1, minScale: 0.74 }),
-      ...(showFull && different ? [
-        text(full, compact ? 8 : 9, 'medium', C.sub, { maxLines: compact ? 1 : 2, minScale: 0.58 })
-      ] : [])
+      text(summary, compact ? 10 : 11, 'heavy', color, { maxLines: 2, minScale: 0.74 })
     ], compact ? 3 : 4, { url: item.url });
   };
 
@@ -148,7 +142,11 @@ export default async function (ctx) {
         spacer(5),
         text(error || '等待下一次数据同步', 11, 'medium', C.muted, { maxLines: 2 }),
         spacer(),
-        row([text(`${data?.accounts_ok ?? 0}/${data?.accounts_total ?? 4} 源`, 9, 'bold', C.muted), spacer(), text(`同步 ${syncTime}`, 9, 'bold', C.muted)])
+        row([
+          text(`${data?.accounts_ok ?? 0}/${data?.accounts_total ?? 4} 源`, 9, 'bold', C.muted),
+          spacer(),
+          text(`同步 ${syncTime}`, 9, 'bold', C.muted)
+        ])
       ]
     };
   }
@@ -161,9 +159,13 @@ export default async function (ctx) {
       children: [
         header(13),
         spacer(8),
-        eventBlock(item, kind, true, false),
+        eventBlock(item, kind, true),
         spacer(),
-        row([text(`${data?.accounts_ok ?? 0}/${data?.accounts_total ?? 4} 源`, 8, 'bold', C.muted), spacer(), text(`同步 ${syncTime}`, 8, 'bold', C.muted)])
+        row([
+          text(`${data?.accounts_ok ?? 0}/${data?.accounts_total ?? 4} 源`, 8, 'bold', C.muted),
+          spacer(),
+          text(`同步 ${syncTime}`, 8, 'bold', C.muted)
+        ])
       ]
     };
   }
@@ -176,7 +178,7 @@ export default async function (ctx) {
         header(17),
         spacer(10),
         col(items.flatMap((item, i) => [
-          eventBlock(item, item?.kind === 'reset' ? 'reset' : 'update', false, true),
+          eventBlock(item, item?.kind === 'reset' ? 'reset' : 'update', false),
           ...(i < items.length - 1 ? [divider()] : [])
         ]), 8, { flex: 1 }),
         spacer(6),
@@ -194,11 +196,11 @@ export default async function (ctx) {
     children: [
       header(15),
       spacer(8),
-      eventBlock(reset, 'reset', false, true),
+      eventBlock(reset, 'reset', false),
       spacer(7),
       divider(),
       spacer(7),
-      eventBlock(update, 'update', false, true),
+      eventBlock(update, 'update', false),
       spacer(),
       row([
         text(`${data?.accounts_ok ?? 0}/${data?.accounts_total ?? 4} 源`, 8, 'medium', C.muted),
