@@ -1,14 +1,26 @@
 {
-  "updated_at": "2026-09-08T02:50:00Z",
+  "updated_at": "2026-09-08T08:51:55.861140Z",
   "source": "x_syndication",
   "translation": "zh-CN",
   "accounts_total": 4,
-  "accounts_ok": 4,
+  "accounts_ok": 0,
   "accounts": [
-    {"handle": "thsottiaux", "name": "Tibo"},
-    {"handle": "dkundel", "name": "Dominik"},
-    {"handle": "nickbaumann_", "name": "Nick"},
-    {"handle": "OpenAIDevs", "name": "OpenAI Developers"}
+    {
+      "handle": "thsottiaux",
+      "name": "Tibo"
+    },
+    {
+      "handle": "dkundel",
+      "name": "Dominik"
+    },
+    {
+      "handle": "nickbaumann_",
+      "name": "Nick"
+    },
+    {
+      "handle": "OpenAIDevs",
+      "name": "OpenAI Developers"
+    }
   ],
   "latest_reset": {
     "id": "2096035437299237298",
