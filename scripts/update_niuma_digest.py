@@ -25,10 +25,12 @@ RESET_RE = re.compile(
 )
 UPDATE_RE = re.compile(
     r"\b(update|updated|ship|shipped|shipping|release|released|launch|launched|rollout|rolling out|"
-    r"available|landed|lands|new|added|fix|fixed|feature|version|app|cli|extension|browser|plugin|hooks?)\b",
+    r"available|landed|lands|new|added|fix|fixed|feature|version|app|cli|extension|browser|plugin|hooks?|"
+    r"improve|improved|improves|improvement|improvements|usage|reasoning effort|reasoning efforts|"
+    r"cost|cheaper|scalable|scalability|performance|quality|subscription)\b",
     re.I,
 )
-CODEX_RE = re.compile(r"\b(codex|chatgpt work|astra)\b", re.I)
+CODEX_RE = re.compile(r"\b(codex|chatgpt work|astra|gpt[- ]?6)\b", re.I)
 CJK_RE = re.compile(r"[\u3400-\u9fff]")
 NEXT_DATA_RE = re.compile(
     r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', re.S
@@ -52,7 +54,7 @@ def load_old():
         return {}
 
 
-def fetch_profile(handle, attempts=2):
+def fetch_profile(handle, attempts=3):
     url = f"https://syndication.twitter.com/srv/timeline-profile/screen-name/{handle}?dnt=true&lang=en"
     last_error = None
     for attempt in range(attempts):
@@ -71,17 +73,17 @@ def fetch_profile(handle, attempts=2):
                 raise
             retry_after = exc.headers.get("Retry-After") if exc.headers else None
             try:
-                delay = int(retry_after) if retry_after else 30
+                delay = int(retry_after) if retry_after else 30 * (attempt + 1)
             except Exception:
-                delay = 30
-            delay = max(15, min(delay, 60))
+                delay = 30 * (attempt + 1)
+            delay = max(20, min(delay, 75))
             print(f"{handle}: rate limited; retry in {delay}s")
             time.sleep(delay)
         except Exception as exc:
             last_error = exc
             if attempt >= attempts - 1:
                 raise
-            time.sleep(8)
+            time.sleep(10 * (attempt + 1))
     if last_error:
         raise last_error
     return []
@@ -235,7 +237,7 @@ def main():
         except Exception as exc:
             print(f"{handle}: {type(exc).__name__}: {exc}")
         if idx < len(ACCOUNTS) - 1:
-            time.sleep(20)
+            time.sleep(35)
 
     # 所有来源都被限流/失败时，绝不覆盖现有健康数据和摘要。
     if ok == 0:
