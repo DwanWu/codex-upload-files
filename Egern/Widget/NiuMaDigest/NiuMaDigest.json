@@ -1,6 +1,6 @@
 {
-  "updated_at": "2026-09-09T16:48:56.810173Z",
-  "last_success_at": "2026-09-09T16:48:56.810173Z",
+  "updated_at": "2026-09-09T21:07:31.180075Z",
+  "last_success_at": "2026-09-09T21:07:31.180075Z",
   "source": "x_syndication",
   "source_health": {
     "x_syndication": {
@@ -9,10 +9,10 @@
       "accounts_total": 4,
       "failed_accounts": [
         "thsottiaux",
-        "dkundel",
+        "nickbaumann_",
         "OpenAIDevs"
       ],
-      "posts": 2
+      "posts": 17
     }
   },
   "translation": "zh-CN",
@@ -107,7 +107,7 @@
       "created_at": "2026-07-01T20:50:48Z",
       "text": "🖲️ We love our community! To celebrate getting together with many of you we brought @thsottiaux's reset button to AIE World's Fair. Congrats Melanie for pushing the button 🎉 All Codex Go/Plus/Pro subscribers around the world are receiving a reset in the bank! Happy Codexing!",
       "url": "https://x.com/dkundel/status/2072422693081940445",
-      "likes": 980,
+      "likes": 981,
       "reposts": 51,
       "source": "x_syndication",
       "text_zh": "🖲️我们热爱我们的社区！为了庆祝与你们中的许多人相聚，我们将 @thsottiaux 的重置按钮带到了 AIE 世界博览会。恭喜 Melanie 按下按钮 🎉 全球所有 Codex Go/Plus/Pro 订阅者都将在银行收到重置​​！快乐编码！",
@@ -205,7 +205,7 @@
       "created_at": "2025-11-15T22:16:02Z",
       "text": "People often don't realize that the code for the entire Codex CLI including the prompts and agent logic is open-source!",
       "url": "https://x.com/dkundel/status/1989819708045234617",
-      "likes": 518,
+      "likes": 517,
       "reposts": 20,
       "source": "x_syndication",
       "text_zh": "人们通常没有意识到整个 Codex CLI 的代码（包括提示和代理逻辑）都是开源的！",
