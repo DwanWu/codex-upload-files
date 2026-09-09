@@ -1,24 +1,22 @@
 {
-  "updated_at": "2026-09-08T23:33:55.725408Z",
-  "last_success_at": "2026-09-08T23:33:55.725408Z",
+  "updated_at": "2026-09-09T04:46:15.944874Z",
+  "last_success_at": "2026-09-09T04:46:15.944874Z",
   "source": "x_syndication",
   "source_health": {
     "x_syndication": {
       "status": "partial",
-      "accounts_ok": 1,
+      "accounts_ok": 3,
       "accounts_total": 4,
       "failed_accounts": [
-        "thsottiaux",
-        "dkundel",
-        "OpenAIDevs"
+        "thsottiaux"
       ],
-      "posts": 2
+      "posts": 34
     }
   },
   "translation": "zh-CN",
   "summary": "zh-CN-compact",
   "accounts_total": 4,
-  "accounts_ok": 1,
+  "accounts_ok": 3,
   "accounts": [
     {
       "handle": "thsottiaux",
