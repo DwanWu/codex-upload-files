@@ -1,9 +1,11 @@
 /**
  * 牛马消息
- * 仅显示分类、时间和精简摘要；摘要尽量填满可用两行，再由 Egern 自然截断。
+ * 主源由 GitHub Actions 免费抓取，ChatGPT 定时联网查询作为独立补充源。
+ * 两边按消息 ID 合并，只显示分类、时间和精简摘要。
  */
 
 const DATA_URL = 'https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaDigest/NiuMaDigest.json';
+const CHATGPT_DATA_URL = 'https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaDigest/NiuMaDigestChatGPT.json';
 
 export default async function (ctx) {
   const family = String(ctx.widgetFamily || 'systemMedium').toLowerCase();
@@ -65,8 +67,6 @@ export default async function (ctx) {
     const summary = clean(item?.summary_zh || item?.summary || '');
     const fullZh = compactText(item?.text_zh || item?.translation || item?.text || '');
 
-    // 后台旧摘要可能在固定字符数时已经手工加了“…”；
-    // 这种情况下改用更长的中文精简文本，让 Egern 根据实际两行宽度决定截断位置。
     if (summary.endsWith('…') && fullZh && fullZh.length > summary.length) {
       return fullZh.slice(0, 160);
     }
@@ -92,25 +92,57 @@ export default async function (ctx) {
     return `${p(t.getUTCHours())}:${p(t.getUTCMinutes())}`;
   };
 
-  let data = null;
-  let error = '';
-  try {
-    const resp = await ctx.http.get(`${DATA_URL}?t=${Date.now()}`, {
+  const fetchJson = async url => {
+    const resp = await ctx.http.get(`${url}?t=${Date.now()}`, {
       headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
       timeout: 8000
     });
-    data = JSON.parse(await resp.text());
+    return JSON.parse(await resp.text());
+  };
+
+  let data = null;
+  let chatgptData = null;
+  const errors = [];
+
+  try {
+    data = await fetchJson(DATA_URL);
   } catch (e) {
-    error = e?.message || String(e);
+    errors.push(e?.message || String(e));
   }
 
-  const feed = Array.isArray(data?.feed) ? data.feed : [];
-  const reset = data?.latest_reset || feed.find(x => x?.kind === 'reset') || null;
-  const update = data?.latest_update || feed.find(x => x?.kind === 'update') || null;
+  try {
+    chatgptData = await fetchJson(CHATGPT_DATA_URL);
+  } catch (e) {
+    errors.push(e?.message || String(e));
+  }
+
+  const merged = new Map();
+  const addItems = items => {
+    for (const raw of Array.isArray(items) ? items : []) {
+      const item = raw && typeof raw === 'object' ? raw : null;
+      const id = String(item?.id || '');
+      if (!id) continue;
+      const previous = merged.get(id) || {};
+      merged.set(id, { ...previous, ...item });
+    }
+  };
+
+  addItems(data?.feed);
+  addItems(chatgptData?.feed);
+
+  const feed = Array.from(merged.values())
+    .sort((a, b) => new Date(b?.created_at || 0) - new Date(a?.created_at || 0));
+
+  const reset = feed.find(x => x?.kind === 'reset') || null;
+  const update = feed.find(x => x?.kind === 'update') || null;
   const latest = [reset, update].filter(Boolean)
     .sort((a, b) => new Date(b?.created_at || 0) - new Date(a?.created_at || 0))[0] || null;
   const latestUrl = latest?.url || 'https://x.com/thsottiaux';
-  const syncTime = fmtSyncTime(data?.updated_at);
+
+  const syncCandidates = [data?.updated_at, chatgptData?.updated_at]
+    .filter(Boolean)
+    .sort((a, b) => new Date(b) - new Date(a));
+  const syncTime = fmtSyncTime(syncCandidates[0]);
 
   const header = size => row([
     icon('antenna.radiowaves.left.and.right', C.purple, size + 1),
@@ -163,7 +195,7 @@ export default async function (ctx) {
         spacer(8),
         text('暂无新消息', 14, 'heavy', C.main),
         spacer(5),
-        text(error || '等待下一次数据同步', 11, 'medium', C.muted, { maxLines: 2 }),
+        text(errors[0] || '等待下一次数据同步', 11, 'medium', C.muted, { maxLines: 2 }),
         spacer(),
         row([
           text(`${data?.accounts_ok ?? 0}/${data?.accounts_total ?? 4} 源`, 9, 'bold', C.muted),
