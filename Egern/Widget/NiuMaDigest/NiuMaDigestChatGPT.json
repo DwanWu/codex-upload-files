@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-09T12:27:10Z",
+  "updated_at": "2026-09-09T18:31:53Z",
   "source": "chatgpt_web",
   "feed": [
     {
@@ -12,6 +12,18 @@
       "text_zh": "Astra 需求前所未有，OpenAI 正尽力扩容并优先保障现有用户；如果需求持续，可能会暂时暂停新的 Pro 订阅。",
       "summary_zh": "Astra 需求前所未有，如持续可能暂时暂停新的 Pro 订阅",
       "url": "https://x.com/thsottiaux/status/2097559315150426222",
+      "source": "chatgpt_web"
+    },
+    {
+      "id": "2097482307812859978",
+      "kind": "update",
+      "handle": "thsottiaux",
+      "author_name": "Tibo",
+      "created_at": "2026-09-09T00:28:00Z",
+      "text": "I for one am glad prompt injection is getting solved across the industry and that Astra is not only our most capable, but also our most aligned model to date. But also ...",
+      "text_zh": "Tibo 表示，行业正在持续解决提示词注入问题，并称 Astra 不仅是目前能力最强的模型，也是迄今对齐表现最好的模型。",
+      "summary_zh": "Tibo 称 Astra 兼具当前最强能力与迄今最佳对齐表现",
+      "url": "https://x.com/thsottiaux/status/2097482307812859978",
       "source": "chatgpt_web"
     },
     {
