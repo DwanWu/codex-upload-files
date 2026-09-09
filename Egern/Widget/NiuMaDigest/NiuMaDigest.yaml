@@ -16,7 +16,7 @@ auto_update:
 scriptings:
   - generic:
       name: 牛马消息
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaDigest/NiuMaDigest.js?v=20260909-2
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaDigest/NiuMaDigest.js?v=20260909-3
 
 widgets:
   - name: 牛马消息
