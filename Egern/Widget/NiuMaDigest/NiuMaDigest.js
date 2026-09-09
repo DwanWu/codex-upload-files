@@ -11,6 +11,7 @@ export default async function (ctx) {
   const family = String(ctx.widgetFamily || 'systemMedium').toLowerCase();
   const isSmall = family.includes('small');
   const isLarge = family.includes('large');
+  const refreshAfter = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
   const C = {
     bg: [{ light: '#FFFFFF', dark: '#1C1C1E' }, { light: '#F8F7FB', dark: '#111113' }],
@@ -210,7 +211,7 @@ export default async function (ctx) {
 
   if (!reset && !update) {
     return {
-      type: 'widget', padding: 13, url: latestUrl, backgroundGradient: bg,
+      type: 'widget', refreshAfter, padding: 13, url: latestUrl, backgroundGradient: bg,
       children: [
         header(15),
         spacer(12),
@@ -233,7 +234,7 @@ export default async function (ctx) {
     const item = latest;
     const kind = item?.kind === 'reset' ? 'reset' : 'update';
     return {
-      type: 'widget', padding: 11, url: item?.url || latestUrl, backgroundGradient: bg,
+      type: 'widget', refreshAfter, padding: 11, url: item?.url || latestUrl, backgroundGradient: bg,
       children: [
         header(13),
         spacer(8),
@@ -251,7 +252,7 @@ export default async function (ctx) {
   if (isLarge) {
     const items = feed.slice(0, 4);
     return {
-      type: 'widget', padding: 16, url: latestUrl, backgroundGradient: bg,
+      type: 'widget', refreshAfter, padding: 16, url: latestUrl, backgroundGradient: bg,
       children: [
         header(17),
         spacer(10),
@@ -270,7 +271,7 @@ export default async function (ctx) {
   }
 
   return {
-    type: 'widget', padding: [10, 12, 8, 12], url: latestUrl, backgroundGradient: bg,
+    type: 'widget', refreshAfter, padding: [10, 12, 8, 12], url: latestUrl, backgroundGradient: bg,
     children: [
       header(15),
       spacer(),
