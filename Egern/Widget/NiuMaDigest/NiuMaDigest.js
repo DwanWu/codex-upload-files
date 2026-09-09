@@ -250,12 +250,14 @@ export default async function (ctx) {
     type: 'widget', padding: [10, 12, 8, 12], url: latestUrl, backgroundGradient: bg,
     children: [
       header(15),
-      spacer(8),
-      eventBlock(reset, 'reset', false),
-      spacer(7),
-      divider(),
-      spacer(7),
-      eventBlock(update, 'update', false),
+      spacer(),
+      col([
+        eventBlock(reset, 'reset', false),
+        spacer(7),
+        divider(),
+        spacer(7),
+        eventBlock(update, 'update', false)
+      ], 0),
       spacer(),
       row([
         text(`${data?.accounts_ok ?? 0}/${data?.accounts_total ?? 4} 源`, 8, 'medium', C.muted),
