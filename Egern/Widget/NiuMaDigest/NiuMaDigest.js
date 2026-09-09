@@ -1,7 +1,7 @@
 /**
  * 牛马消息
  * 主源由 GitHub Actions 免费抓取，ChatGPT 定时联网查询作为独立补充源。
- * 两边按消息 ID 合并，只显示分类、时间和精简摘要。
+ * 两边按帖子 ID / 规范化 X 链接合并，只显示分类、时间和精简摘要。
  */
 
 const DATA_URL = 'https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaDigest/NiuMaDigest.json';
@@ -51,6 +51,13 @@ export default async function (ctx) {
     .replace(/https?:\/\/t\.co\/\w+/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+
+  const normalizeUrl = value => String(value || '')
+    .trim()
+    .replace(/^http:\/\/twitter\.com\//i, 'https://x.com/')
+    .replace(/^https:\/\/twitter\.com\//i, 'https://x.com/')
+    .replace(/[?#].*$/, '')
+    .replace(/\/$/, '');
 
   const compactText = s => clean(s)
     .replace(/已经/g, '已')
@@ -104,26 +111,40 @@ export default async function (ctx) {
   let chatgptData = null;
   const errors = [];
 
-  try {
-    data = await fetchJson(DATA_URL);
-  } catch (e) {
-    errors.push(e?.message || String(e));
+  const [mainResult, chatgptResult] = await Promise.allSettled([
+    fetchJson(DATA_URL),
+    fetchJson(CHATGPT_DATA_URL)
+  ]);
+
+  if (mainResult.status === 'fulfilled') {
+    data = mainResult.value;
+  } else {
+    errors.push(mainResult.reason?.message || String(mainResult.reason));
   }
 
-  try {
-    chatgptData = await fetchJson(CHATGPT_DATA_URL);
-  } catch (e) {
-    errors.push(e?.message || String(e));
+  if (chatgptResult.status === 'fulfilled') {
+    chatgptData = chatgptResult.value;
+  } else {
+    errors.push(chatgptResult.reason?.message || String(chatgptResult.reason));
   }
 
   const merged = new Map();
+  const urlKeys = new Map();
   const addItems = items => {
     for (const raw of Array.isArray(items) ? items : []) {
       const item = raw && typeof raw === 'object' ? raw : null;
-      const id = String(item?.id || '');
-      if (!id) continue;
-      const previous = merged.get(id) || {};
-      merged.set(id, { ...previous, ...item });
+      const id = String(item?.id || '').trim();
+      const urlKey = normalizeUrl(item?.url);
+      if (!id && !urlKey) continue;
+
+      let key = id ? `id:${id}` : `url:${urlKey}`;
+      if (urlKey && urlKeys.has(urlKey)) {
+        key = urlKeys.get(urlKey);
+      }
+
+      const previous = merged.get(key) || {};
+      merged.set(key, { ...previous, ...item });
+      if (urlKey) urlKeys.set(urlKey, key);
     }
   };
 
@@ -131,6 +152,7 @@ export default async function (ctx) {
   addItems(chatgptData?.feed);
 
   const feed = Array.from(merged.values())
+    .filter(item => !Number.isNaN(new Date(item?.created_at || 0).getTime()))
     .sort((a, b) => new Date(b?.created_at || 0) - new Date(a?.created_at || 0));
 
   const reset = feed.find(x => x?.kind === 'reset') || null;
@@ -141,6 +163,7 @@ export default async function (ctx) {
 
   const syncCandidates = [data?.updated_at, chatgptData?.updated_at]
     .filter(Boolean)
+    .filter(value => !Number.isNaN(new Date(value).getTime()))
     .sort((a, b) => new Date(b) - new Date(a));
   const syncTime = fmtSyncTime(syncCandidates[0]);
 
