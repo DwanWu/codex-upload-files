@@ -1,0 +1,30 @@
+{
+  "updated_at": "2026-09-09T00:34:21Z",
+  "source": "chatgpt_web",
+  "feed": [
+    {
+      "id": "2097174560412246215",
+      "kind": "reset",
+      "handle": "thsottiaux",
+      "author_name": "Tibo",
+      "created_at": "2026-09-08T04:05:53Z",
+      "text": "All reset for everyone. Enjoy the week with Astra.",
+      "text_zh": "已为所有人完成全局额度重置，可以继续使用 Astra。",
+      "summary_zh": "已为所有人完成全局额度重置，可以继续使用 Astra",
+      "url": "https://x.com/thsottiaux/status/2097174560412246215",
+      "source": "chatgpt_web"
+    },
+    {
+      "id": "2097099796280660173",
+      "kind": "update",
+      "handle": "dkundel",
+      "author_name": "Dominik",
+      "created_at": "2026-09-07T23:08:48Z",
+      "text": "Reminder that GPT-6 Astra on Low can be better than 5.6 Sol on High",
+      "text_zh": "提醒：GPT-6 Astra 的 Low 推理强度表现可优于 GPT-5.6 Sol 的 High。",
+      "summary_zh": "GPT-6 Astra 的 Low 推理强度表现可优于 GPT-5.6 Sol 的 High",
+      "url": "https://x.com/dkundel/status/2097099796280660173",
+      "source": "chatgpt_web"
+    }
+  ]
+}
