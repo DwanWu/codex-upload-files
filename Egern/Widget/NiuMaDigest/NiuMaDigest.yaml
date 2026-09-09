@@ -10,13 +10,12 @@
 name: "牛马消息"
 description: "GitHub Actions 免费抓取并由 ChatGPT 定时联网补漏，自动合并 Codex 相关动态，仅显示重置/更新分类、发布时间和中文摘要。"
 
-auto_update:
-  interval: 1800
-
 scriptings:
   - generic:
       name: 牛马消息
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaDigest/NiuMaDigest.js?v=20260909-4
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaDigest/NiuMaDigest.js?v=20260909-5
+      update_interval: 1800
+      timeout: 20
 
 widgets:
   - name: 牛马消息
