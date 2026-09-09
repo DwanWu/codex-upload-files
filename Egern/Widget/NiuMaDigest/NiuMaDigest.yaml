@@ -2,12 +2,13 @@
 # 📌 模块名称: 牛马消息
 # 🟣 图标: 紫色
 # ✨ 功能: 跟踪 X 上 Codex 重置/额度与更新/发布信息
-# 🌏 显示: 自动翻译 + 中文摘要，仅保留分类、时间和摘要
+# 🌏 数据: GitHub Actions 免费抓取 + ChatGPT 定时联网补漏
+# 🌏 显示: 仅保留分类、时间和中文摘要
 # 👥 重点来源: Tibo / Dominik / Nick / OpenAI Developers
 # ==========================================
 
 name: "牛马消息"
-description: "自动抓取并翻译 Codex 相关 X 动态，仅显示重置/更新分类、发布时间和中文摘要。"
+description: "GitHub Actions 免费抓取并由 ChatGPT 定时联网补漏，自动合并 Codex 相关动态，仅显示重置/更新分类、发布时间和中文摘要。"
 
 auto_update:
   interval: 1800
@@ -15,7 +16,7 @@ auto_update:
 scriptings:
   - generic:
       name: 牛马消息
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaDigest/NiuMaDigest.js?v=20260909-1
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaDigest/NiuMaDigest.js?v=20260909-2
 
 widgets:
   - name: 牛马消息
