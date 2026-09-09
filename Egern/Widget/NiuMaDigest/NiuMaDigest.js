@@ -1,6 +1,6 @@
 /**
  * 牛马消息
- * 仅显示分类、时间和精简摘要，不重复显示完整正文，也不显示作者与账号。
+ * 仅显示分类、时间和精简摘要；摘要尽量填满可用两行，再由 Egern 自然截断。
  */
 
 const DATA_URL = 'https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NiuMaDigest/NiuMaDigest.json';
@@ -50,9 +50,29 @@ export default async function (ctx) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  const summaryText = item => clean(
-    item?.summary_zh || item?.text_zh || item?.translation || item?.text || item?.summary || '暂无消息'
-  );
+  const compactText = s => clean(s)
+    .replace(/已经/g, '已')
+    .replace(/目前正在/g, '正')
+    .replace(/正在/g, '')
+    .replace(/将会/g, '将')
+    .replace(/陆续开始/g, '陆续')
+    .replace(/正式开始/g, '开始')
+    .replace(/进行完整的/g, '进行完整')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const summaryText = item => {
+    const summary = clean(item?.summary_zh || item?.summary || '');
+    const fullZh = compactText(item?.text_zh || item?.translation || item?.text || '');
+
+    // 后台旧摘要可能在固定字符数时已经手工加了“…”；
+    // 这种情况下改用更长的中文精简文本，让 Egern 根据实际两行宽度决定截断位置。
+    if (summary.endsWith('…') && fullZh && fullZh.length > summary.length) {
+      return fullZh.slice(0, 160);
+    }
+
+    return summary || fullZh || '暂无消息';
+  };
 
   const fmtDateTime = value => {
     if (!value) return '--.-- --:--';
@@ -126,7 +146,10 @@ export default async function (ctx) {
         spacer(),
         text(fmtDateTime(item.created_at), compact ? 8 : 9, 'bold', color, { maxLines: 1 })
       ], 4),
-      text(summary, compact ? 10 : 11, 'heavy', color, { maxLines: 2, minScale: 0.74 })
+      text(summary, compact ? 10 : 11, 'heavy', color, {
+        maxLines: 2,
+        minScale: compact ? 0.78 : 0.86
+      })
     ], compact ? 3 : 4, { url: item.url });
   };
 
