@@ -1,6 +1,6 @@
 {
-  "updated_at": "2026-09-09T11:30:21.057954Z",
-  "last_success_at": "2026-09-09T11:30:21.057954Z",
+  "updated_at": "2026-09-09T16:48:56.810173Z",
+  "last_success_at": "2026-09-09T16:48:56.810173Z",
   "source": "x_syndication",
   "source_health": {
     "x_syndication": {
@@ -10,9 +10,9 @@
       "failed_accounts": [
         "thsottiaux",
         "dkundel",
-        "nickbaumann_"
+        "OpenAIDevs"
       ],
-      "posts": 15
+      "posts": 2
     }
   },
   "translation": "zh-CN",
