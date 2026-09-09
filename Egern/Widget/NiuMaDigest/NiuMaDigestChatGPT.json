@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-09T06:32:57Z",
+  "updated_at": "2026-09-09T12:27:10Z",
   "source": "chatgpt_web",
   "feed": [
     {
@@ -12,6 +12,18 @@
       "text_zh": "Astra 需求前所未有，OpenAI 正尽力扩容并优先保障现有用户；如果需求持续，可能会暂时暂停新的 Pro 订阅。",
       "summary_zh": "Astra 需求前所未有，如持续可能暂时暂停新的 Pro 订阅",
       "url": "https://x.com/thsottiaux/status/2097559315150426222",
+      "source": "chatgpt_web"
+    },
+    {
+      "id": "2097193293532848288",
+      "kind": "update",
+      "handle": "thsottiaux",
+      "author_name": "Tibo",
+      "created_at": "2026-09-08T05:20:00Z",
+      "text": "Looking at this 28 page deck right now where Codex is keeping track of all the individual launches. Each one of them I can't wait to see what people do with it. Brought to you by an incredible team (and Astra)",
+      "text_zh": "Codex 正用一份 28 页的材料跟踪多项独立发布；Tibo 表示很期待看到用户如何使用这些由团队和 Astra 推动的新功能。",
+      "summary_zh": "Codex 正跟踪多项独立发布，后续还有一系列 Astra 相关上线内容",
+      "url": "https://x.com/thsottiaux/status/2097193293532848288",
       "source": "chatgpt_web"
     },
     {
@@ -132,6 +144,30 @@
       "text_zh": "从当天起，付费 ChatGPT 用户每多一天无法使用 Astra，就会获得一次 banked reset；第一次预计约 3 小时后到账。",
       "summary_zh": "未获得 Astra 的付费用户每天可获一次 banked reset，第一次约 3 小时后到账",
       "url": "https://x.com/thsottiaux/status/2095651088502591861",
+      "source": "chatgpt_web"
+    },
+    {
+      "id": "2095597659545591917",
+      "kind": "update",
+      "handle": "thsottiaux",
+      "author_name": "Tibo",
+      "created_at": "2026-09-03T19:39:00Z",
+      "text": "Across the plans Astra will be included in the normal usage allocation and you will be able to use 100% of it towards Astra.",
+      "text_zh": "各付费方案中，Astra 计入正常使用额度，并且可以把全部正常额度用于 Astra。",
+      "summary_zh": "Astra 计入正常使用额度，可将全部额度用于 Astra",
+      "url": "https://x.com/thsottiaux/status/2095597659545591917",
+      "source": "chatgpt_web"
+    },
+    {
+      "id": "2095597168816226335",
+      "kind": "update",
+      "handle": "thsottiaux",
+      "author_name": "Tibo",
+      "created_at": "2026-09-03T19:37:00Z",
+      "text": "We are starting to release GPT-6 Astra and we are doing it as carefully and quickly as possible. It was very important to us that we bring it to all Plus users and not only Pro, Business and Enterprise. It will take a few days for the rollout to complete and behind the scenes many novel systems will operate at scale for the first time and we are bringing a lot of compute up. It is pure magic.",
+      "text_zh": "GPT-6 Astra 开始逐步发布，目标覆盖所有 Plus 用户以及 Pro、Business、Enterprise；完整推送预计需要数天。",
+      "summary_zh": "GPT-6 Astra 开始逐步发布，完整推送预计需要数天并覆盖所有 Plus 用户",
+      "url": "https://x.com/thsottiaux/status/2095597168816226335",
       "source": "chatgpt_web"
     },
     {
