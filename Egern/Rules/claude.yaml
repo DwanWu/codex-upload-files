@@ -1,20 +1,44 @@
-# Extracted and organized from QuixoticHeart/rule-set egern/ai.yaml
-# Anthropic / Claude related domains
+# Anthropic / Claude routing rules for Egern
+# Sources:
+# - Anthropic/Claude official product and IP documentation
+# - QuixoticHeart/rule-set egern/ai.yaml
+# - Cross-check against current Claude desktop/CLI dependency rules
+
+no_resolve: true
 
 domain_set:
 - anthropic-com.ghost.io
 - anthropic.com.cdn.cloudflare.net
 - servd-anthropic-website.b-cdn.net
+- cdn.growthbook.io
+- cdn.usefathom.com
 
 domain_suffix_set:
 - anthropic.com
+- antspace.dev
 - clau.de
 - claude.ai
+- claude.app
 - claude.com
+- claude.new
+- claude.site
 - claudemcpclient.com
 - claudemcpcontent.com
+- claudepages.dev
 - claudeusercontent.com
+- modelcontextprotocol.com
+- modelcontextprotocol.io
+- modelcontextprotocol.net
+- modelcontextprotocol.org
 
 domain_keyword_set:
 - anthropic
 - claude
+
+# Anthropic owns 160.79.104.0/21; the official inbound API/Console range is 160.79.104.0/23.
+# Routing the full /21 is deliberately fail-safe so direct-IP Anthropic traffic cannot bypass domain matching.
+ip_cidr_set:
+- 160.79.104.0/21
+
+ip_cidr6_set:
+- 2607:6bc0::/48
