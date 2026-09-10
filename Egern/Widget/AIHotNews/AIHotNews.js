@@ -170,9 +170,9 @@ export default async function (ctx) {
   ], 6);
 
   const footer = size => row([
-    text('数据来源 · AIHOT', size, 'medium', C.muted, { maxLines: 1 }),
+    text('AIHOT', size, 'medium', C.muted, { maxLines: 1 }),
     spacer(),
-    text(latestAt ? `更新 ${formatClock(latestAt)}` : '实时读取', size, 'medium', C.muted, { maxLines: 1 })
+    text(latestAt ? formatClock(latestAt) : '--:--', size, 'medium', C.muted, { maxLines: 1 })
   ]);
 
   if (!items.length) {
