@@ -1,10 +1,10 @@
 # ==========================================
-# 📌 模块名称: 广东油价 Widget
+# 📌 模块名称: 广东油价
 # ✨ 主要功能: 固定显示广东省 92/95/98 号汽油及柴油价格、涨跌和调价倒计时。
 # 🔗 https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/OilPriceGD/OilPriceGD.yaml
 # ==========================================
 
-name: "广东油价 Widget"
+name: "广东油价"
 description: "固定广东省油价，不提供其他省市切换；支持三尺寸、自适应油价卡片、涨跌趋势及调价倒计时。"
 
 auto_update:
