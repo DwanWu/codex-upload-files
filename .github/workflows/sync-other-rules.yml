@@ -1,0 +1,114 @@
+name: Sync complete Other rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sync-other-rules.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build other rules from complete proxy rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p Egern/Rules /tmp/egern-rules
+          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/proxy.yaml' -o /tmp/egern-rules/proxy.yaml
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          source = Path('/tmp/egern-rules/proxy.yaml')
+          category_files = [
+              Path('Egern/Rules/chatgpt.yaml'),
+              Path('Egern/Rules/google.yaml'),
+              Path('Egern/Rules/claude.yaml'),
+          ]
+          output = Path('Egern/Rules/other.yaml')
+
+          section_names = {
+              'domain_set',
+              'domain_suffix_set',
+              'domain_keyword_set',
+              'domain_regex_set',
+              'ip_cidr_set',
+              'ip_cidr6_set',
+              'asn_set',
+              'url_regex_set',
+              'process_name_set',
+          }
+
+          def parse_rules(path):
+              result = {name: set() for name in section_names}
+              if not path.exists():
+                  return result
+              current = None
+              for raw in path.read_text(encoding='utf-8').splitlines():
+                  line = raw.strip()
+                  if not line or line.startswith('#'):
+                      continue
+                  if line.endswith(':') and not line.startswith('-'):
+                      key = line[:-1].strip()
+                      current = key if key in section_names else None
+                      continue
+                  if current and line.startswith('- '):
+                      result[current].add(line[2:].strip())
+              return result
+
+          excluded = {name: set() for name in section_names}
+          for file in category_files:
+              parsed = parse_rules(file)
+              for section, values in parsed.items():
+                  excluded[section].update(values)
+
+          lines = source.read_text(encoding='utf-8').splitlines()
+          out = []
+          current = None
+          removed = 0
+          for raw in lines:
+              stripped = raw.strip()
+              if stripped.endswith(':') and not stripped.startswith('-'):
+                  key = stripped[:-1].strip()
+                  current = key if key in section_names else None
+                  out.append(raw)
+                  continue
+              if current and stripped.startswith('- '):
+                  value = stripped[2:].strip()
+                  if value in excluded[current]:
+                      removed += 1
+                      continue
+              out.append(raw)
+
+          header = [
+              '# Complete OTHER proxy rules for Egern',
+              '# Source: QuixoticHeart/rule-set egern/proxy.yaml',
+              '# Excludes rules already assigned to chatgpt.yaml, google.yaml and claude.yaml.',
+              '# Includes common overseas services/sites and other AI services.',
+              '',
+          ]
+          output.write_text('\n'.join(header + out) + '\n', encoding='utf-8')
+          print(f'Generated {output}; removed {removed} rules already covered by dedicated categories.')
+          PY
+
+          rm -f Egern/Rules/other-ai.yaml
+
+      - name: Commit synced rules
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A Egern/Rules/other.yaml Egern/Rules/other-ai.yaml
+          if git diff --cached --quiet; then
+            echo 'No changes.'
+          else
+            git commit -m 'Sync complete Other Egern rules'
+            git push
+          fi
