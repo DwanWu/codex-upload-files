@@ -1,0 +1,36 @@
+name: Sync complete Google rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sync-google-rules.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download complete Google Egern rules
+        run: |
+          mkdir -p Egern/Rules
+          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/google.yaml' -o Egern/Rules/google.yaml
+          rm -f Egern/Rules/google-ai.yaml
+
+      - name: Commit synced rules
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Egern/Rules/google.yaml Egern/Rules/google-ai.yaml
+          if git diff --cached --quiet; then
+            echo 'No changes.'
+          else
+            git commit -m 'Sync complete Google Egern rules'
+            git push
+          fi
