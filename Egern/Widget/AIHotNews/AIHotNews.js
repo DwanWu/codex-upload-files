@@ -100,6 +100,7 @@ export default async function (ctx) {
   let mode = 'hot';
   let items = [];
   let errorText = '';
+  let syncAt = null;
 
   try {
     const payload = await getJson(HOT_URL);
@@ -112,6 +113,7 @@ export default async function (ctx) {
       latestAt: item?.latestAt || null,
       url: normalizeAIHotUrl(item?.links?.story)
     })).sort((a, b) => a.rank - b.rank);
+    if (items.length) syncAt = new Date().toISOString();
   } catch (e) {
     errorText = e?.message || String(e);
   }
@@ -129,15 +131,11 @@ export default async function (ctx) {
         latestAt: item?.publishedAt || item?.discoveredAt || null,
         url: normalizeAIHotUrl(item?.links?.aihot)
       }));
+      if (items.length) syncAt = new Date().toISOString();
     } catch (e) {
       errorText = e?.message || String(e);
     }
   }
-
-  const latestAt = items
-    .map(item => item.latestAt)
-    .filter(Boolean)
-    .sort((a, b) => new Date(b) - new Date(a))[0] || null;
 
   const rankColor = rank => rank === 1 ? C.red : rank === 2 ? C.orange : rank === 3 ? C.gold : C.muted;
   const rankBadge = (rank, compact = false) => ({
@@ -172,7 +170,7 @@ export default async function (ctx) {
   const footer = size => row([
     text('AIHOT', size, 'medium', C.muted, { maxLines: 1 }),
     spacer(),
-    text(latestAt ? formatClock(latestAt) : '--:--', size, 'medium', C.muted, { maxLines: 1 })
+    text(syncAt ? formatClock(syncAt) : '--:--', size, 'medium', C.muted, { maxLines: 1 })
   ]);
 
   if (!items.length) {
