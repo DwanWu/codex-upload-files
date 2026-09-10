@@ -55,7 +55,7 @@ export default async function (ctx) {
   const divider = () => ({
     type: 'stack', height: 0.5, backgroundColor: C.divider, children: []
   });
-  const chip = (label, color = C.red) => ({
+  const chip = (label, color = C.blue) => ({
     type: 'stack', direction: 'row', padding: [3, 7, 3, 7], backgroundColor: C.chip,
     children: [text(label, 9, 'bold', color, { maxLines: 1 })]
   });
@@ -150,30 +150,23 @@ export default async function (ctx) {
     ]
   });
 
-  const hotRow = (item, compact = false, showMeta = true) => {
-    const meta = mode === 'hot'
-      ? `${item.sourceCount || 0}源${item.signalCount ? ` · ${item.signalCount}信号` : ''}`
-      : formatClock(item.latestAt);
-
-    return row([
-      rankBadge(item.rank, compact),
-      text(item.title, compact ? 10 : 11, item.rank <= 3 ? 'heavy' : 'bold', C.main, {
-        maxLines: compact ? 2 : 1,
-        minScale: compact ? 0.72 : 0.78
-      }),
-      spacer(),
-      ...(showMeta ? [text(meta, compact ? 8 : 9, 'medium', C.muted, { maxLines: 1, minScale: 0.72 })] : [])
-    ], compact ? 3 : 5, {
-      url: item.url || HOME_URL,
-      padding: compact ? [2, 0, 2, 0] : [3, 0, 3, 0]
-    });
-  };
+  const hotRow = (item, compact = false) => row([
+    rankBadge(item.rank, compact),
+    text(item.title, compact ? 10 : 11, item.rank <= 3 ? 'heavy' : 'bold', C.main, {
+      maxLines: compact ? 2 : 1,
+      minScale: compact ? 0.72 : 0.78
+    }),
+    spacer()
+  ], compact ? 3 : 5, {
+    url: item.url || HOME_URL,
+    padding: compact ? [2, 0, 2, 0] : [3, 0, 3, 0]
+  });
 
   const header = size => row([
-    icon('flame.fill', C.red, size + 1),
+    icon('flame.fill', C.blue, size + 1),
     text('智能热搜', size, 'heavy', C.main),
     spacer(),
-    chip(mode === 'hot' ? 'AIHOT 热榜' : 'AIHOT 精选', mode === 'hot' ? C.red : C.blue)
+    chip(mode === 'hot' ? '热榜' : '精选', C.blue)
   ], 6);
 
   const footer = size => row([
@@ -207,7 +200,7 @@ export default async function (ctx) {
         header(13),
         spacer(7),
         col(shown.flatMap((item, i) => [
-          hotRow(item, true, false),
+          hotRow(item, true),
           ...(i < shown.length - 1 ? [divider()] : [])
         ]), 4),
         spacer(),
@@ -224,7 +217,7 @@ export default async function (ctx) {
         header(17),
         spacer(8),
         col(shown.flatMap((item, i) => [
-          hotRow(item, false, true),
+          hotRow(item, false),
           ...(i < shown.length - 1 ? [divider()] : [])
         ]), 2, { flex: 1 }),
         spacer(6),
@@ -240,7 +233,7 @@ export default async function (ctx) {
       header(15),
       spacer(6),
       col(shown.flatMap((item, i) => [
-        hotRow(item, false, true),
+        hotRow(item, false),
         ...(i < shown.length - 1 ? [divider()] : [])
       ]), 1, { flex: 1 }),
       spacer(5),
