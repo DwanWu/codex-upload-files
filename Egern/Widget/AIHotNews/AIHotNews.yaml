@@ -12,7 +12,7 @@ description: "直接读取 AIHOT 官方热点榜，展示当前 AI 圈热门事�
 scriptings:
   - generic:
       name: 智能热搜
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/AIHotNews/AIHotNews.js?v=20260910-2
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/AIHotNews/AIHotNews.js?v=20260910-3
       update_interval: 1800
       timeout: 20
 
