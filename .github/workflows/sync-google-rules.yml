@@ -39,23 +39,19 @@ jobs:
           def parse(path):
               data = {k: [] for k in LIST_KEYS}
               current = None
-              no_resolve = False
               for raw in Path(path).read_text(encoding='utf-8').splitlines():
                   line = raw.rstrip()
-                  if line == 'no_resolve: true':
-                      no_resolve = True
-                      current = None
-                  elif line in [k + ':' for k in LIST_KEYS]:
+                  if line in [k + ':' for k in LIST_KEYS]:
                       current = line[:-1]
                   elif line.startswith('- ') and current:
                       data[current].append(line[2:])
                   elif line and not line.startswith('#'):
                       current = None
-              return no_resolve, data
+              return data
 
-          _, google = parse('/tmp/google-rules/google.yaml')
-          _, fcm = parse('/tmp/google-rules/googlefcm.yaml')
-          _, ai = parse('/tmp/google-rules/ai.yaml')
+          google = parse('/tmp/google-rules/google.yaml')
+          fcm = parse('/tmp/google-rules/googlefcm.yaml')
+          ai = parse('/tmp/google-rules/ai.yaml')
 
           def is_google_ai(value):
               v = value.lower()
@@ -71,7 +67,6 @@ jobs:
           for k in LIST_KEYS:
               merged[k].extend(fcm[k])
               merged[k].extend(x for x in ai[k] if is_google_ai(x))
-              # Stable de-duplication.
               merged[k] = list(dict.fromkeys(merged[k]))
 
           out = [
@@ -92,7 +87,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A Egern/Rules/google.yaml Egern/Rules/google-ai.yaml
+          git add -A Egern/Rules
           if git diff --cached --quiet; then
             echo 'No changes.'
           else
