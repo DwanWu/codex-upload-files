@@ -1,0 +1,82 @@
+name: Sync ChatGPT Voice IPs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sync-chatgpt-voice.yml'
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch current OpenAI Voice IP ranges
+        run: |
+          curl -fsSL 'https://openai.com/chatgpt-voice.json' -o /tmp/chatgpt-voice.json
+
+      - name: Merge IP ranges into Egern rules
+        run: |
+          python3 - <<'PY'
+          import ipaddress, json, re
+          from pathlib import Path
+
+          path = Path('Egern/Rules/chatgpt.yaml')
+          text = path.read_text(encoding='utf-8')
+
+          # Remove any previously generated IP sections.
+          lines = text.splitlines()
+          out = []
+          skipping = False
+          for line in lines:
+              if line in ('ip_cidr_set:', 'ip_cidr6_set:'):
+                  skipping = True
+                  continue
+              if skipping:
+                  if line.startswith('- ') or not line.strip():
+                      continue
+                  skipping = False
+              out.append(line)
+
+          data = json.loads(Path('/tmp/chatgpt-voice.json').read_text(encoding='utf-8'))
+          blob = json.dumps(data)
+          candidates = set(re.findall(r'(?<![0-9A-Fa-f:.])(?:[0-9A-Fa-f:.]+)/\d{1,3}', blob))
+          v4, v6 = [], []
+          for s in candidates:
+              try:
+                  n = ipaddress.ip_network(s, strict=False)
+              except ValueError:
+                  continue
+              (v4 if n.version == 4 else v6).append(str(n))
+          v4 = sorted(set(v4), key=lambda x: (int(ipaddress.ip_network(x).network_address), ipaddress.ip_network(x).prefixlen))
+          v6 = sorted(set(v6), key=lambda x: (int(ipaddress.ip_network(x).network_address), ipaddress.ip_network(x).prefixlen))
+          if not v4 and not v6:
+              raise SystemExit('No CIDR ranges found in chatgpt-voice.json')
+
+          result = '\n'.join(out).rstrip() + '\n\n# Auto-synced from https://openai.com/chatgpt-voice.json\n'
+          if v4:
+              result += 'ip_cidr_set:\n' + ''.join(f'- {x}\n' for x in v4)
+          if v6:
+              result += 'ip_cidr6_set:\n' + ''.join(f'- {x}\n' for x in v6)
+          path.write_text(result, encoding='utf-8')
+          PY
+
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Egern/Rules/chatgpt.yaml
+          if git diff --cached --quiet; then
+            echo 'No changes.'
+          else
+            git commit -m 'Sync current ChatGPT Voice IP ranges'
+            git push
+          fi
