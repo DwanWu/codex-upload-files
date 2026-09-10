@@ -1,9 +1,16 @@
-# Extracted and organized from QuixoticHeart/rule-set egern/ai.yaml
-# OpenAI / ChatGPT / Sora related domains
+# OpenAI / ChatGPT / Codex / Sora routing rules for Egern
+# Sources:
+# - OpenAI official network recommendations
+# - QuixoticHeart/rule-set egern/ai.yaml
+# Third-party endpoints below are included only where they are used by ChatGPT/OpenAI.
+
+no_resolve: true
 
 domain_set:
 - api.statsig.com
 - browser-intake-datadoghq.com
+- rum.browser-intake-datadoghq.com
+- o207216.ingest.sentry.io
 - o33249.ingest.sentry.io
 - openai.qualtrics.com
 - openaiassets.blob.core.windows.net
@@ -11,13 +18,25 @@ domain_set:
 - openaicom.imgix.net
 - openaicomproductionae4b.blob.core.windows.net
 - production-openaicom-storage.azureedge.net
+- cdn.openaimerge.com
+- cdn.workos.com
+- forwarder.workos.com
+- setup.workos.com
+- images.workoscdn.com
+- workos.imgix.net
+- challenges.cloudflare.com
+- humb.apple.com
+- js.stripe.com
+- openai-api.arkoselabs.com
 
 domain_suffix_set:
 - ai.com
 - auth0.com
+- auth.openai.com
 - chat.com
 - chatgpt.com
 - chatgpt.site
+- ct.sendgrid.net
 - client-api.arkoselabs.com
 - events.statsigapi.net
 - featuregates.org
@@ -30,11 +49,18 @@ domain_suffix_set:
 - openai.com.cdn.cloudflare.net
 - openaiapi-site.azureedge.net
 - sora.com
+- chatgpt.livekit.cloud
+- host.livekit.cloud
+- turn.livekit.cloud
 
 domain_keyword_set:
+- chatgpt
 - openai
 - openaiapi
 - openaicom
+- oaistatic
+- oaistatsig
+- oaiusercontent
 
 domain_regex_set:
 - ^chatgpt-async-webps-prod-\S+-\d+\.webpubsub\.azure\.com$
