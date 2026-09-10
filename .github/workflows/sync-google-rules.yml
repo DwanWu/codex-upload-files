@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/sync-google-rules.yml'
+  schedule:
+    - cron: '11 3 * * *'
   workflow_dispatch:
 
 permissions:
@@ -17,20 +19,83 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download complete Google Egern rules
+      - name: Download Google rule sources
         run: |
-          mkdir -p Egern/Rules
-          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/google.yaml' -o Egern/Rules/google.yaml
-          rm -f Egern/Rules/google-ai.yaml
+          mkdir -p /tmp/google-rules Egern/Rules
+          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/google.yaml' -o /tmp/google-rules/google.yaml
+          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/googlefcm.yaml' -o /tmp/google-rules/googlefcm.yaml
+          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/ai.yaml' -o /tmp/google-rules/ai.yaml
+
+      - name: Merge Google core, Google AI and FCM IP rules
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          LIST_KEYS = [
+              'domain_set', 'domain_suffix_set', 'domain_keyword_set',
+              'domain_regex_set', 'ip_cidr_set', 'ip_cidr6_set'
+          ]
+
+          def parse(path):
+              data = {k: [] for k in LIST_KEYS}
+              current = None
+              no_resolve = False
+              for raw in Path(path).read_text(encoding='utf-8').splitlines():
+                  line = raw.rstrip()
+                  if line == 'no_resolve: true':
+                      no_resolve = True
+                      current = None
+                  elif line in [k + ':' for k in LIST_KEYS]:
+                      current = line[:-1]
+                  elif line.startswith('- ') and current:
+                      data[current].append(line[2:])
+                  elif line and not line.startswith('#'):
+                      current = None
+              return no_resolve, data
+
+          _, google = parse('/tmp/google-rules/google.yaml')
+          _, fcm = parse('/tmp/google-rules/googlefcm.yaml')
+          _, ai = parse('/tmp/google-rules/ai.yaml')
+
+          def is_google_ai(value):
+              v = value.lower()
+              markers = (
+                  'google', 'googleapis', 'gstatic', 'deepmind', 'gemini',
+                  'notebooklm', 'makersuite', 'antigravity', 'generative',
+                  'alkali', 'cloudaicompanion', 'jules', 'labs.google',
+                  'opal.google', 'flow.google', 'stitch.withgoogle'
+              )
+              return v in {'g.ai', 'ai.studio'} or any(m in v for m in markers)
+
+          merged = {k: list(google[k]) for k in LIST_KEYS}
+          for k in LIST_KEYS:
+              merged[k].extend(fcm[k])
+              merged[k].extend(x for x in ai[k] if is_google_ai(x))
+              # Stable de-duplication.
+              merged[k] = list(dict.fromkeys(merged[k]))
+
+          out = [
+              '# Complete Google routing rules for Egern',
+              '# Merged daily from QuixoticHeart: google.yaml + googlefcm.yaml + Google entries in ai.yaml',
+              '# Includes Google/Gemini domains and FCM direct-IP endpoints.',
+              '',
+              'no_resolve: true',
+          ]
+          for key in LIST_KEYS:
+              if merged[key]:
+                  out += ['', key + ':'] + [f'- {x}' for x in merged[key]]
+          Path('Egern/Rules/google.yaml').write_text('\n'.join(out) + '\n', encoding='utf-8')
+          Path('Egern/Rules/google-ai.yaml').unlink(missing_ok=True)
+          PY
 
       - name: Commit synced rules
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add Egern/Rules/google.yaml Egern/Rules/google-ai.yaml
+          git add -A Egern/Rules/google.yaml Egern/Rules/google-ai.yaml
           if git diff --cached --quiet; then
             echo 'No changes.'
           else
-            git commit -m 'Sync complete Google Egern rules'
+            git commit -m 'Sync hardened Google Egern rules'
             git push
           fi
