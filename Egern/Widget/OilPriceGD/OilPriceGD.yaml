@@ -5,7 +5,7 @@
 # ==========================================
 
 name: "广东油价"
-description: "固定广东省油价；恢复旧版完整信息量，支持三尺寸、92/95/98/柴油、单项涨跌、整体涨跌、下轮调价倒计时、临近调价预测及大号历史走势。"
+description: "固定广东省油价；支持三尺寸、92/95/98/柴油、单项涨跌、整体涨跌、下轮调价倒计时及大号历史走势。"
 
 auto_update:
   interval: 43200
@@ -13,7 +13,7 @@ auto_update:
 scriptings:
   - generic:
       name: 广东油价
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/OilPriceGD/OilPriceGD.js?v=20260916-2
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/OilPriceGD/OilPriceGD.js?v=20260916-3
       update_interval: 1800
       timeout: 20
 
