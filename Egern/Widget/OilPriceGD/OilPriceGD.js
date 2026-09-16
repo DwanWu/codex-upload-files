@@ -1,6 +1,7 @@
 /**
  * 广东油价 · Egern Widget
  * 稳定修复版：保留旧版 Small / Medium / Large 布局，只重写数据层。
+ * 显示：92/95/98 号汽油；三卡参考 NodeVitals 居中布局。
  * 主源：9662 广东实时油价（92/95/98/柴油、涨跌、历史、下轮调价）
  * 备源：油价网 zzcha 广东页
  */
@@ -136,8 +137,8 @@ function parsePage(html) {
   const p98 = pickGrade(currentScope, '98');
   const diesel = pickGrade(currentScope, '0');
 
-  if (![p92.price,p95.price,p98.price,diesel.price].every(Number.isFinite)) {
-    throw new Error('未解析到完整 92/95/98/柴油价格');
+  if (![p92.price,p95.price,p98.price].every(Number.isFinite)) {
+    throw new Error('未解析到完整 92/95/98 号汽油价格');
   }
 
   const history = parseHistory(text);
@@ -216,8 +217,7 @@ export default async function(ctx) {
   const items=[
     {label:'92号',key:'p92',color:C.gold,hex:'#D4A02A'},
     {label:'95号',key:'p95',color:C.red,hex:'#FF453A'},
-    {label:'98号',key:'p98',color:C.blue,hex:'#2F80ED'},
-    {label:'柴油',key:'diesel',color:C.teal,hex:'#27AE60'}
+    {label:'98号',key:'p98',color:C.blue,hex:'#2F80ED'}
   ].map(x=>({...x,price:data.current[x.key].price,delta:data.current[x.key].delta,val:data.current[x.key].price.toFixed(2),series:series(x.key)}));
 
   const deltaNode=(it,size)=>Number.isFinite(it.delta)&&it.delta!==0?t(`${it.delta>0?'+':''}${it.delta.toFixed(2)}`,size,'bold',it.delta>0?C.red:C.teal,{maxLines:1}):t(' ',size,'bold',C.muted);
@@ -225,6 +225,14 @@ export default async function(ctx) {
     const chart=cfg.chart&&it.series.length>1?lineChartSVG(it.series,{color:it.hex,width:cfg.cw,height:cfg.ch}):null;
     return {type:'stack',direction:'column',alignItems:'center',flex:1,backgroundColor:C.card,borderRadius:cfg.r,padding:cfg.pad,children:[sp(),t(it.label,cfg.ls,'bold',it.color,{maxLines:1}),sp(cfg.g),t(it.val,cfg.vs,'heavy',C.main,{maxLines:1,minScale:.75}),sp(2),deltaNode(it,cfg.ds),...(chart?[sp(5),{type:'image',src:chart,width:cfg.cw,height:cfg.ch,resizable:true,resizeMode:'contain'}]:[]),sp()]};
   };
+
+  const centeredBody=(cfg,gap,height)=>({
+    type:'stack',direction:'column',flex:1,children:[
+      sp(),
+      row(items.map(x=>card(x,cfg)),gap,{height}),
+      sp()
+    ]
+  });
 
   const deltas=items.map(x=>x.delta).filter(Number.isFinite).filter(x=>x!==0);
   let trend=null;
@@ -234,30 +242,29 @@ export default async function(ctx) {
   }
 
   if(isSmall){
-    const cfg={r:10,pad:[4,2,4,2],ls:10,vs:14,ds:9,g:1};
-    const content={type:'stack',direction:'column',children:[
-      row([icon('fuelpump.circle.fill',C.red,13),sp(4),t('广东油价',13,'heavy',C.main),sp(),t(updateTimeStr,9,'bold',C.muted,{family:'Menlo'})],0),sp(8),
-      {type:'stack',direction:'column',gap:8,children:[row(items.slice(0,2).map(x=>card(x,cfg)),6),row(items.slice(2,4).map(x=>card(x,cfg)),6)]},sp(8),
+    const cfg={r:10,pad:[6,2,6,2],ls:9,vs:13,ds:8,g:2};
+    return {type:'widget',refreshAfter,padding:12,url:OFFICIAL_URL,backgroundGradient:bg,children:[
+      row([icon('fuelpump.circle.fill',C.red,13),sp(4),t('广东油价',13,'heavy',C.main),sp(),t(updateTimeStr,9,'bold',C.muted,{family:'Menlo'})],0),
+      centeredBody(cfg,6,62),
       row([sp(),icon('clock.fill',C.red,9),sp(3),t(`下轮调价: ${next.dateStr}`,9,'bold',C.red)],0)
     ]};
-    return {type:'widget',refreshAfter,padding:[6,12,6,12],url:OFFICIAL_URL,backgroundGradient:bg,children:[sp(),content,sp()]};
   }
 
   if(isLarge){
-    const cfg={r:14,pad:[10,4,10,4],ls:14,vs:24,ds:12,g:4,chart:true,cw:84,ch:26};
-    const content={type:'stack',direction:'column',children:[
-      row([icon('fuelpump.circle.fill',C.red,17),sp(4),t('广东油价',16,'heavy',C.main),sp(),t('下轮调价: ',12,'medium',C.red),t(next.dateStr,12,'bold',C.red),t(` ${next.countdown}`,12,'bold',C.red)],0),sp(14),
-      {type:'stack',direction:'column',gap:12,children:[row(items.slice(0,2).map(x=>card(x,cfg)),12),row(items.slice(2,4).map(x=>card(x,cfg)),12)]},sp(12),divider(),sp(8),
+    const cfg={r:14,pad:[14,6,14,6],ls:14,vs:26,ds:12,g:6,chart:true,cw:94,ch:30};
+    return {type:'widget',refreshAfter,padding:16,url:OFFICIAL_URL,backgroundGradient:bg,children:[
+      row([icon('fuelpump.circle.fill',C.red,17),sp(4),t('广东油价',16,'heavy',C.main),sp(),t('下轮调价: ',12,'medium',C.red),t(next.dateStr,12,'bold',C.red),t(` ${next.countdown}`,12,'bold',C.red)],0),
+      centeredBody(cfg,12,140),
+      divider(),sp(8),
       row([...(trend?[row([t('较上次调整: ',11,'medium',C.muted),t(trend.text,11,'bold',trend.color)],2)]:[]),sp(),t(updateTimeStr,11,'bold',C.muted,{family:'Menlo'})],0)
     ]};
-    return {type:'widget',refreshAfter,padding:[10,16,10,16],url:OFFICIAL_URL,backgroundGradient:bg,children:[sp(),content,sp()]};
   }
 
-  const cfg={r:13,pad:[12,6,12,6],ls:11,vs:18,ds:11,g:4};
-  const content={type:'stack',direction:'column',children:[
-    row([icon('fuelpump.circle.fill',C.red,16),sp(2),t('广东油价',15,'heavy',C.main),sp(),t('下轮调价: ',11,'medium',C.red),t(next.dateStr,11,'bold',C.red),t(` ${next.countdown}`,11,'bold',C.red)],0),sp(14),
-    row(items.map(x=>card(x,cfg)),6),sp(14),divider(),sp(8),
+  const cfg={r:12,pad:[11,5,11,5],ls:11,vs:21,ds:10,g:4};
+  return {type:'widget',refreshAfter,padding:13,url:OFFICIAL_URL,backgroundGradient:bg,children:[
+    row([icon('fuelpump.circle.fill',C.red,16),sp(2),t('广东油价',15,'heavy',C.main),sp(),t('下轮调价: ',11,'medium',C.red),t(next.dateStr,11,'bold',C.red),t(` ${next.countdown}`,11,'bold',C.red)],0),
+    centeredBody(cfg,8,78),
+    divider(),sp(8),
     row([...(trend?[row([t('较上次调整: ',11,'medium',C.muted),t(trend.text,11,'bold',trend.color)],2)]:[]),sp(),t(updateTimeStr,10,'bold',C.muted,{family:'Menlo'})],0)
   ]};
-  return {type:'widget',refreshAfter,padding:[6,12,6,12],url:OFFICIAL_URL,backgroundGradient:bg,children:[sp(),content,sp()]};
 }
