@@ -2,6 +2,7 @@
 # Source: QuixoticHeart/rule-set egern/proxy.yaml
 # Excludes rules already assigned to chatgpt.yaml, google.yaml and claude.yaml.
 # Excludes Apple rules from apple, apple-cn, apple-proxy, apple-tv and apns.
+# Adds common IP/proxy node test sites as domain keywords.
 # Includes common overseas services/sites and other AI services.
 
 no_resolve: true
@@ -27398,6 +27399,22 @@ domain_keyword_set:
 - whatsapp
 - wikileaks
 - youtube
+- dnsleaktest
+- ip2location
+- ipapi
+- ipcheck
+- iphey
+- ipify
+- ipinfo
+- ipleak
+- iplocation
+- ippure
+- ipqualityscore
+- iprobe
+- ping0
+- pixelscan
+- scamalytics
+- whoer
 domain_regex_set:
 - (^|\.)13mei[5-7]\.buzz$
 - (^|\.)18j[efg]\.life$
