@@ -57,6 +57,28 @@ jobs:
               'process_name_set',
           }
 
+          # Keep common proxy-node/IP purity/leak test sites in this aggregate.
+          # Keywords are intentional so related subdomains/API hosts are covered too.
+          custom_ip_test_keywords = {
+              'ippure',
+              'ping0',
+              'ipinfo',
+              'ipify',
+              'ipapi',
+              'iplocation',
+              'ip2location',
+              'whoer',
+              'ipleak',
+              'dnsleaktest',
+              'browserleaks',
+              'scamalytics',
+              'ipqualityscore',
+              'iphey',
+              'pixelscan',
+              'iprobe',
+              'ipcheck',
+          }
+
           def parse_rules(path):
               result = {name: set() for name in section_names}
               if not path.exists():
@@ -84,6 +106,7 @@ jobs:
           out = []
           current = None
           removed = 0
+          existing = {name: set() for name in section_names}
           for raw in lines:
               stripped = raw.strip()
               if stripped.endswith(':') and not stripped.startswith('-'):
@@ -96,18 +119,36 @@ jobs:
                   if value in excluded[current]:
                       removed += 1
                       continue
+                  existing[current].add(value)
               out.append(raw)
+
+          # Insert custom test-site keywords into domain_keyword_set. If the source
+          # ever lacks that section, append a valid section at the end.
+          missing = sorted(custom_ip_test_keywords - existing['domain_keyword_set'])
+          if missing:
+              try:
+                  idx = next(i for i, line in enumerate(out) if line.strip() == 'domain_keyword_set:')
+                  insert_at = idx + 1
+                  while insert_at < len(out) and (out[insert_at].lstrip().startswith('- ') or not out[insert_at].strip()):
+                      insert_at += 1
+                  out[insert_at:insert_at] = [f'- {value}' for value in missing]
+              except StopIteration:
+                  if out and out[-1].strip():
+                      out.append('')
+                  out.append('domain_keyword_set:')
+                  out.extend(f'- {value}' for value in missing)
 
           header = [
               '# Complete OTHER proxy rules for Egern',
               '# Source: QuixoticHeart/rule-set egern/proxy.yaml',
               '# Excludes rules already assigned to chatgpt.yaml, google.yaml and claude.yaml.',
               '# Excludes Apple rules from apple, apple-cn, apple-proxy, apple-tv and apns.',
+              '# Adds common IP/proxy node test sites as domain keywords.',
               '# Includes common overseas services/sites and other AI services.',
               '',
           ]
           output.write_text('\n'.join(header + out) + '\n', encoding='utf-8')
-          print(f'Generated {output}; removed {removed} rules covered by dedicated categories or Apple rules.')
+          print(f'Generated {output}; removed {removed} excluded rules; ensured {len(custom_ip_test_keywords)} IP-test keywords.')
           PY
 
       - name: Commit synced rules
