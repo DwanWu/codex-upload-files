@@ -1,11 +1,11 @@
 # ==========================================
 # 📌 模块名称: 广东油价
-# ✨ 主要功能: 固定显示广东省 92/95/98 号汽油及柴油价格、涨跌和调价倒计时。
+# ✨ 主要功能: 固定显示广东省 92/95/98 号汽油及柴油价格、单项涨跌、整体涨跌、调价倒计时及历史走势。
 # 🔗 https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/OilPriceGD/OilPriceGD.yaml
 # ==========================================
 
 name: "广东油价"
-description: "固定广东省油价，不提供其他省市切换；支持三尺寸、自适应油价卡片、涨跌趋势及调价倒计时。"
+description: "固定广东省油价；恢复旧版完整信息量，支持三尺寸、92/95/98/柴油、单项涨跌、整体涨跌、下轮调价倒计时、临近调价预测及大号历史走势。"
 
 auto_update:
   interval: 43200
@@ -13,7 +13,7 @@ auto_update:
 scriptings:
   - generic:
       name: 广东油价
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/OilPriceGD/OilPriceGD.js?v=20260916-1
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/OilPriceGD/OilPriceGD.js?v=20260916-2
       update_interval: 1800
       timeout: 20
 
