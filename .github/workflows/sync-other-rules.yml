@@ -23,6 +23,11 @@ jobs:
           set -euo pipefail
           mkdir -p Egern/Rules /tmp/egern-rules
           curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/proxy.yaml' -o /tmp/egern-rules/proxy.yaml
+          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/apple.yaml' -o /tmp/egern-rules/apple.yaml
+          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/apple-cn.yaml' -o /tmp/egern-rules/apple-cn.yaml
+          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/apple-proxy.yaml' -o /tmp/egern-rules/apple-proxy.yaml
+          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/apple-tv.yaml' -o /tmp/egern-rules/apple-tv.yaml
+          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/apns.yaml' -o /tmp/egern-rules/apns.yaml
 
           python3 <<'PY'
           from pathlib import Path
@@ -32,6 +37,11 @@ jobs:
               Path('Egern/Rules/chatgpt.yaml'),
               Path('Egern/Rules/google.yaml'),
               Path('Egern/Rules/claude.yaml'),
+              Path('/tmp/egern-rules/apple.yaml'),
+              Path('/tmp/egern-rules/apple-cn.yaml'),
+              Path('/tmp/egern-rules/apple-proxy.yaml'),
+              Path('/tmp/egern-rules/apple-tv.yaml'),
+              Path('/tmp/egern-rules/apns.yaml'),
           ]
           output = Path('Egern/Rules/other.yaml')
 
@@ -92,11 +102,12 @@ jobs:
               '# Complete OTHER proxy rules for Egern',
               '# Source: QuixoticHeart/rule-set egern/proxy.yaml',
               '# Excludes rules already assigned to chatgpt.yaml, google.yaml and claude.yaml.',
+              '# Excludes Apple rules from apple, apple-cn, apple-proxy, apple-tv and apns.',
               '# Includes common overseas services/sites and other AI services.',
               '',
           ]
           output.write_text('\n'.join(header + out) + '\n', encoding='utf-8')
-          print(f'Generated {output}; removed {removed} rules already covered by dedicated categories.')
+          print(f'Generated {output}; removed {removed} rules covered by dedicated categories or Apple rules.')
           PY
 
           rm -f Egern/Rules/other-ai.yaml
