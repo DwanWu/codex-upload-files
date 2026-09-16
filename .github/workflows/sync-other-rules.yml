@@ -110,13 +110,11 @@ jobs:
           print(f'Generated {output}; removed {removed} rules covered by dedicated categories or Apple rules.')
           PY
 
-          rm -f Egern/Rules/other-ai.yaml
-
       - name: Commit synced rules
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A Egern/Rules/other.yaml Egern/Rules/other-ai.yaml
+          git add -A -- Egern/Rules/other.yaml
           if git diff --cached --quiet; then
             echo 'No changes.'
           else
