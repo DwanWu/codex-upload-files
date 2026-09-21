@@ -239,6 +239,7 @@ domain_suffix_set:
 - fflick.com
 - financeleadsonline.com
 - firebase.com
+- firebase.dev
 - firebase.io
 - firebaseapp.com
 - firebaseio.com
@@ -920,6 +921,7 @@ domain_suffix_set:
 - cloudcode-pa.googleapis.com
 - deepmind.google
 - flow.google
+- flow.google.com
 - g.ai
 - geller-pa.googleapis.com
 - gemini.google
@@ -932,6 +934,7 @@ domain_suffix_set:
 - labs.google
 - labs.google.com
 - makersuite.google.com
+- notebook.google
 - notebook.google.com
 - notebooklm.google
 - notebooklm.google.com
