@@ -1,0 +1,128 @@
+name: Sync Shadowrocket rules from Egern
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Egern/Rules/**'
+      - '.github/workflows/sync-shadowrocket-rules.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Convert Egern YAML rules to Shadowrocket lists
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p Shadowrocket/Rules
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          src_dir = Path('Egern/Rules')
+          out_dir = Path('Shadowrocket/Rules')
+
+          mapping = {
+              'chatgpt.yaml': 'chatgpt.list',
+              'google.yaml': 'google.list',
+              'claude.yaml': 'claude.list',
+              'other.yaml': 'other.list',
+          }
+
+          section_map = {
+              'domain_set': 'DOMAIN',
+              'domain_suffix_set': 'DOMAIN-SUFFIX',
+              'domain_keyword_set': 'DOMAIN-KEYWORD',
+              'ip_cidr_set': 'IP-CIDR',
+              'ip_cidr6_set': 'IP-CIDR6',
+              'process_name_set': 'PROCESS-NAME',
+          }
+
+          unsupported = {
+              'domain_regex_set',
+              'url_regex_set',
+              'asn_set',
+          }
+
+          def convert(src: Path, dst: Path):
+              current = None
+              output = [
+                  '# Shadowrocket rule-set',
+                  f'# Auto-generated from {src.as_posix()}',
+                  '# Format: TYPE,VALUE',
+                  '# Do not edit manually; update the Egern source instead.',
+                  '',
+              ]
+
+              skipped = []
+              seen = set()
+
+              for raw in src.read_text(encoding='utf-8').splitlines():
+                  line = raw.strip()
+                  if not line or line.startswith('#'):
+                      continue
+
+                  if line.endswith(':') and not line.startswith('-'):
+                      key = line[:-1].strip()
+                      if key in section_map:
+                          current = key
+                      elif key in unsupported:
+                          current = key
+                      else:
+                          current = None
+                      continue
+
+                  if not (current and line.startswith('- ')):
+                      continue
+
+                  value = line[2:].strip()
+                  if not value:
+                      continue
+
+                  if current in unsupported:
+                      skipped.append((current, value))
+                      continue
+
+                  rule_type = section_map[current]
+                  rule = f'{rule_type},{value}'
+                  if rule not in seen:
+                      seen.add(rule)
+                      output.append(rule)
+
+              if skipped:
+                  output += [
+                      '',
+                      '# Unsupported Egern-only/regex entries skipped:',
+                  ]
+                  for kind, value in skipped:
+                      output.append(f'# {kind}: {value}')
+
+              dst.write_text('\n'.join(output) + '\n', encoding='utf-8')
+              print(f'Generated {dst}: {len(seen)} rules, skipped {len(skipped)} unsupported entries.')
+
+          for src_name, dst_name in mapping.items():
+              src = src_dir / src_name
+              if not src.exists():
+                  raise FileNotFoundError(src)
+              convert(src, out_dir / dst_name)
+          PY
+
+      - name: Commit generated Shadowrocket rules
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A -- Shadowrocket/Rules
+          if git diff --cached --quiet; then
+            echo 'No changes.'
+          else
+            git commit -m 'Sync Shadowrocket rules from Egern'
+            git push
+          fi
