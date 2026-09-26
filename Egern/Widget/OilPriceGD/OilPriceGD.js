@@ -83,12 +83,12 @@ async function getText(ctx, url, timeout = 12000) {
 
 function normalizeDate(y, m, d) {
   if (![y,m,d].every(Number.isFinite)) return null;
-  return \`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}\`;
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
 
 function dateValue(value) {
   if (!value) return 0;
-  const n = new Date(\`${value}T00:00:00+08:00\`).getTime();
+  const n = new Date(`${value}T00:00:00+08:00`).getTime();
   return Number.isFinite(n) ? n : 0;
 }
 
@@ -104,9 +104,9 @@ function expectedLatestAdjustment(now) {
 
 function findPrice(text, grade) {
   const patterns = [
-    new RegExp(\`${grade}号汽油为\\\\s*([0-9]+(?:\\\\.[0-9]+)?)\\\\s*元\`, 'i'),
-    new RegExp(\`${grade}号汽油[^0-9]{0,24}([0-9]+(?:\\\\.[0-9]+)?)\\\\s*元(?:\\\\/升)?\`, 'i'),
-    new RegExp(\`广东\\\\s*${grade}\\\\s*#?[^0-9]{0,16}([0-9]+(?:\\\\.[0-9]+)?)\`, 'i')
+    new RegExp(`${grade}号汽油为\\\\s*([0-9]+(?:\\\\.[0-9]+)?)\\\\s*元`, 'i'),
+    new RegExp(`${grade}号汽油[^0-9]{0,24}([0-9]+(?:\\\\.[0-9]+)?)\\\\s*元(?:\\\\/升)?`, 'i'),
+    new RegExp(`广东\\\\s*${grade}\\\\s*#?[^0-9]{0,16}([0-9]+(?:\\\\.[0-9]+)?)`, 'i')
   ];
   for (const re of patterns) {
     const m = text.match(re);
@@ -120,8 +120,8 @@ function findPrice(text, grade) {
 
 function findDelta(text, grade) {
   const patterns = [
-    new RegExp(\`广东\\\\s*${grade}\\\\s*#?[\\\\s\\\\S]{0,40}?([↑↓▲▼])\\\\s*([0-9]+(?:\\\\.[0-9]+)?)\`, 'i'),
-    new RegExp(\`${grade}号汽油[\\\\s\\\\S]{0,60}?([↑↓▲▼])\\\\s*([0-9]+(?:\\\\.[0-9]+)?)\`, 'i')
+    new RegExp(`广东\\\\s*${grade}\\\\s*#?[\\\\s\\\\S]{0,40}?([↑↓▲▼])\\\\s*([0-9]+(?:\\\\.[0-9]+)?)`, 'i'),
+    new RegExp(`${grade}号汽油[\\\\s\\\\S]{0,60}?([↑↓▲▼])\\\\s*([0-9]+(?:\\\\.[0-9]+)?)`, 'i')
   ];
   for (const re of patterns) {
     const m = text.match(re);
@@ -209,7 +209,7 @@ async function loadData(ctx, now) {
   const errors = [];
   settled.forEach((r, i) => {
     if (r.status === 'fulfilled') candidates.push(r.value);
-    else errors.push(\`${sources[i][0]}:${r.reason?.message || r.reason || ''}\`);
+    else errors.push(`${sources[i][0]}:${r.reason?.message || r.reason || ''}`);
   });
 
   if (!candidates.length) throw new Error(errors.join('；') || '所有油价源均不可用');
@@ -222,7 +222,7 @@ async function loadData(ctx, now) {
     const fresh = candidates.find(x => x.dataDate && dateValue(x.dataDate) >= dateValue(expected));
     if (fresh) chosen = fresh;
     else if (chosen.dataDate && dateValue(chosen.dataDate) < dateValue(expected)) {
-      throw new Error(\`数据源仍停留在 ${chosen.dataDate}，应至少更新到 ${expected} 调价周期\`);
+      throw new Error(`数据源仍停留在 ${chosen.dataDate}，应至少更新到 ${expected} 调价周期`);
     }
   }
 
