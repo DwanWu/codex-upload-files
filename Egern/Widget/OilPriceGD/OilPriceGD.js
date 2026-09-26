@@ -1,14 +1,16 @@
 /**
  * 广东油价 · Egern Widget
- * 稳定修复版：保留旧版 Small / Medium / Large 布局，只重写数据层。
- * 显示：92/95/98 号汽油；三卡参考 NodeVitals 居中布局。
- * 主源：9662 广东实时油价（92/95/98、涨跌、历史、下轮调价）
- * 备源：油价网 zzcha 广东页
+ * 稳定增强版：保留 Small / Medium / Large 与三卡居中布局。
+ * 显示：92/95/98 号汽油。
+ * 当前价：多源并发读取并按“调价执行日期”选最新，拒绝旧调价周期数据。
+ * 历史价：固定地址补充走势；任何辅助源失败都不影响当前价显示。
  */
 
 const REGION_NAME = '广东';
-const PRIMARY_URL = 'https://9662.net/guangdong/16175.html';
-const FALLBACK_URL = 'https://youjia.zzcha.com/guangdong/27160.html';
+const PRIMARY_URL = 'https://oil.qqday.com/province/440000.htm';
+const SECONDARY_URL = 'https://oil.qqday.com/city/440100.htm';
+const LEGACY_URL = 'https://9662.net/guangdong/16175.html';
+const HISTORY_URL = 'https://www.icauto.com.cn/oil/price_440000_0.html';
 const OFFICIAL_URL = 'https://cx.sinopecsales.com/yjkqiantai/core/initCpb';
 
 const CALENDAR_2026 = [
@@ -79,37 +81,102 @@ async function getText(ctx, url, timeout = 12000) {
   return body;
 }
 
-function pickGrade(scope, label) {
-  const escaped = label.replace('#', '#?');
-  const patterns = [
-    new RegExp(`${escaped}号(?:汽油|柴油)[^0-9]{0,30}([0-9]+(?:\\.[0-9]+)?)[^+\\-0-9]{0,30}([+\\-]\\s*[0-9]+(?:\\.[0-9]+)?)`, 'i'),
-    new RegExp(`${escaped}号(?:汽油|柴油)[^0-9]{0,30}([0-9]+(?:\\.[0-9]+)?)`, 'i')
-  ];
-  for (const re of patterns) {
-    const m = scope.match(re);
-    if (!m) continue;
-    const price = safeNum(m[1]);
-    const delta = m[2] ? safeNum(String(m[2]).replace(/\s+/g,'')) : null;
-    if (Number.isFinite(price)) return { price, delta };
-  }
-  return { price: null, delta: null };
+function normalizeDate(y, m, d) {
+  if (![y,m,d].every(Number.isFinite)) return null;
+  return \`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}\`;
 }
 
-function parseHistory(text) {
-  const mark = text.indexOf('广东油价变化记录');
-  const alt = text.indexOf('广东油价调整明细');
-  const start = mark >= 0 ? mark : alt >= 0 ? alt : 0;
-  const scope = text.slice(start);
+function dateValue(value) {
+  if (!value) return 0;
+  const n = new Date(\`${value}T00:00:00+08:00\`).getTime();
+  return Number.isFinite(n) ? n : 0;
+}
+
+function expectedLatestAdjustment(now) {
+  if (now.getFullYear() !== 2026) return null;
+  let last = null;
+  for (const [m,d] of CALENDAR_2026) {
+    const at = new Date(2026, m - 1, d + 1, 0, 0, 0);
+    if (at.getTime() <= now.getTime()) last = normalizeDate(2026, m, d);
+  }
+  return last;
+}
+
+function findPrice(text, grade) {
+  const patterns = [
+    new RegExp(\`${grade}号汽油为\\\\s*([0-9]+(?:\\\\.[0-9]+)?)\\\\s*元\`, 'i'),
+    new RegExp(\`${grade}号汽油[^0-9]{0,24}([0-9]+(?:\\\\.[0-9]+)?)\\\\s*元(?:\\\\/升)?\`, 'i'),
+    new RegExp(\`广东\\\\s*${grade}\\\\s*#?[^0-9]{0,16}([0-9]+(?:\\\\.[0-9]+)?)\`, 'i')
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (m) {
+      const n = safeNum(m[1]);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return null;
+}
+
+function findDelta(text, grade) {
+  const patterns = [
+    new RegExp(\`广东\\\\s*${grade}\\\\s*#?[\\\\s\\\\S]{0,40}?([↑↓▲▼])\\\\s*([0-9]+(?:\\\\.[0-9]+)?)\`, 'i'),
+    new RegExp(\`${grade}号汽油[\\\\s\\\\S]{0,60}?([↑↓▲▼])\\\\s*([0-9]+(?:\\\\.[0-9]+)?)\`, 'i')
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (!m) continue;
+    const n = safeNum(m[2]);
+    if (!Number.isFinite(n)) continue;
+    return (m[1] === '↓' || m[1] === '▼') ? -n : n;
+  }
+  return null;
+}
+
+function findEffectiveDate(text) {
+  const patterns = [
+    /(20\d{2})年(\d{1,2})月(\d{1,2})日起执行/,
+    /以上(?:油价|汽油柴油价格)[^0-9]{0,16}(20\d{2})年(\d{1,2})月(\d{1,2})日/,
+    /更新(?:日期|时间)?[:：]?\s*(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})日?/
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (m) return normalizeDate(Number(m[1]), Number(m[2]), Number(m[3]));
+  }
+  return null;
+}
+
+function parseCurrentPage(html, source) {
+  const text = htmlToText(html);
+  const p92 = { price: findPrice(text, '92'), delta: findDelta(text, '92') };
+  const p95 = { price: findPrice(text, '95'), delta: findDelta(text, '95') };
+  const p98 = { price: findPrice(text, '98'), delta: findDelta(text, '98') };
+
+  if (![p92.price,p95.price,p98.price].every(Number.isFinite)) {
+    throw new Error('未解析到完整 92/95/98 号汽油价格');
+  }
+
+  return {
+    source,
+    dataDate: findEffectiveDate(text),
+    current: { p92, p95, p98 },
+    nextAdjust: parseNextAdjust(text)
+  };
+}
+
+function parseHistoryPage(html) {
+  const text = htmlToText(html);
+  const mark = text.indexOf('广东汽油柴油历史油价表');
+  const scope = mark >= 0 ? text.slice(mark) : text;
   const rows = [];
-  const re = /(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})(?:日)?\s+([0-9]+(?:\.[0-9]+)?)\s*([+\-]\s*[0-9]+(?:\.[0-9]+)?)?\s+([0-9]+(?:\.[0-9]+)?)\s*([+\-]\s*[0-9]+(?:\.[0-9]+)?)?\s+([0-9]+(?:\.[0-9]+)?)\s*([+\-]\s*[0-9]+(?:\.[0-9]+)?)?\s+([0-9]+(?:\.[0-9]+)?)\s*([+\-]\s*[0-9]+(?:\.[0-9]+)?)?/g;
+  const re = /(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})(?:日)?\s+([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:\.[0-9]+)?)/g;
   let m;
   while ((m = re.exec(scope)) && rows.length < 16) {
     rows.push({
-      date: `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`,
-      p92: safeNum(m[4]), d92: m[5] ? safeNum(m[5].replace(/\s+/g,'')) : null,
-      p95: safeNum(m[6]), d95: m[7] ? safeNum(m[7].replace(/\s+/g,'')) : null,
-      p98: safeNum(m[8]), d98: m[9] ? safeNum(m[9].replace(/\s+/g,'')) : null,
-      diesel: safeNum(m[10]), ddiesel: m[11] ? safeNum(m[11].replace(/\s+/g,'')) : null
+      date: normalizeDate(Number(m[1]), Number(m[2]), Number(m[3])),
+      p92: safeNum(m[5]),
+      p95: safeNum(m[7]),
+      p98: null
     });
   }
   return rows;
@@ -127,43 +194,55 @@ function parseNextAdjust(text) {
   return null;
 }
 
-function parsePage(html) {
-  const text = htmlToText(html);
-  const headCut = ['广东油价变化记录','广东油价调整明细'].map(x => text.indexOf(x)).filter(x => x >= 0).sort((a,b)=>a-b)[0];
-  const currentScope = headCut >= 0 ? text.slice(0, headCut) : text.slice(0, 5000);
+async function loadData(ctx, now) {
+  const sources = [
+    ['QQDay广东', PRIMARY_URL],
+    ['QQDay广州', SECONDARY_URL],
+    ['9662备用', LEGACY_URL]
+  ];
 
-  const p92 = pickGrade(currentScope, '92');
-  const p95 = pickGrade(currentScope, '95');
-  const p98 = pickGrade(currentScope, '98');
-  const diesel = pickGrade(currentScope, '0');
+  const settled = await Promise.allSettled(
+    sources.map(async ([name,url]) => parseCurrentPage(await getText(ctx,url), name))
+  );
 
-  if (![p92.price,p95.price,p98.price].every(Number.isFinite)) {
-    throw new Error('未解析到完整 92/95/98 号汽油价格');
-  }
-
-  const history = parseHistory(text);
-  if (history.length) {
-    if (!Number.isFinite(p92.delta) && Number.isFinite(history[0].d92)) p92.delta = history[0].d92;
-    if (!Number.isFinite(p95.delta) && Number.isFinite(history[0].d95)) p95.delta = history[0].d95;
-    if (!Number.isFinite(p98.delta) && Number.isFinite(history[0].d98)) p98.delta = history[0].d98;
-    if (!Number.isFinite(diesel.delta) && Number.isFinite(history[0].ddiesel)) diesel.delta = history[0].ddiesel;
-  }
-
-  return { current:{p92,p95,p98,diesel}, history, nextAdjust:parseNextAdjust(text) };
-}
-
-async function loadData(ctx) {
+  const candidates = [];
   const errors = [];
-  for (const [name,url] of [['主源',PRIMARY_URL],['备源',FALLBACK_URL]]) {
-    try {
-      const parsed = parsePage(await getText(ctx,url));
-      parsed.source = name;
-      return parsed;
-    } catch (e) {
-      errors.push(`${name}:${e?.message || e}`);
+  settled.forEach((r, i) => {
+    if (r.status === 'fulfilled') candidates.push(r.value);
+    else errors.push(\`${sources[i][0]}:${r.reason?.message || r.reason || ''}\`);
+  });
+
+  if (!candidates.length) throw new Error(errors.join('；') || '所有油价源均不可用');
+
+  candidates.sort((a,b) => dateValue(b.dataDate) - dateValue(a.dataDate));
+  const expected = expectedLatestAdjustment(now);
+  let chosen = candidates[0];
+
+  if (expected) {
+    const fresh = candidates.find(x => x.dataDate && dateValue(x.dataDate) >= dateValue(expected));
+    if (fresh) chosen = fresh;
+    else if (chosen.dataDate && dateValue(chosen.dataDate) < dateValue(expected)) {
+      throw new Error(\`数据源仍停留在 ${chosen.dataDate}，应至少更新到 ${expected} 调价周期\`);
     }
   }
-  throw new Error(errors.join('；'));
+
+  // 历史走势属于增强信息：失败时不影响当前油价。
+  let history = [];
+  try {
+    history = parseHistoryPage(await getText(ctx, HISTORY_URL, 9000));
+  } catch (_) {}
+
+  // 用历史表补齐 92/95 的涨跌；98 涨跌以当前主源为准。
+  if (history.length >= 2) {
+    const diff = key => {
+      const a = history[0]?.[key], b = history[1]?.[key];
+      return Number.isFinite(a) && Number.isFinite(b) ? Number((a-b).toFixed(2)) : null;
+    };
+    if (!Number.isFinite(chosen.current.p92.delta)) chosen.current.p92.delta = diff('p92');
+    if (!Number.isFinite(chosen.current.p95.delta)) chosen.current.p95.delta = diff('p95');
+  }
+
+  return { ...chosen, history };
 }
 
 export default async function(ctx) {
@@ -190,7 +269,7 @@ export default async function(ctx) {
   const bg={type:'linear',colors:C.bg,startPoint:{x:0,y:0},endPoint:{x:1,y:1}};
 
   let data=null, fetchError='';
-  try { data=await loadData(ctx); } catch(e){ fetchError=e?.message||String(e); }
+  try { data=await loadData(ctx, now); } catch(e){ fetchError=e?.message||String(e); }
 
   if (!data) {
     return {type:'widget',refreshAfter,padding:14,url:OFFICIAL_URL,backgroundGradient:bg,children:[
