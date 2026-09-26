@@ -104,9 +104,9 @@ function expectedLatestAdjustment(now) {
 
 function findPrice(text, grade) {
   const patterns = [
-    new RegExp(`${grade}号汽油为\\\\s*([0-9]+(?:\\\\.[0-9]+)?)\\\\s*元`, 'i'),
-    new RegExp(`${grade}号汽油[^0-9]{0,24}([0-9]+(?:\\\\.[0-9]+)?)\\\\s*元(?:\\\\/升)?`, 'i'),
-    new RegExp(`广东\\\\s*${grade}\\\\s*#?[^0-9]{0,16}([0-9]+(?:\\\\.[0-9]+)?)`, 'i')
+    new RegExp(`${grade}号汽油为\\s*([0-9]+(?:\\.[0-9]+)?)\\s*元`, 'i'),
+    new RegExp(`${grade}号汽油[^0-9]{0,24}([0-9]+(?:\\.[0-9]+)?)\\s*元(?:\\/升)?`, 'i'),
+    new RegExp(`广东\\s*${grade}\\s*#?[^0-9]{0,16}([0-9]+(?:\\.[0-9]+)?)`, 'i')
   ];
   for (const re of patterns) {
     const m = text.match(re);
@@ -120,8 +120,8 @@ function findPrice(text, grade) {
 
 function findDelta(text, grade) {
   const patterns = [
-    new RegExp(`广东\\\\s*${grade}\\\\s*#?[\\\\s\\\\S]{0,40}?([↑↓▲▼])\\\\s*([0-9]+(?:\\\\.[0-9]+)?)`, 'i'),
-    new RegExp(`${grade}号汽油[\\\\s\\\\S]{0,60}?([↑↓▲▼])\\\\s*([0-9]+(?:\\\\.[0-9]+)?)`, 'i')
+    new RegExp(`广东\\s*${grade}\\s*#?[\\s\\S]{0,40}?([↑↓▲▼])\\s*([0-9]+(?:\\.[0-9]+)?)`, 'i'),
+    new RegExp(`${grade}号汽油[\\s\\S]{0,60}?([↑↓▲▼])\\s*([0-9]+(?:\\.[0-9]+)?)`, 'i')
   ];
   for (const re of patterns) {
     const m = text.match(re);
