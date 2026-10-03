@@ -44,6 +44,7 @@ export default async function(ctx) {
   const D = now.getDate();
   const WEEK = '日一二三四五六'[now.getDay()];
   const P = n => String(n).padStart(2, '0');
+  const refreshAfter = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
 
   const clean = s => String(s ?? '').replace(/[.。]+/g, ' ').replace(/\s+/g, ' ').trim();
   const normalizeList = s => clean(s).replace(/\s+/g, ' · ');
@@ -285,7 +286,7 @@ export default async function(ctx) {
 
   if (isSmall) {
     return {
-      type: 'widget', padding: 12, backgroundGradient: bg, url: 'calshow://',
+      type: 'widget', refreshAfter, padding: 12, backgroundGradient: bg, url: 'calshow://',
       children: [
         header(13),
         spacer(9),
@@ -311,7 +312,7 @@ export default async function(ctx) {
 
   if (isLarge) {
     return {
-      type: 'widget', padding: 16, backgroundGradient: bg, url: 'calshow://',
+      type: 'widget', refreshAfter, padding: 16, backgroundGradient: bg, url: 'calshow://',
       children: [
         header(17),
         spacer(10),
@@ -349,7 +350,7 @@ export default async function(ctx) {
   }
 
   return {
-    type: 'widget', padding: 13, backgroundGradient: bg, url: 'calshow://',
+    type: 'widget', refreshAfter, padding: 13, backgroundGradient: bg, url: 'calshow://',
     children: [
       header(15),
       spacer(9),
