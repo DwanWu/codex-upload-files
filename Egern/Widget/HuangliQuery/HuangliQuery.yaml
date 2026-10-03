@@ -1,11 +1,11 @@
 # ==========================================
 # 📌 模块名称: 黄历查询
 # 🟨 图标: 黄色日历
-# ✨ 功能: 公历日期、农历、干支、生肖、宜、忌、节气/节日、吉日标记
+# ✨ 功能: 双源黄历；公历、农历、干支、生肖、宜忌、节气节日、冲煞、星宿、胎神、彭祖百忌
 # ==========================================
 
 name: "黄历查询"
-description: "黄色日历风格黄历面板，显示今日公历、农历、干支、生肖、宜、忌、节气/节日及吉日标记。"
+description: "双远程数据源并带本地农历兜底；显示公历、农历、干支、生肖、宜忌、节气节日，大号补充冲煞、星宿、胎神、彭祖百忌等。"
 
 auto_update:
   interval: 21600
@@ -13,7 +13,9 @@ auto_update:
 scriptings:
   - generic:
       name: 黄历查询
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/HuangliQuery/HuangliQuery.js
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/HuangliQuery/HuangliQuery.js?v=20261003-1
+      update_interval: 10800
+      timeout: 25
 
 widgets:
   - name: 黄历查询
