@@ -130,6 +130,26 @@ export default async function(ctx) {
     return terms.find(x => v.includes(x)) || '';
   };
 
+  // 节气与节日来自不同数据源；先拆分单个节日，再去掉重合节气和跨源重复项。
+  const parseFestivalItems = value => String(value ?? '')
+    .split(/[，,、;；·|\\s]+/)
+    .map(v => clean(v).replace(/[（(]\\d{1,2}:\\d{2}(?::\\d{2})?[）)]$/, ''))
+    .filter(Boolean);
+
+  const mergeFestivalItems = (solarTerm, ...values) => {
+    const seen = new Set();
+    const items = [];
+    const termKey = clean(solarTerm);
+    for (const value of values) {
+      for (const item of parseFestivalItems(value)) {
+        if (item === termKey || seen.has(item)) continue;
+        seen.add(item);
+        items.push(item);
+      }
+    }
+    return items.join(' · ');
+  };
+
   const normalizeSecondaryDay = json => {
     const list = Array.isArray(json) ? json : [];
     const item = list.find(x => Number(x?.day) === D);
@@ -195,9 +215,7 @@ export default async function(ctx) {
     for (const key of ['lMonth','lDate','gzYear','gzMonth','gzDate','animal','suit','avoid','festivalList','term']) {
       if (!clean(merged[key]) && clean(secondary[key])) merged[key] = secondary[key];
     }
-    if (secondary.festivalList && primary.festivalList && !primary.festivalList.includes(secondary.festivalList)) {
-      merged.festivalList = `${primary.festivalList} · ${secondary.festivalList}`;
-    }
+    merged.festivalList = mergeFestivalItems(merged.term || secondary.term, primary.festivalList, secondary.festivalList);
     return merged;
   };
 
@@ -248,9 +266,9 @@ export default async function(ctx) {
   const animal = clean(today?.animal);
   const yi = normalizeList(today?.suit) || '暂无数据';
   const ji = normalizeList(today?.avoid) || '暂无数据';
-  const festival = clean(today?.festivalList || today?.value);
-  const term = clean(today?.term);
-  const extra = [term, festival].filter((v, i, a) => v && a.indexOf(v) === i).join(' · ');
+  const term = clean(today?.term) || termFromFestival(today?.festivalList);
+  const festival = mergeFestivalItems(term, today?.festivalList || today?.value);
+  const extra = [term, festival].filter(Boolean).join(' · ');
   const jiri = today?.jiri === true || String(today?.jiri || '') === '1';
   const details = today?.details || {};
   const chong = clean(details.chong);
