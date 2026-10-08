@@ -132,8 +132,8 @@ export default async function(ctx) {
 
   // 节气与节日来自不同数据源；先拆分单个节日，再去掉重合节气和跨源重复项。
   const parseFestivalItems = value => String(value ?? '')
-    .split(/[，,、;；·|\\s]+/)
-    .map(v => clean(v).replace(/[（(]\\d{1,2}:\\d{2}(?::\\d{2})?[）)]$/, ''))
+    .split(/[，,、;；·|\s]+/)
+    .map(v => clean(v).replace(/[（(]\d{1,2}:\d{2}(?::\d{2})?[）)]$/, ''))
     .filter(Boolean);
 
   const mergeFestivalItems = (solarTerm, ...values) => {
