@@ -79,6 +79,36 @@ jobs:
               'ipcheck',
           }
 
+          # Keep Meta Muse / Facebook ecosystem in OTHER even if upstream source changes.
+          custom_meta_suffixes = {
+              'muse.ai',
+              'metaaiusercontent.com',
+              'metaaivm.com',
+              'meta.ai',
+              'llama.com',
+              'atmeta.com',
+              'facebook.com',
+              'facebook.net',
+              'fbcdn.net',
+              'fbsbx.com',
+              'fb.me',
+              'fb.watch',
+              'm.me',
+              'messenger.com',
+              'instagram.com',
+              'cdninstagram.com',
+              'threads.net',
+              'threads.com',
+              'whatsapp.com',
+              'whatsapp.net',
+              'wa.me',
+              'meta.com',
+              'oculus.com',
+          }
+          custom_meta_hosts = {
+              'fbcdn-a.akamaihd.net',
+          }
+
           def parse_rules(path):
               result = {name: set() for name in section_names}
               if not path.exists():
@@ -138,17 +168,40 @@ jobs:
                   out.append('domain_keyword_set:')
                   out.extend(f'- {value}' for value in missing)
 
+          # Retain core Meta domains after upstream refresh while avoiding
+          # duplicates and preserving exclusions owned by dedicated categories.
+          def ensure_entries(section, required):
+              missing = sorted(required - existing[section] - excluded[section])
+              if not missing:
+                  return 0
+              try:
+                  idx = next(i for i, line in enumerate(out) if line.strip() == f'{section}:')
+                  out[idx + 1:idx + 1] = [f'- {value}' for value in missing]
+              except StopIteration:
+                  if out and out[-1].strip():
+                      out.append('')
+                  out.append(f'{section}:')
+                  out.extend(f'- {value}' for value in missing)
+              existing[section].update(missing)
+              return len(missing)
+
+          added_meta = (
+              ensure_entries('domain_suffix_set', custom_meta_suffixes)
+              + ensure_entries('domain_set', custom_meta_hosts)
+          )
+
           header = [
               '# Complete OTHER proxy rules for Egern',
               '# Source: QuixoticHeart/rule-set egern/proxy.yaml',
               '# Excludes rules already assigned to chatgpt.yaml, google.yaml and claude.yaml.',
               '# Excludes Apple rules from apple, apple-cn, apple-proxy, apple-tv and apns.',
               '# Adds common IP/proxy node test sites as domain keywords.',
+              '# Retains Meta Muse/Facebook/Instagram/WhatsApp/Threads and CDN endpoints.',
               '# Includes common overseas services/sites and other AI services.',
               '',
           ]
           output.write_text('\n'.join(header + out) + '\n', encoding='utf-8')
-          print(f'Generated {output}; removed {removed} excluded rules; ensured {len(custom_ip_test_keywords)} IP-test keywords.')
+          print(f'Generated {output}; removed {removed} excluded rules; ensured {len(custom_ip_test_keywords)} IP-test keywords and {added_meta} additional Meta entries.')
           PY
 
       - name: Commit synced rules
