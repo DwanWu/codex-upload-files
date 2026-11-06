@@ -6,6 +6,10 @@ on:
     paths:
       - 'Egern/Rules/**'
       - '.github/workflows/sync-shadowrocket-rules.yml'
+  # GitHub Actions commits using GITHUB_TOKEN do not necessarily trigger
+  # downstream push workflows, so run an independent daily reconciliation.
+  schedule:
+    - cron: '15 5 * * *'
   workflow_dispatch:
 
 permissions:
