@@ -69,6 +69,26 @@ jobs:
               merged[k].extend(x for x in ai[k] if is_google_ai(x))
               merged[k] = list(dict.fromkeys(merged[k]))
 
+          # Preserve essential Google AI product/API domains even if the
+          # upstream community file removes or renames an entry.
+          pinned_google_ai_suffixes = (
+              'g.ai', 'ai.studio', 'google.com', 'googleapis.com',
+              'googleusercontent.com', 'gstatic.com', 'deepmind.google',
+              'gemini.google.com', 'aistudio.google.com',
+              'notebooklm.google', 'notebooklm.google.com',
+              'generativelanguage.googleapis.com', 'antigravity.google',
+              'jules.google', 'jules.google.com', 'labs.google',
+              'flow.google', 'flow.google.com', 'opal.google',
+              'opal.google.com', 'stitch.withgoogle.com',
+          )
+          pinned_google_ai_hosts = ('ai.google.dev',)
+          merged['domain_suffix_set'] = list(dict.fromkeys(
+              merged['domain_suffix_set'] + list(pinned_google_ai_suffixes)
+          ))
+          merged['domain_set'] = list(dict.fromkeys(
+              merged['domain_set'] + list(pinned_google_ai_hosts)
+          ))
+
           out = [
               '# Complete Google routing rules for Egern',
               '# Merged daily from QuixoticHeart: google.yaml + googlefcm.yaml + Google entries in ai.yaml',
@@ -87,7 +107,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A Egern/Rules
+          git add -A -- Egern/Rules/google.yaml
           if git diff --cached --quiet; then
             echo 'No changes.'
           else
