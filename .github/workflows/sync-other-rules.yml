@@ -117,17 +117,12 @@ jobs:
           # Retain verified AI assistant, coding, multimedia and inference
           # service domains even if the upstream proxy rules omit them.
           custom_ai_suffixes = {
-              'deepseek.com',
-              'kimi.com',
-              'qwen.ai',
               'v0.app',
               'bolt.new',
               'lovable.dev',
               'genspark.ai',
               'udio.com',
               'runwayml.com',
-              'klingai.com',
-              'hailuoai.video',
               'replicate.com',
               'fal.ai',
               'together.ai',
@@ -145,6 +140,93 @@ jobs:
           custom_ai_hosts = {
               'default.exp-tas.com',
           }
+
+          # Chinese-developed AI products are excluded from OTHER,
+          # while shared CDN / cloud infrastructure remains unaffected.
+          excluded_chinese_ai_domains = {
+              'deepseek.com',
+              'deepseek.ai',
+              'deepseek.net',
+              'kimi.com',
+              'kimi.ai',
+              'moonshot.ai',
+              'moonshot.cn',
+              'qwen.ai',
+              'qwenlm.ai',
+              'qwenlm.com',
+              'qwen.com',
+              'tongyi.aliyun.com',
+              'dashscope.aliyuncs.com',
+              'doubao.com',
+              'doubao.com.cn',
+              'coze.com',
+              'coze.cn',
+              'coze.space',
+              'minimax.io',
+              'minimax.com',
+              'minimax.chat',
+              'hailuoai.video',
+              'hailuoai.com',
+              'klingai.com',
+              'klingai.cn',
+              'trae.ai',
+              'trae.com',
+              'trae.cn',
+              'manus.im',
+              'manus.ai',
+              'manuscdn.com',
+              'zhipuai.cn',
+              'zhipuai.com',
+              'bigmodel.cn',
+              'bigmodel.com',
+              'chatglm.cn',
+              'chatglm.com',
+              'stepfun.com',
+              'stepfun.ai',
+              'step.ai',
+              'baichuan-ai.com',
+              'baichuan-ai.cn',
+              '01.ai',
+              'yi.ai',
+              'sensenova.cn',
+              'sensenova.com',
+              'yiyan.baidu.com',
+              'wenxin.baidu.com',
+              'hunyuan.tencent.com',
+              'yuanbao.tencent.com',
+              'modelscope.cn',
+          }
+          excluded_chinese_ai_keywords = {
+              'deepseek',
+              'kimi',
+              'moonshot',
+              'qwen',
+              'tongyi',
+              'doubao',
+              'coze',
+              'minimax',
+              'hailuo',
+              'klingai',
+              'trae',
+              'manus',
+              'zhipu',
+              'bigmodel',
+              'chatglm',
+              'stepfun',
+              'baichuan',
+              'sensenova',
+              'hunyuan',
+              'yuanbao',
+          }
+
+          def is_chinese_ai_entry(section, value):
+              value = value.strip().lower()
+              if section in ('domain_set', 'domain_suffix_set'):
+                  return any(value == root or value.endswith('.' + root)
+                             for root in excluded_chinese_ai_domains)
+              if section == 'domain_keyword_set':
+                  return value in excluded_chinese_ai_keywords
+              return False
 
           def parse_rules(path):
               result = {name: set() for name in section_names}
@@ -183,7 +265,7 @@ jobs:
                   continue
               if current and stripped.startswith('- '):
                   value = stripped[2:].strip()
-                  if value in excluded[current]:
+                  if value in excluded[current] or is_chinese_ai_entry(current, value):
                       removed += 1
                       continue
                   existing[current].add(value)
@@ -208,7 +290,8 @@ jobs:
           # Retain core Meta domains after upstream refresh while avoiding
           # duplicates and preserving exclusions owned by dedicated categories.
           def ensure_entries(section, required):
-              missing = sorted(required - existing[section] - excluded[section])
+              missing = sorted(v for v in required - existing[section] - excluded[section]
+                               if not is_chinese_ai_entry(section, v))
               if not missing:
                   return 0
               try:
@@ -234,7 +317,8 @@ jobs:
               '# Excludes Apple rules from apple, apple-cn, apple-proxy, apple-tv and apns.',
               '# Adds common IP/proxy node test sites as domain keywords.',
               '# Retains Meta Muse/Facebook/Instagram/WhatsApp/Threads and CDN endpoints.',
-              '# Includes verified AI assistants, coding and creative services.',
+              '# Includes international AI assistants, coding and creative services.',
+              '# Excludes Chinese AI product domains and exact AI keywords.',
               '',
           ]
           output.write_text('\n'.join(header + out) + '\n', encoding='utf-8')
