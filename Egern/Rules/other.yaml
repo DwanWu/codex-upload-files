@@ -3,10 +3,12 @@
 # Excludes rules already assigned to chatgpt.yaml, google.yaml and claude.yaml.
 # Excludes Apple rules from apple, apple-cn, apple-proxy, apple-tv and apns.
 # Adds common IP/proxy node test sites as domain keywords.
+# Keeps Meta Muse, Facebook, Instagram, WhatsApp, Threads and related CDN domains in OTHER.
 # Includes common overseas services/sites and other AI services.
 
 no_resolve: true
 domain_set:
+- fbcdn-a.akamaihd.net
 - 1password.drift.click
 - adobeereg.com
 - agb9r0ad.qllfkl.com
@@ -123,6 +125,10 @@ domain_set:
 - zftksc.launches.appsflyersdk.com
 - ztedevices.com
 domain_suffix_set:
+- muse.ai
+- metaaiusercontent.com
+- metaaivm.com
+- fb.watch
 - 000webhost.com
 - 01.org
 - 02weqj32.com
