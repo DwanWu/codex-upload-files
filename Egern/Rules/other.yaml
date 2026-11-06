@@ -4,7 +4,8 @@
 # Excludes Apple rules from apple, apple-cn, apple-proxy, apple-tv and apns.
 # Adds common IP/proxy node test sites as domain keywords.
 # Retains Meta Muse/Facebook/Instagram/WhatsApp/Threads and CDN endpoints.
-# Includes verified AI assistants, coding and creative services.
+# Includes international AI assistants, coding and creative services.
+# Excludes Chinese AI product domains and exact AI keywords.
 
 no_resolve: true
 domain_set:
@@ -129,18 +130,13 @@ domain_suffix_set:
 - blackforestlabs.ai
 - bolt.new
 - deepgram.com
-- deepseek.com
 - fal.ai
 - fb.watch
 - fireworks.ai
 - genspark.ai
-- hailuoai.video
 - heygen.com
 - ideogram.ai
-- kimi.com
-- klingai.com
 - lovable.dev
-- qwen.ai
 - replicate.com
 - runwayml.com
 - stability.ai
@@ -5731,7 +5727,6 @@ domain_suffix_set:
 - covid19-rx.org
 - covid19rx.org
 - cowboom.com
-- coze.com
 - cp44.net
 - cpan.org
 - cpc.com.tw
@@ -13656,7 +13651,6 @@ domain_suffix_set:
 - killwall.com
 - kilmeadeandfriends.com
 - kimchi.tv
-- kimi.ai
 - kimogirl.cc
 - kimootoko.net
 - kimosex.com
@@ -14679,8 +14673,6 @@ domain_suffix_set:
 - mantan-web.jp
 - mantochichi.com
 - manurefetish.com
-- manus.im
-- manuscdn.com
 - manytoon.com
 - manyvids.com
 - manyvoices.news
@@ -15558,7 +15550,6 @@ domain_suffix_set:
 - minilondon.co
 - minimarkham.ca
 - minimarkham.com
-- minimax.io
 - minimoncton.ca
 - minimoncton.com
 - minimontrealcentre.ca
@@ -15880,7 +15871,6 @@ domain_suffix_set:
 - moonbbs.com
 - moonbbs.info
 - moonbingo.com
-- moonshot.ai
 - mooo.com
 - moozporn.com
 - moptt.tw
@@ -23634,7 +23624,6 @@ domain_suffix_set:
 - traderjoexyz.com
 - tradeup.com
 - tradingview.com
-- trae.ai
 - trafficmanager.net
 - trainingpeaks.com
 - trakt.tv
