@@ -5,6 +5,11 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/sync-other-rules.yml'
+      - 'Egern/Rules/chatgpt.yaml'
+      - 'Egern/Rules/claude.yaml'
+      - 'Egern/Rules/google.yaml'
+  schedule:
+    - cron: '41 4 * * *'
   workflow_dispatch:
 
 permissions:
@@ -109,6 +114,38 @@ jobs:
               'fbcdn-a.akamaihd.net',
           }
 
+          # Retain verified AI assistant, coding, multimedia and inference
+          # service domains even if the upstream proxy rules omit them.
+          custom_ai_suffixes = {
+              'deepseek.com',
+              'kimi.com',
+              'qwen.ai',
+              'v0.app',
+              'bolt.new',
+              'lovable.dev',
+              'genspark.ai',
+              'udio.com',
+              'runwayml.com',
+              'klingai.com',
+              'hailuoai.video',
+              'replicate.com',
+              'fal.ai',
+              'together.ai',
+              'fireworks.ai',
+              'deepgram.com',
+              'assemblyai.com',
+              'heygen.com',
+              'synthesia.io',
+              'ideogram.ai',
+              'stability.ai',
+              'blackforestlabs.ai',
+          }
+          # Specific shared infrastructure needed by AI applications; avoid
+          # broad domains that would capture unrelated apps.
+          custom_ai_hosts = {
+              'default.exp-tas.com',
+          }
+
           def parse_rules(path):
               result = {name: set() for name in section_names}
               if not path.exists():
@@ -185,9 +222,9 @@ jobs:
               existing[section].update(missing)
               return len(missing)
 
-          added_meta = (
-              ensure_entries('domain_suffix_set', custom_meta_suffixes)
-              + ensure_entries('domain_set', custom_meta_hosts)
+          added_custom = (
+              ensure_entries('domain_suffix_set', custom_meta_suffixes | custom_ai_suffixes)
+              + ensure_entries('domain_set', custom_meta_hosts | custom_ai_hosts)
           )
 
           header = [
@@ -197,11 +234,11 @@ jobs:
               '# Excludes Apple rules from apple, apple-cn, apple-proxy, apple-tv and apns.',
               '# Adds common IP/proxy node test sites as domain keywords.',
               '# Retains Meta Muse/Facebook/Instagram/WhatsApp/Threads and CDN endpoints.',
-              '# Includes common overseas services/sites and other AI services.',
+              '# Includes verified AI assistants, coding and creative services.',
               '',
           ]
           output.write_text('\n'.join(header + out) + '\n', encoding='utf-8')
-          print(f'Generated {output}; removed {removed} excluded rules; ensured {len(custom_ip_test_keywords)} IP-test keywords and {added_meta} additional Meta entries.')
+          print(f'Generated {output}; removed {removed} excluded rules; ensured {len(custom_ip_test_keywords)} IP-test keywords and {added_custom} Meta/AI entries.')
           PY
 
       - name: Commit synced rules
