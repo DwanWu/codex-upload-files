@@ -4,10 +4,11 @@
 # Excludes Apple rules from apple, apple-cn, apple-proxy, apple-tv and apns.
 # Adds common IP/proxy node test sites as domain keywords.
 # Retains Meta Muse/Facebook/Instagram/WhatsApp/Threads and CDN endpoints.
-# Includes common overseas services/sites and other AI services.
+# Includes verified AI assistants, coding and creative services.
 
 no_resolve: true
 domain_set:
+- default.exp-tas.com
 - fbcdn-a.akamaihd.net
 - 1password.drift.click
 - adobeereg.com
@@ -124,7 +125,29 @@ domain_set:
 - zftksc.launches.appsflyersdk.com
 - ztedevices.com
 domain_suffix_set:
+- assemblyai.com
+- blackforestlabs.ai
+- bolt.new
+- deepgram.com
+- deepseek.com
+- fal.ai
 - fb.watch
+- fireworks.ai
+- genspark.ai
+- hailuoai.video
+- heygen.com
+- ideogram.ai
+- kimi.com
+- klingai.com
+- lovable.dev
+- qwen.ai
+- replicate.com
+- runwayml.com
+- stability.ai
+- synthesia.io
+- together.ai
+- udio.com
+- v0.app
 - 000webhost.com
 - 01.org
 - 02weqj32.com
