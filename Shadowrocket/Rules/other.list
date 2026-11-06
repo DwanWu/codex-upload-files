@@ -3,6 +3,7 @@
 # Format: TYPE,VALUE
 # Do not edit manually; update the Egern source instead.
 
+DOMAIN,default.exp-tas.com
 DOMAIN,fbcdn-a.akamaihd.net
 DOMAIN,1password.drift.click
 DOMAIN,adobeereg.com
@@ -118,7 +119,29 @@ DOMAIN,yangzhi.app
 DOMAIN,zftksc.cdn-settings.appsflyersdk.com
 DOMAIN,zftksc.launches.appsflyersdk.com
 DOMAIN,ztedevices.com
+DOMAIN-SUFFIX,assemblyai.com
+DOMAIN-SUFFIX,blackforestlabs.ai
+DOMAIN-SUFFIX,bolt.new
+DOMAIN-SUFFIX,deepgram.com
+DOMAIN-SUFFIX,deepseek.com
+DOMAIN-SUFFIX,fal.ai
 DOMAIN-SUFFIX,fb.watch
+DOMAIN-SUFFIX,fireworks.ai
+DOMAIN-SUFFIX,genspark.ai
+DOMAIN-SUFFIX,hailuoai.video
+DOMAIN-SUFFIX,heygen.com
+DOMAIN-SUFFIX,ideogram.ai
+DOMAIN-SUFFIX,kimi.com
+DOMAIN-SUFFIX,klingai.com
+DOMAIN-SUFFIX,lovable.dev
+DOMAIN-SUFFIX,qwen.ai
+DOMAIN-SUFFIX,replicate.com
+DOMAIN-SUFFIX,runwayml.com
+DOMAIN-SUFFIX,stability.ai
+DOMAIN-SUFFIX,synthesia.io
+DOMAIN-SUFFIX,together.ai
+DOMAIN-SUFFIX,udio.com
+DOMAIN-SUFFIX,v0.app
 DOMAIN-SUFFIX,000webhost.com
 DOMAIN-SUFFIX,01.org
 DOMAIN-SUFFIX,02weqj32.com
