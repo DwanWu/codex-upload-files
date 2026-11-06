@@ -37,6 +37,10 @@ jobs:
           out = []
           skipping = False
           for line in lines:
+              # Clean old generated provenance comments as well as IP blocks.
+              # Without this, each scheduled run accumulates another comment.
+              if line.strip() == '# Auto-synced from https://openai.com/chatgpt-voice.json':
+                  continue
               if line in ('ip_cidr_set:', 'ip_cidr6_set:'):
                   skipping = True
                   continue
