@@ -1,0 +1,11 @@
+# Shadowrocket rule-set
+# Auto-generated from Egern/Rules/apple-ai.yaml
+# Format: TYPE,VALUE
+# Do not edit manually; update the Egern source instead.
+
+DOMAIN,apple-relay.apple.com
+DOMAIN,apple-relay.cloudflare.com
+DOMAIN,apple-relay.fastly-edge.com
+DOMAIN,cp4.cloudflare.com
+DOMAIN,guzzoni.apple.com
+DOMAIN-SUFFIX,smoot.apple.com

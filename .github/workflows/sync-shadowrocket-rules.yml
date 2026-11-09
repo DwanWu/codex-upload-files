@@ -39,6 +39,7 @@ jobs:
               'google.yaml': 'google.list',
               'claude.yaml': 'claude.list',
               'other.yaml': 'other.list',
+              'apple-ai.yaml': 'apple-ai.list',
           }
 
           section_map = {
