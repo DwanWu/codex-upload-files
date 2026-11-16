@@ -29,6 +29,7 @@ DOMAIN,appsgenaiserver-pa.clients6.google.com
 DOMAIN,appsgenaiserver-pa.googleapis.com
 DOMAIN,cloudaicompanion.googleapis.com
 DOMAIN,daily-cloudcode-pa.googleapis.com
+DOMAIN,daily-cloudcode-pa.sandbox.googleapis.com
 DOMAIN,geminiweb-pa.clients.google.com
 DOMAIN,geminiweb-pa.clients6.google.com
 DOMAIN,notebooklm-pa.googleapis.com
