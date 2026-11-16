@@ -31,6 +31,7 @@ domain_set:
 - appsgenaiserver-pa.googleapis.com
 - cloudaicompanion.googleapis.com
 - daily-cloudcode-pa.googleapis.com
+- daily-cloudcode-pa.sandbox.googleapis.com
 - geminiweb-pa.clients.google.com
 - geminiweb-pa.clients6.google.com
 - notebooklm-pa.googleapis.com
