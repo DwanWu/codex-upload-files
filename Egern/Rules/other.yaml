@@ -32,6 +32,7 @@ domain_set:
 - cisco.evergage.com
 - clubhouse.pubnubapi.com
 - community.oneplus.com
+- courses.myecnu.org
 - crl.versign.net
 - databank.worldbank.org
 - datarouter.apps.netherrealm.com
@@ -4520,6 +4521,7 @@ domain_suffix_set:
 - cachefly.com
 - cachefly.net
 - cachinese.com
+- cachix.org
 - cacnw.com
 - cactusvpn.com
 - cad-mep.com
@@ -8607,6 +8609,7 @@ domain_suffix_set:
 - fastly.com
 - fastly.io
 - fastly.net
+- fastlydns.net
 - fastlylabs.com
 - fastlylb.net
 - fastmail.com
@@ -25073,6 +25076,7 @@ domain_suffix_set:
 - vivaldi.com
 - vivatube.com
 - vivaxnxx.com
+- vivox.com
 - vivthomas.com
 - vixen.com
 - vixengroup.com
