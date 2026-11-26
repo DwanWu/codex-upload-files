@@ -2,13 +2,8 @@ name: Mirror Egern tag module
 
 on:
   schedule:
-    - cron: '17,47 * * * *'
+    - cron: '17 5 * * *' # 13:17 Beijing time daily
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/sync-tag-module.yml'
-      - 'scripts/sync_tag_module.py'
 
 permissions:
   contents: write
