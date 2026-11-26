@@ -2,7 +2,7 @@ name: Mirror Egern tag module
 
 on:
   schedule:
-    - cron: '17 5 * * *' # 13:17 Beijing time daily
+    - cron: '11 5 * * *' # 13:11 Beijing time daily
   workflow_dispatch:
 
 permissions:
