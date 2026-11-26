@@ -1,16 +1,16 @@
 name: Network Slate
 desc: 人工智能检测系统
 category: Network
-version: '4.2.1'
+version: '4.3.0'
 tiles:
-  - name: wzw-ip-quality-slate-node
+  - name: wzw-ip-quality-slate-node-43
     interval: 1800
     collapsed: true
     title: IP
     content: 等待检测
     icon: shield
     backgroundColor: '#303745'
-  - name: wzw-ai-service-slate-node-421
+  - name: wzw-ai-service-slate-node-43
     interval: 1800
     collapsed: true
     title: AI
@@ -18,73 +18,76 @@ tiles:
     icon: sparkles
     backgroundColor: '#303745'
 script-providers:
-  wzw-ip-quality-slate-node:
+  wzw-ip-quality-slate-node-43:
     interval: 86400
     payload: |
       (function () {
-        var finished=false, primary=null, secondary=null;
+        var finished=false, primary=null, secondary=null, statusA='未完成',statusB='未完成';
         var slate='#303745';
         function score(v){if(typeof v==='string'&&/^\d+(?:\.\d+)?$/.test(v.trim()))v=Number(v);return typeof v==='number'&&isFinite(v)&&v>=0&&v<=100?Math.round(v):null;}
         function clean(v){return typeof v==='string'&&v.trim()?v.trim().replace(/\s+/g,' '):'未知';}
-        function mark(v){return v===true?'!':v===false?'○':'?';}
         function flag(cc){return /^[A-Z]{2}$/.test(cc)?String.fromCodePoint(127397+cc.charCodeAt(0),127397+cc.charCodeAt(1))+' ':'';}
-        function time(){var d=new Date();return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);}
-        function joinFlag(a,b){return a===true||b===true?true:a===false||b===false?false:null;}
-        function done(title,content,color,icon){
-          if(finished)return;finished=true;
-          $done({title:title,content:content,backgroundColor:color,icon:icon,url:'https://ipquery.io/'});
-        }
+        function merge(a,b){return a===true||b===true?true:a===false||b===false?false:null;}
+        function log(v){try{console.log('Ip details '+JSON.stringify(v));}catch(e){}}
+        function done(title,content,icon,url){if(finished)return;finished=true;$done({title:title,content:content,backgroundColor:slate,icon:icon,url:url||'https://ipquery.io/'});}
         function request(url,timeout,cb){
+          var called=false;
+          function end(data,reason){if(called||finished)return;called=true;cb(data,reason);}
           try{$httpClient.get({url:url,timeout:timeout,headers:{Accept:'application/json','Cache-Control':'no-cache, no-store','Pragma':'no-cache'},'auto-cookie':false,'auto-redirect':false},function(e,r,d){
-            if(finished)return;
-            if(e||!r||Number(r.status||r.statusCode)!==200){cb(null);return;}
-            try{cb(JSON.parse(d));}catch(err){cb(null);}
-          });}catch(e){cb(null);}
+            if(finished||called)return;
+            var code=r?Number(r.status||r.statusCode):0;
+            if(e||code!==200){end(null,code?'HTTP '+code:String(e||'无响应'));return;}
+            var obj;try{obj=typeof d==='string'?JSON.parse(d):d;}catch(err){end(null,'JSON 无效');return;}
+            if(!obj||typeof obj!=='object'){end(null,'响应无效');return;}
+            end(obj,'HTTP 200');
+          });}catch(e){end(null,'请求异常');}
         }
+        function validIp(v){return typeof v==='string'&&/^[0-9a-f:.]+$/i.test(v)&&v.length<=45&&(v.indexOf(':')>=0||/^\d{1,3}(\.\d{1,3}){3}$/.test(v)&&v.split('.').every(function(s){return Number(s)<=255;}));}
         function render(){
           if(finished)return;
-          if(!primary){done('IP·—','查询失败或超时',slate,'exclamationmark.shield');return;}
-          var d=primary,loc=d.location||{},isp=d.isp||{},r=d.risk||{},p=secondary||{};
-          var a=score(r.risk_score),b=score(p.risk),values=[a,b].filter(function(v){return v!==null;});
-          var risk=values.length?Math.max.apply(null,values):null,quality=risk===null?null:100-risk;
-          var pc=typeof p.proxy==='string'?p.proxy.toLowerCase():'',pt=typeof p.type==='string'?p.type:'';
-          var proxy=joinFlag(r.is_proxy,pc==='yes'?true:pc==='no'?false:null);
-          var vpn=joinFlag(r.is_vpn,/vpn/i.test(pt)&&pc==='yes'?true:null);
-          var tor=joinFlag(r.is_tor,/\btor\b/i.test(pt)&&pc==='yes'?true:null);
-          var dc=joinFlag(r.is_datacenter,/hosting|datacenter|data center/i.test(pt)?true:null);
-          var flagged=[proxy,vpn,tor,dc].indexOf(true)>=0;
-          var uncertain=[proxy,vpn,tor,dc].indexOf(null)>=0;
-          var label=risk===null?'评分未知':risk>=60?'高风险':risk>=25?'需留意':flagged?'存在标记':uncertain?'部分标记未知':risk>0?'低风险':'未见评分风险';
-          var cc=clean(loc.country_code||'').toUpperCase(),place=flag(cc)+(cc==='未知'?'':cc+' · ')+clean(loc.city||loc.country);
-          var asn=clean(String(isp.asn||''));
-          var provider=clean(isp.isp||isp.org);
-          var type=dc===true?'机房':r.is_mobile===true?'移动网络':dc===false&&r.is_mobile===false?'宽带特征':'类型未知';
-          var count=values.length;
-          var flags=[['机房',dc],['代理',proxy],['VPN',vpn],['Tor',tor]];
-          var hits=flags.filter(function(v){return v[1]===true;}).map(function(v){return v[0];});
-          var unknown=flags.filter(function(v){return v[1]===null;}).length;
-          var summary=hits.length?'! '+hits.join('/'):(unknown?'部分未知':'未见标记');
-          if(hits.length&&unknown)summary+=' / ?';
-          var detail={ip:d.ip,location:place,provider:provider,asn:asn,network:type,risk:{ipquery:a,proxycheck:b,reference:risk},quality:quality,sourceCount:count,flags:{datacenter:dc,proxy:proxy,vpn:vpn,tor:tor},summary:summary,label:label};
-          try{console.log('Ip details '+JSON.stringify(detail));}catch(e){}
+          if(!primary){log({ipquery:statusA,proxycheck:statusB});done('IP·—','查询失败或超时','exclamationmark.shield');return;}
+          var d=primary,r=d.risk||{},loc=d.location||{},isp=d.isp||{},p=secondary||{},det=p.detections||{},net=p.network||{};
+          var a=score(r.risk_score),b=score(det.risk),scores=[a,b].filter(function(v){return v!==null;}),count=scores.length;
+          var dc=merge(r.is_datacenter,det.hosting===true||String(net.type||'').toLowerCase()==='hosting'?true:det.hosting===false?false:null);
+          var proxy=merge(r.is_proxy,det.proxy),vpn=merge(r.is_vpn,det.vpn),tor=merge(r.is_tor,det.tor);
+          var scraper=det.scraper===true,compromised=det.compromised===true;
+          // Reference purity policy: documented ProxyCheck baseline points, applied only to positively detected classifications.
+          // Database risk scores remain unchanged in logs. No numerical score is fabricated when neither database supplies one.
+          var floor=Math.max(dc===true?33:0,vpn===true?50:0,tor===true||scraper?75:0,proxy===true||compromised?100:0);
+          var actual=count?Math.max.apply(null,scores):null;
+          var ref=count?Math.max(actual,floor):null,quality=ref===null?null:100-ref;
+          var hits=[dc,proxy,vpn,tor,scraper,compromised].indexOf(true)>=0;
+          var uncertain=[dc,proxy,vpn,tor].some(function(x){return x===null;});
+          var cc=clean(loc.country_code||((p.location||{}).country_code)||'').toUpperCase();
+          var detail={ip:d.ip,checkedAt:new Date().toISOString(),country:cc,city:clean(loc.city||((p.location||{}).city_name)),isp:clean(isp.isp||isp.org||net.provider),asn:clean(String(isp.asn||net.asn||'')),sources:{ipquery:statusA,proxycheck:statusB},scores:{ipquery:a,proxycheck:b},sourceCount:count,rawMaxRisk:actual,classificationFloor:floor,referenceRisk:ref,referencePurity:quality,flags:{hosting:dc,proxy:proxy,vpn:vpn,tor:tor,scraper:det.scraper===true?true:det.scraper===false?false:null,compromised:det.compromised===true?true:det.compromised===false?false:null}};
+          log(detail);
           var displayIp=d.ip;
           if(displayIp.length>15&&displayIp.indexOf(':')>=0)displayIp=displayIp.slice(0,7)+'…'+displayIp.slice(-5);
-          var title='IP·'+(quality===null?'—':quality);
-          var subtitle=flag(cc)+displayIp;
-          var icon=flagged||risk!==null&&risk>=25?'exclamationmark.shield':quality===null||uncertain||count<2?'shield.lefthalf.filled':'checkmark.shield';
-          done(title,subtitle,slate,icon);
+          var title='IP·'+(quality===null?'—':quality+(count===1?'*':''));
+          var icon=hits||ref!==null&&ref>=25?'exclamationmark.shield':quality===null||uncertain||count<2?'shield.lefthalf.filled':'checkmark.shield';
+          done(title,flag(cc)+displayIp,icon,'https://ipquery.io/ip/'+encodeURIComponent(d.ip));
         }
-        setTimeout(render,11000);
-        request('https://api.ipquery.io/?format=json',5,function(d){
-          if(!d||typeof d.ip!=='string'||!/^[0-9a-f:.]+$/i.test(d.ip)){render();return;}
+        setTimeout(function(){if(statusA==='未完成')statusA='超时';if(statusB==='未完成')statusB='超时或未查询';render();},15000);
+        request('https://api.ipquery.io/?format=json',6,function(d,why){
+          statusA=why;
+          if(!d||!validIp(d.ip)){if(d)statusA='IP 字段缺失或无效';statusB='未查询';render();return;}
           primary=d;
-          request('https://proxycheck.io/v2/'+encodeURIComponent(d.ip)+'?vpn=1&risk=1&tag=0',5,function(x){
-            if(x&&(x.status==='ok'||x.status==='warning')&&x[d.ip]&&typeof x[d.ip]==='object')secondary=x[d.ip];
+          if(score((d.risk||{}).risk_score)===null)statusA='HTTP 200 / 无有效风险分';
+          request('https://proxycheck.io/v3/'+encodeURIComponent(d.ip)+'?tag=0&ver=24-June-2026',7,function(x,reason){
+            statusB=reason;
+            if(x&&(x.status==='ok'||x.status==='warning')){
+              var key=Object.keys(x).filter(function(k){return k.toLowerCase()===d.ip.toLowerCase();})[0];
+              if(key&&x[key]&&typeof x[key]==='object'){
+                secondary=x[key];
+                if(score((secondary.detections||{}).risk)===null)statusB='HTTP 200 / 无有效风险分';
+                else if(x.status==='warning')statusB='HTTP 200 / API warning';
+              }else statusB='HTTP 200 / IP 记录缺失';
+            }else if(x)statusB='HTTP 200 / '+String(x.status||'无效状态');
             render();
           });
         });
       })();
-  wzw-ai-service-slate-node-421:
+  wzw-ai-service-slate-node-43:
     interval: 86400
     payload: |
       (function () {
@@ -98,7 +101,7 @@ script-providers:
         function finish(){
           if(finished)return;finished=true;
           var responded=0,normal=0,restricted=0,failed=0,signs=[],delays=[],detail=[];
-          var labels=['GPT','C','Gemini'];
+          var labels=['Chatgpt','Claude','Gemini'];
           services.forEach(function(s,i){
             var w=results[i].web||{text:'超时',state:'fail',http:false},a=results[i].api||{text:'超时',state:'fail',http:false};
             var has=w.http||a.http,ok=w.state==='ok'&&(a.state==='ok'||a.state==='auth'),region=w.state==='region'||a.state==='region';
