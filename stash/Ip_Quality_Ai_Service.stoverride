@@ -1,0 +1,115 @@
+name: Ip quality & Ai service
+desc: |-
+  检测 Tagss 默认出口 IP 风险及 Chatgpt、Claude、Gemini 策略组的网页和 API 响应。
+  独立面板，不改变节点、订阅、DNS 或分流规则。仅作网络连通性与 IP 风险参考。
+  IPQuery 为第三方查询源，无须 API Key。
+category: Network
+version: '1.0.0'
+tiles:
+  - name: wzw-ip-quality-v1
+    interval: 1800
+    title: Ip quality
+    content: 等待检测 · Tagss
+    icon: shield.lefthalf.filled
+    backgroundColor: '#64748B'
+  - name: wzw-ai-service-v1
+    interval: 1800
+    title: Ai service
+    content: 等待检测 · Chatgpt / Claude / Gemini
+    icon: cpu
+    backgroundColor: '#64748B'
+script-providers:
+  wzw-ip-quality-v1:
+    interval: 86400
+    payload: |
+      (function () {
+        var group = 'Tagss';
+        var finished = false;
+        function done(title, content, color, icon) {
+          if (finished) return;
+          finished = true;
+          $done({title:title, content:content, backgroundColor:color, icon:icon,
+            url:'https://ipquery.io/'});
+        }
+        function flag(v) { return v === true ? '是' : v === false ? '否' : '?'; }
+        function clean(v) { return typeof v === 'string' && v.trim() ? v.trim().replace(/\s+/g,' ') : '未知'; }
+        setTimeout(function(){done('Ip quality · 超时','Tagss · 检测源未响应','#64748B','exclamationmark.shield');}, 11000);
+        try {
+          $httpClient.get({url:'https://api.ipquery.io/?format=json',timeout:8,
+            headers:{'Accept':'application/json','X-Stash-Selected-Proxy':encodeURIComponent(group)},
+            'auto-cookie':false,'auto-redirect':false}, function(error,response,data) {
+            if (finished) return;
+            var status = response ? Number(response.status || response.statusCode) : 0;
+            if (error || status !== 200) {done('Ip quality · 未知','Tagss · '+(status ? 'HTTP '+status : '请求失败'),'#64748B','exclamationmark.shield');return;}
+            try {
+              var d=JSON.parse(data); if (!d.ip || typeof d.ip !== 'string') throw Error('missing ip');
+              var loc=d.location||{}, isp=d.isp||{}, r=d.risk||{};
+              var s=r.risk_score, valid=typeof s==='number' && isFinite(s) && s>=0 && s<=100;
+              var grade= !valid ? '未知' : s>=60 ? '高风险' : s>=25 ? '中风险' : s>0 ? '低风险' : '未见评分风险';
+              var color= !valid ? '#64748B' : s>=60 ? '#B91C1C' : s>=25 ? '#B45309' : (s>0 || r.is_datacenter===true || r.is_vpn===true || r.is_proxy===true || r.is_tor===true) ? '#A16207' : '#0F766E';
+              var network=r.is_datacenter===true?'机房':r.is_mobile===true?'移动网络':r.is_datacenter===false&&r.is_mobile===false?'非机房/非移动':'未知类型';
+              var lines=[d.ip+' · '+clean(loc.country_code || loc.country),clean(loc.city)+' · '+clean(isp.isp || isp.org),clean(isp.asn)+' · '+network,
+                '风险 '+(valid?s+'/100':'未知')+' · '+grade,
+                'VPN '+flag(r.is_vpn)+' / 代理 '+flag(r.is_proxy)+' / Tor '+flag(r.is_tor)];
+              done('Ip quality · '+(valid?'纯净参考 '+(100-s)+'/100':'评分未知'),lines.join('\n'),color,'shield.lefthalf.filled');
+            } catch(e){done('Ip quality · 未知','Tagss · 响应数据异常','#64748B','exclamationmark.shield');}
+          });
+        } catch(e){done('Ip quality · 未知','Tagss · 请求初始化失败','#64748B','exclamationmark.shield');}
+      })();
+  wzw-ai-service-v1:
+    interval: 86400
+    payload: |
+      (function () {
+        var services=[
+          {name:'Chatgpt',web:'https://chatgpt.com/',api:'https://api.openai.com/v1/models',headers:{}},
+          {name:'Claude',web:'https://claude.ai/',api:'https://api.anthropic.com/v1/models',headers:{'anthropic-version':'2023-06-01'}},
+          {name:'Gemini',web:'https://gemini.google.com/',api:'https://generativelanguage.googleapis.com/v1beta/models',headers:{}}
+        ];
+        var results=services.map(function(){return {web:null,api:null};}), left=6, finished=false;
+        function finish() {
+          if(finished)return; finished=true;
+          var normal=0, region=0, lines=services.map(function(s,i){
+            var w=results[i].web||{text:'超时',ok:false}, a=results[i].api||{text:'超时',ok:false};
+            if(w.ok&&a.ok)normal++; if(w.region||a.region)region++;
+            return s.name+' · 网页 '+w.text+' / API '+a.text+(typeof a.ms==='number'?' '+a.ms+'ms':'');
+          });
+          $done({title:'Ai service · '+normal+'/3 响应正常',content:lines.join('\n'),icon:'cpu',
+            backgroundColor:normal===3?'#0F766E':region>0?'#B91C1C':normal>0?'#A16207':'#64748B'});
+        }
+        function classify(s,kind,error,res,data,ms){
+          var code=res?Number(res.status||res.statusCode):0;
+          if(error||!code)return {text:/timeout|timed out|超时/i.test(String(error))?'超时':'连接失败',ok:false};
+          var str=typeof data==='string'?data:'', obj=null;
+          try{obj=JSON.parse(str);}catch(e){}
+          var er=obj&&obj.error?obj.error:{}, message=typeof er.message==='string'?er.message:'', errcode=String(er.code||''), errtype=String(er.type||''), details=JSON.stringify(er.details||[]);
+          var headers=res.headers||{}, loc='', challenge=false;
+          Object.keys(headers).forEach(function(k){var v=String(headers[k]||'');if(k.toLowerCase()==='location')loc=v;if(k.toLowerCase()==='cf-mitigated'&&/challenge/i.test(v))challenge=true;});
+          var regionText=kind==='api'?message+' '+errcode+' '+errtype:loc;
+          if(/unsupported[_ -](country|region|territory)|country[_ -]not[_ -]supported|(?:country|region|territory).{0,60}(?:not supported|not available|unsupported)|user location is not supported|not available in (?:your|this) (?:country|region|location)|unavailable[-_]in[-_](?:your[-_])?(?:country|region)/i.test(regionText))return {text:'地区受限',ok:false,region:true,ms:ms};
+          if(challenge||/just a moment|cf-chl-|attention required!.*cloudflare/i.test(str.slice(0,16000)))return {text:'安全验证',ok:false,ms:ms};
+          if(kind==='web'){
+            if(code>=200&&code<300)return {text:'HTTP '+code,ok:true,ms:ms};
+            if(code>=300&&code<400)return {text:'跳转'+code,ok:true,ms:ms};
+          }else{
+            if(code>=200&&code<300&&obj&&(Array.isArray(obj.data)||Array.isArray(obj.models)))return {text:'已响应',ok:true,ms:ms};
+            var auth=false;
+            if(s.name==='Chatgpt')auth=code===401&&!!obj&&/api.?key|bearer|authentication|authorization/i.test(message+' '+errcode+' '+errtype);
+            if(s.name==='Claude')auth=code===401&&!!obj&&(/authentication_error/i.test(errtype)||/api.?key|authentication/i.test(message));
+            if(s.name==='Gemini')auth=[400,401,403].indexOf(code)>=0&&!!obj&&/API_KEY_INVALID|API_KEY_MISSING|API key|unregistered caller|API keys|UNAUTHENTICATED/i.test(message+' '+details+' '+String(er.status||''));
+            if(auth)return {text:'待鉴权',ok:true,ms:ms};
+          }
+          if(code===429)return {text:'限流429',ok:false,ms:ms};
+          if(code>=500)return {text:'服务'+code,ok:false,ms:ms};
+          return {text:'HTTP '+code,ok:false,ms:ms};
+        }
+        function run(s,i,kind){
+          var start=Date.now(), headers={'Accept':kind==='api'?'application/json':'text/html,application/xhtml+xml','X-Stash-Selected-Proxy':encodeURIComponent(s.name)};
+          if(kind==='api')Object.keys(s.headers).forEach(function(k){headers[k]=s.headers[k];});
+          function record(result){if(finished||results[i][kind])return;results[i][kind]=result;left--;if(left===0)finish();}
+          try{$httpClient.get({url:s[kind],headers:headers,timeout:8,'auto-cookie':false,'auto-redirect':false},function(e,r,d){
+            try{record(classify(s,kind,e,r,d,Date.now()-start));}catch(err){record({text:'响应异常',ok:false});}
+          });}catch(e){record({text:'请求失败',ok:false});}
+        }
+        setTimeout(finish,11000);
+        services.forEach(function(s,i){run(s,i,'web');run(s,i,'api');});
+      })();
