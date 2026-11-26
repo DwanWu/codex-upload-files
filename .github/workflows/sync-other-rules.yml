@@ -10,7 +10,7 @@ on:
       - 'scripts/sync_egern.py'
       - 'scripts/egern-policy.json'
       - '.github/workflows/sync-*.yml'
-      - 'Egern/Rules/apple-ai.yaml'
+      - 'Egern/Rules/apple.yaml'
 
 permissions:
   contents: write

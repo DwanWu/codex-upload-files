@@ -285,7 +285,7 @@ def main():
     if args.target=='test':
         return
     target=args.target
-    names=('chatgpt','claude','google','other','apple-ai')
+    names=('chatgpt','claude','google','other','apple')
     old={k:read(k) for k in names}
     result={k:old[k] for k in names}
     ai=source('ai',30)
@@ -298,7 +298,7 @@ def main():
         result['google']['domain_set'].discard('claude.googleapis.com')
         result['google']['domain_suffix_set'].discard('claude.googleapis.com')
     apple=[source(x,5) for x in ('apple','apple-cn','apple-proxy','apple-tv','apns')]
-    owners=[result[x] for x in ('chatgpt','claude','google','apple-ai')]+apple
+    owners=[result[x] for x in ('chatgpt','claude','google','apple')]+apple
     result['other']=guard('other',other(source('proxy',1000),ai,owners),old['other'])
     selected=('chatgpt','claude','google','other') if target=='all' else ('other',) if target=='other' else (target,'other')
     # Fully validate all selected outputs before changing any tracked file.
