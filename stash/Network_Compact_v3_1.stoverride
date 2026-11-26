@@ -1,0 +1,151 @@
+name: Network Compact 3.1 (Collapsed)
+desc: |-
+  Egern 风格紧凑折叠面板，收纳于第三方服务。IPQuery 与 ProxyCheck 双源查询；参考评分为 100 减去可用风险分中的最大值，不代表绝对纯净。
+  IP 卡片显示风险分、有效评分源数量和风险标记摘要；未见标记仅指可用数据库结果。
+  AI 已响应表示网页或 API 收到 HTTP 响应，并非鉴权成功；✓ 网页正常且 API 正常或明确待鉴权。
+  检测使用 Tagss、Chatgpt、Claude、Gemini 策略组；无须 API Key，不修改任何分流配置。
+category: Network
+version: '3.1.0'
+tiles:
+  - name: wzw-ip-quality-v31
+    interval: 1800
+    collapsed: true
+    title: Ip
+    content: 等待检测 · Tagss
+    icon: checkmark.shield.fill
+    backgroundColor: '#16A085'
+  - name: wzw-ai-service-v31
+    interval: 1800
+    collapsed: true
+    title: Ai
+    content: 等待检测 · 3 项服务
+    icon: cpu.fill
+    backgroundColor: '#64748B'
+script-providers:
+  wzw-ip-quality-v31:
+    interval: 86400
+    payload: |
+      (function () {
+        var group='Tagss', finished=false, primary=null, secondary=null;
+        var neutral='#64748B', green='#16A085', amber='#C58A2B', red='#C84B4B';
+        function score(v){if(typeof v==='string'&&/^\d+(?:\.\d+)?$/.test(v.trim()))v=Number(v);return typeof v==='number'&&isFinite(v)&&v>=0&&v<=100?Math.round(v):null;}
+        function clean(v){return typeof v==='string'&&v.trim()?v.trim().replace(/\s+/g,' '):'未知';}
+        function mark(v){return v===true?'!':v===false?'○':'?';}
+        function flag(cc){return /^[A-Z]{2}$/.test(cc)?String.fromCodePoint(127397+cc.charCodeAt(0),127397+cc.charCodeAt(1))+' ':'';}
+        function time(){var d=new Date();return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);}
+        function joinFlag(a,b){return a===true||b===true?true:a===false||b===false?false:null;}
+        function done(title,content,color,icon){
+          if(finished)return;finished=true;
+          $done({title:title,content:content,backgroundColor:color,icon:icon,url:'https://ipquery.io/'});
+        }
+        function request(url,timeout,cb){
+          try{$httpClient.get({url:url,timeout:timeout,headers:{Accept:'application/json','X-Stash-Selected-Proxy':encodeURIComponent(group)},'auto-cookie':false,'auto-redirect':false},function(e,r,d){
+            if(finished)return;
+            if(e||!r||Number(r.status||r.statusCode)!==200){cb(null);return;}
+            try{cb(JSON.parse(d));}catch(err){cb(null);}
+          });}catch(e){cb(null);}
+        }
+        function render(){
+          if(finished)return;
+          if(!primary){done('Ip · 未知','Tagss · 查询失败或超时',neutral,'exclamationmark.shield');return;}
+          var d=primary,loc=d.location||{},isp=d.isp||{},r=d.risk||{},p=secondary||{};
+          var a=score(r.risk_score),b=score(p.risk),values=[a,b].filter(function(v){return v!==null;});
+          var risk=values.length?Math.max.apply(null,values):null,quality=risk===null?null:100-risk;
+          var pc=typeof p.proxy==='string'?p.proxy.toLowerCase():'',pt=typeof p.type==='string'?p.type:'';
+          var proxy=joinFlag(r.is_proxy,pc==='yes'?true:pc==='no'?false:null);
+          var vpn=joinFlag(r.is_vpn,/vpn/i.test(pt)&&pc==='yes'?true:null);
+          var tor=joinFlag(r.is_tor,/\btor\b/i.test(pt)&&pc==='yes'?true:null);
+          var dc=joinFlag(r.is_datacenter,/hosting|datacenter|data center/i.test(pt)?true:null);
+          var flagged=[proxy,vpn,tor,dc].indexOf(true)>=0;
+          var uncertain=[proxy,vpn,tor,dc].indexOf(null)>=0;
+          var label=risk===null?'评分未知':risk>=60?'高风险':risk>=25?'需留意':flagged?'存在标记':uncertain?'部分标记未知':risk>0?'低风险':'未见评分风险';
+          var color=(risk!==null&&risk>=60)?red:(flagged||risk!==null&&risk>=25)?amber:(risk===null||uncertain)?neutral:green;
+          var cc=clean(loc.country_code||'').toUpperCase(),place=flag(cc)+(cc==='未知'?'':cc+' · ')+clean(loc.city||loc.country);
+          var asn=clean(String(isp.asn||''));
+          var provider=clean(isp.isp||isp.org);
+          var type=dc===true?'机房':r.is_mobile===true?'移动网络':dc===false&&r.is_mobile===false?'宽带特征':'类型未知';
+          var count=values.length;
+          var flags=[['机房',dc],['代理',proxy],['VPN',vpn],['Tor',tor]];
+          var hits=flags.filter(function(v){return v[1]===true;}).map(function(v){return v[0];});
+          var unknown=flags.filter(function(v){return v[1]===null;}).length;
+          var summary=hits.length?'! '+hits.join('/'):(unknown?'部分未知':'未见标记');
+          if(hits.length&&unknown)summary+=' / ?';
+          var lines=[place+' · '+type,d.ip+' · '+asn,provider+' · 风险 '+(risk===null?'—':risk)+' · '+count+'/2源',summary];
+          done('Ip · '+(quality===null?'未知':quality+'/100'),lines.join('\n'),color,flagged||risk!==null&&risk>=25?'exclamationmark.shield.fill':quality===null||uncertain?'shield.lefthalf.filled':'checkmark.shield.fill');
+        }
+        setTimeout(render,11000);
+        request('https://api.ipquery.io/?format=json',5,function(d){
+          if(!d||typeof d.ip!=='string'||!/^[0-9a-f:.]+$/i.test(d.ip)){render();return;}
+          primary=d;
+          request('https://proxycheck.io/v2/'+encodeURIComponent(d.ip)+'?vpn=1&risk=1&tag=0',5,function(x){
+            if(x&&(x.status==='ok'||x.status==='warning')&&x[d.ip]&&typeof x[d.ip]==='object')secondary=x[d.ip];
+            render();
+          });
+        });
+      })();
+  wzw-ai-service-v31:
+    interval: 86400
+    payload: |
+      (function () {
+        var services=[
+          {name:'Chatgpt',web:'https://chatgpt.com/',api:'https://api.openai.com/v1/models',headers:{}},
+          {name:'Claude',web:'https://claude.ai/',api:'https://api.anthropic.com/v1/models',headers:{'anthropic-version':'2023-06-01'}},
+          {name:'Gemini',web:'https://gemini.google.com/',api:'https://generativelanguage.googleapis.com/v1beta/models',headers:{}}
+        ];
+        var results=services.map(function(){return {web:null,api:null};}),left=6,finished=false;
+        function time(){var d=new Date();return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);}
+        function finish(){
+          if(finished)return;finished=true;
+          var responded=0,normal=0,restricted=0;
+          var lines=services.map(function(s,i){
+            var w=results[i].web||{text:'超时',state:'fail',http:false},a=results[i].api||{text:'超时',state:'fail',http:false};
+            var has=w.http||a.http,ok=w.state==='ok'&&(a.state==='ok'||a.state==='auth'),region=w.state==='region'||a.state==='region';
+            if(has)responded++;if(ok)normal++;if(region)restricted++;
+            var sign=ok?'✓':region||!has?'×':'◐';
+            var latency=typeof a.ms==='number'&&a.http?a.ms+'ms':typeof w.ms==='number'&&w.http?w.ms+'ms(网页)':'—';
+            var ws=w.state==='ok'?'网页通':w.text==='安全验证'?'网页验证':'网页'+w.text;
+            var as=a.state==='ok'?'API通':a.state==='auth'?'API待鉴权':'API'+a.text;
+            return sign+' '+s.name+' · '+latency+' · '+ws+'/'+as;
+          });
+          $done({title:'Ai · '+responded+'/3 响应',content:lines.join('\n'),icon:'cpu.fill',
+            backgroundColor:normal===3?'#16A085':restricted>0?'#C84B4B':responded>0?'#C58A2B':'#64748B'});
+        }
+        function classify(s,kind,error,res,data,ms){
+          var code=res?Number(res.status||res.statusCode):0;
+          function out(text,state){return {text:text,state:state,http:!!code,ms:ms};}
+          if(error||!code)return {text:/timeout|timed out|超时/i.test(String(error))?'超时':'连接失败',state:'fail',http:false,ms:ms};
+          var str=typeof data==='string'?data:'',obj=null;
+          try{obj=JSON.parse(str);}catch(e){}
+          var er=obj&&obj.error?obj.error:{},message=typeof er.message==='string'?er.message:'',errcode=String(er.code||''),errtype=String(er.type||''),details=JSON.stringify(er.details||[]);
+          var headers=res.headers||{},loc='',challenge=false;
+          Object.keys(headers).forEach(function(k){var v=String(headers[k]||'');if(k.toLowerCase()==='location')loc=v;if(k.toLowerCase()==='cf-mitigated'&&/challenge/i.test(v))challenge=true;});
+          var regionText=kind==='api'?message+' '+errcode+' '+errtype+' '+details:loc;
+          if(/unsupported[_ -](country|region|territory)|country[_ -]not[_ -]supported|(?:country|region|territory).{0,60}(?:not supported|not available|unsupported)|user location is not supported|not available in (?:your|this) (?:country|region|location)|unavailable[-_]in[-_](?:your[-_])?(?:country|region)/i.test(regionText))return out('地区受限','region');
+          if(challenge||/<title[^>]*>\s*just a moment|cf-chl-|attention required!.*cloudflare/i.test(str.slice(0,16000)))return out('安全验证','check');
+          if(kind==='web'){
+            if(code>=200&&code<300)return out('正常','ok');
+            if(code>=300&&code<400)return out('跳转 '+code,'check');
+          }else{
+            if(code>=200&&code<300&&obj&&(Array.isArray(obj.data)||Array.isArray(obj.models)))return out('正常','ok');
+            var auth=false;
+            if(s.name==='Chatgpt')auth=code===401&&!!obj&&/api.?key|bearer|authentication|authorization/i.test(message+' '+errcode+' '+errtype);
+            if(s.name==='Claude')auth=code===401&&!!obj&&(/authentication_error/i.test(errtype)||/api.?key|authentication/i.test(message));
+            if(s.name==='Gemini')auth=[400,401,403].indexOf(code)>=0&&!!obj&&/API_KEY_INVALID|API_KEY_MISSING|API key|unregistered callers?|API keys|UNAUTHENTICATED/i.test(message+' '+details+' '+String(er.status||''));
+            if(auth)return out('待鉴权','auth');
+          }
+          if(code===403)return out('403 待确认','check');
+          if(code===429)return out('限流','check');
+          if(code>=500)return out('服务 '+code,'fail');
+          return out('HTTP '+code,'check');
+        }
+        function run(s,i,kind){
+          var start=Date.now(),headers={'Accept':kind==='api'?'application/json':'text/html,application/xhtml+xml','X-Stash-Selected-Proxy':encodeURIComponent(s.name)};
+          if(kind==='api')Object.keys(s.headers).forEach(function(k){headers[k]=s.headers[k];});
+          function record(result){if(finished||results[i][kind])return;results[i][kind]=result;if(--left===0)finish();}
+          try{$httpClient.get({url:s[kind],headers:headers,timeout:8,'auto-cookie':false,'auto-redirect':false},function(e,r,d){
+            try{record(classify(s,kind,e,r,d,Date.now()-start));}catch(err){record({text:'响应异常',state:'fail',http:false});}
+          });}catch(e){record({text:'请求失败',state:'fail',http:false});}
+        }
+        setTimeout(finish,11000);
+        services.forEach(function(s,i){run(s,i,'web');run(s,i,'api');});
+      })();
