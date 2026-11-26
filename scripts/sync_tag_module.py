@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mirror a third-party module verbatim as inert text. Do not execute it."""
+"""Mirror a third-party module as inert text, preserving a local description. Do not execute it."""
 import re
 import ssl
 import sys
@@ -11,6 +11,7 @@ from pathlib import Path
 
 SOURCE = 'https://nys4f2st.nvidia.cn.com:8443/tag.sgmodule'
 MAX_SIZE = 2_000_000
+DESCRIPTION = '#!desc=辅助 TAG 连接外网使用的模块。'.encode('utf-8')
 
 class SameOriginRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -44,6 +45,19 @@ def validate(data):
         raise ValueError('Possible private credential detected; refusing public mirror')
     return data
 
+def apply_description(data):
+    pattern = rb'(?m)^#!desc=[^\r\n]*'
+    if re.search(pattern, data):
+        return re.sub(pattern, lambda _: DESCRIPTION, data, count=1)
+    # Add metadata after the module name, preserving the source line ending.
+    eol = b'\r\n' if b'\r\n' in data else b'\n'
+    name = re.search(rb'(?m)^(?:\xef\xbb\xbf)?#!name=[^\r\n]*(?:\r?\n|$)', data)
+    if name:
+        sep = b'' if data[:name.end()].endswith(b'\n') else eol
+        return data[:name.end()] + sep + DESCRIPTION + eol + data[name.end():]
+    bom = b'\xef\xbb\xbf' if data.startswith(b'\xef\xbb\xbf') else b''
+    return bom + DESCRIPTION + eol + data[len(bom):]
+
 def download():
     opener=urllib.request.build_opener(SameOriginRedirect(),urllib.request.HTTPSHandler(context=ssl.create_default_context()))
     for attempt in range(3):
@@ -53,7 +67,7 @@ def download():
                 if r.status!=200:
                     raise ValueError(f'Unexpected HTTP status {r.status}')
                 raw=r.read(MAX_SIZE+1)
-            return validate(raw)
+            return apply_description(validate(raw))
         except (urllib.error.URLError,TimeoutError,OSError,UnicodeError,ValueError) as exc:
             print(f'Fetch attempt {attempt+1} failed: {type(exc).__name__}',file=sys.stderr)
             if attempt==2:
@@ -65,4 +79,4 @@ if __name__=='__main__':
     data=download()
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_bytes(data)
-    print(f'Validated {len(data)} bytes; saved verbatim without execution.')
+    print(f'Validated {len(data)} bytes; saved with local description without execution.')

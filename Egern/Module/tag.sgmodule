@@ -1,5 +1,5 @@
 #!name=TAG Profile
-#!desc=TAG Custom Profiles
+#!desc=辅助 TAG 连接外网使用的模块。
 
 [Host]
 shanghai.tencent.com = shanghai.tencent.com
