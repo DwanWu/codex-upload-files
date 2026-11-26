@@ -1,26 +1,28 @@
 name: Ip quality & Ai service
 desc: |-
-  原生精简卡片。IPQuery 与 ProxyCheck 双源查询；参考评分为 100 减去可用风险分中的最大值，不代表绝对纯净。
-  风险栏按 IPQuery / ProxyCheck 顺序显示。○ 未见标记，! 检出，? 未知。
+  Egern 风格紧凑折叠面板，收纳于第三方服务。IPQuery 与 ProxyCheck 双源查询；参考评分为 100 减去可用风险分中的最大值，不代表绝对纯净。
+  IP 卡片显示风险分、有效评分源数量和风险标记摘要；未见标记仅指可用数据库结果。
   AI 已响应表示网页或 API 收到 HTTP 响应，并非鉴权成功；✓ 网页正常且 API 正常或明确待鉴权。
   检测使用 Tagss、Chatgpt、Claude、Gemini 策略组；无须 API Key，不修改任何分流配置。
 category: Network
-version: '2.0.0'
+version: '3.0.0'
 tiles:
-  - name: wzw-ip-quality-v2
+  - name: wzw-ip-quality-v3
     interval: 1800
+    collapsed: true
     title: Ip quality
     content: 等待检测 · Tagss
     icon: checkmark.shield.fill
     backgroundColor: '#16A085'
-  - name: wzw-ai-service-v2
+  - name: wzw-ai-service-v3
     interval: 1800
+    collapsed: true
     title: Ai service
     content: 等待检测 · 3 项服务
     icon: cpu.fill
     backgroundColor: '#64748B'
 script-providers:
-  wzw-ip-quality-v2:
+  wzw-ip-quality-v3:
     interval: 86400
     payload: |
       (function () {
@@ -45,7 +47,7 @@ script-providers:
         }
         function render(){
           if(finished)return;
-          if(!primary){done('Ip quality · 暂无数据','Tagss · 查询失败或超时\n请稍后刷新',neutral,'exclamationmark.shield');return;}
+          if(!primary){done('Ip quality · 未知','Tagss · 查询失败或超时',neutral,'exclamationmark.shield');return;}
           var d=primary,loc=d.location||{},isp=d.isp||{},r=d.risk||{},p=secondary||{};
           var a=score(r.risk_score),b=score(p.risk),values=[a,b].filter(function(v){return v!==null;});
           var risk=values.length?Math.max.apply(null,values):null,quality=risk===null?null:100-risk;
@@ -62,13 +64,14 @@ script-providers:
           var asn=clean(String(isp.asn||''));
           var provider=clean(isp.isp||isp.org);
           var type=dc===true?'机房':r.is_mobile===true?'移动网络':dc===false&&r.is_mobile===false?'宽带特征':'类型未知';
-          var bars=quality===null?'—':Array(1+Math.round(quality/10)).join('━')+Array(11-Math.round(quality/10)).join('┄');
           var count=values.length;
-          var lines=[place+' · '+type,d.ip+'  ·  '+asn,provider,
-            bars+'  '+(quality===null?'评分未知':quality+'% 参考'),
-            '机房 '+mark(dc)+'  代理 '+mark(proxy)+'  VPN '+mark(vpn)+'  Tor '+mark(tor),
-            '风险 '+(a===null?'—':a)+' / '+(b===null?'—':b)+'  ·  '+count+'/2 评分源  ·  '+time()];
-          done('Ip quality · '+(quality===null?label:quality+'/100 · '+label),lines.join('\n'),color,flagged||risk!==null&&risk>=25?'exclamationmark.shield.fill':'checkmark.shield.fill');
+          var flags=[['机房',dc],['代理',proxy],['VPN',vpn],['Tor',tor]];
+          var hits=flags.filter(function(v){return v[1]===true;}).map(function(v){return v[0];});
+          var unknown=flags.filter(function(v){return v[1]===null;}).length;
+          var summary=hits.length?'! '+hits.join('/'):(unknown?'部分未知':'未见标记');
+          if(hits.length&&unknown)summary+=' / ?';
+          var lines=[place+' · '+type,d.ip+' · '+asn,provider+' · 风险 '+(risk===null?'—':risk)+' · '+count+'/2源',summary];
+          done('Ip quality · '+(quality===null?'未知':quality+'/100'),lines.join('\n'),color,flagged||risk!==null&&risk>=25?'exclamationmark.shield.fill':quality===null||uncertain?'shield.lefthalf.filled':'checkmark.shield.fill');
         }
         setTimeout(render,11000);
         request('https://api.ipquery.io/?format=json',5,function(d){
@@ -80,7 +83,7 @@ script-providers:
           });
         });
       })();
-  wzw-ai-service-v2:
+  wzw-ai-service-v3:
     interval: 86400
     payload: |
       (function () {
@@ -99,10 +102,12 @@ script-providers:
             var has=w.http||a.http,ok=w.state==='ok'&&(a.state==='ok'||a.state==='auth'),region=w.state==='region'||a.state==='region';
             if(has)responded++;if(ok)normal++;if(region)restricted++;
             var sign=ok?'✓':region||!has?'×':'◐';
-            var latency=typeof a.ms==='number'&&a.http?a.ms+' ms':typeof w.ms==='number'&&w.http?w.ms+' ms（网页）':'—';
-            return sign+'  '+s.name+'  ·  '+latency+'\n    网页 '+w.text+'  /  API '+a.text;
+            var latency=typeof a.ms==='number'&&a.http?a.ms+'ms':typeof w.ms==='number'&&w.http?w.ms+'ms(网页)':'—';
+            var ws=w.state==='ok'?'网页通':w.text==='安全验证'?'网页验证':'网页'+w.text;
+            var as=a.state==='ok'?'API通':a.state==='auth'?'API待鉴权':'API'+a.text;
+            return sign+' '+s.name+' · '+latency+' · '+ws+'/'+as;
           });
-          $done({title:'Ai service · '+responded+'/3 已响应',content:lines.join('\n')+'\n更新 '+time()+'  ·  ✓ 正常  ◐ 待确认  × 受限/失败',icon:'cpu.fill',
+          $done({title:'Ai service · '+responded+'/3 响应',content:lines.join('\n'),icon:'cpu.fill',
             backgroundColor:normal===3?'#16A085':restricted>0?'#C84B4B':responded>0?'#C58A2B':'#64748B'});
         }
         function classify(s,kind,error,res,data,ms){
