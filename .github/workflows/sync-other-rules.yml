@@ -1,338 +1,53 @@
-name: Sync complete Other rules
+name: Sync complete Egern rules (all categories)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/sync-other-rules.yml'
-      - 'Egern/Rules/chatgpt.yaml'
-      - 'Egern/Rules/claude.yaml'
-      - 'Egern/Rules/google.yaml'
   schedule:
     - cron: '41 4 * * *'
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/sync_egern.py'
+      - 'scripts/egern-policy.json'
+      - '.github/workflows/sync-*.yml'
+      - 'Egern/Rules/apple-ai.yaml'
 
 permissions:
   contents: write
-
+concurrency:
+  group: egern-main-sync
+  cancel-in-progress: false
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build other rules from complete proxy rules
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parser
+        run: python -m pip install PyYAML==6.0.2
+      - name: Validate and publish rules
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p Egern/Rules /tmp/egern-rules
-          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/proxy.yaml' -o /tmp/egern-rules/proxy.yaml
-          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/apple.yaml' -o /tmp/egern-rules/apple.yaml
-          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/apple-cn.yaml' -o /tmp/egern-rules/apple-cn.yaml
-          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/apple-proxy.yaml' -o /tmp/egern-rules/apple-proxy.yaml
-          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/apple-tv.yaml' -o /tmp/egern-rules/apple-tv.yaml
-          curl -fsSL 'https://raw.githubusercontent.com/QuixoticHeart/rule-set/refs/heads/ruleset/egern/apns.yaml' -o /tmp/egern-rules/apns.yaml
-
-          python3 <<'PY'
-          from pathlib import Path
-
-          source = Path('/tmp/egern-rules/proxy.yaml')
-          category_files = [
-              Path('Egern/Rules/chatgpt.yaml'),
-              Path('Egern/Rules/google.yaml'),
-              Path('Egern/Rules/claude.yaml'),
-              Path('/tmp/egern-rules/apple.yaml'),
-              Path('/tmp/egern-rules/apple-cn.yaml'),
-              Path('/tmp/egern-rules/apple-proxy.yaml'),
-              Path('/tmp/egern-rules/apple-tv.yaml'),
-              Path('/tmp/egern-rules/apns.yaml'),
-          ]
-          output = Path('Egern/Rules/other.yaml')
-
-          section_names = {
-              'domain_set',
-              'domain_suffix_set',
-              'domain_keyword_set',
-              'domain_regex_set',
-              'ip_cidr_set',
-              'ip_cidr6_set',
-              'asn_set',
-              'url_regex_set',
-              'process_name_set',
-          }
-
-          # Keep common proxy-node/IP purity/leak test sites in this aggregate.
-          # Keywords are intentional so related subdomains/API hosts are covered too.
-          custom_ip_test_keywords = {
-              'ippure',
-              'ping0',
-              'ipinfo',
-              'ipify',
-              'ipapi',
-              'iplocation',
-              'ip2location',
-              'whoer',
-              'ipleak',
-              'dnsleaktest',
-              'browserleaks',
-              'scamalytics',
-              'ipqualityscore',
-              'iphey',
-              'pixelscan',
-              'iprobe',
-              'ipcheck',
-          }
-
-          # Keep Meta Muse / Facebook ecosystem in OTHER even if upstream source changes.
-          custom_meta_suffixes = {
-              'muse.ai',
-              'metaaiusercontent.com',
-              'metaaivm.com',
-              'meta.ai',
-              'llama.com',
-              'atmeta.com',
-              'facebook.com',
-              'facebook.net',
-              'fbcdn.net',
-              'fbsbx.com',
-              'fb.me',
-              'fb.watch',
-              'm.me',
-              'messenger.com',
-              'instagram.com',
-              'cdninstagram.com',
-              'threads.net',
-              'threads.com',
-              'whatsapp.com',
-              'whatsapp.net',
-              'wa.me',
-              'meta.com',
-              'oculus.com',
-          }
-          custom_meta_hosts = {
-              'fbcdn-a.akamaihd.net',
-          }
-
-          # Retain verified AI assistant, coding, multimedia and inference
-          # service domains even if the upstream proxy rules omit them.
-          custom_ai_suffixes = {
-              'v0.app',
-              'bolt.new',
-              'lovable.dev',
-              'genspark.ai',
-              'udio.com',
-              'runwayml.com',
-              'replicate.com',
-              'fal.ai',
-              'together.ai',
-              'fireworks.ai',
-              'deepgram.com',
-              'assemblyai.com',
-              'heygen.com',
-              'synthesia.io',
-              'ideogram.ai',
-              'stability.ai',
-              'blackforestlabs.ai',
-          }
-          # Specific shared infrastructure needed by AI applications; avoid
-          # broad domains that would capture unrelated apps.
-          custom_ai_hosts = {
-              'default.exp-tas.com',
-          }
-
-          # Chinese-developed AI products are excluded from OTHER,
-          # while shared CDN / cloud infrastructure remains unaffected.
-          excluded_chinese_ai_domains = {
-              'deepseek.com',
-              'deepseek.ai',
-              'deepseek.net',
-              'kimi.com',
-              'kimi.ai',
-              'moonshot.ai',
-              'moonshot.cn',
-              'qwen.ai',
-              'qwenlm.ai',
-              'qwenlm.com',
-              'qwen.com',
-              'tongyi.aliyun.com',
-              'dashscope.aliyuncs.com',
-              'doubao.com',
-              'doubao.com.cn',
-              'coze.com',
-              'coze.cn',
-              'coze.space',
-              'minimax.io',
-              'minimax.com',
-              'minimax.chat',
-              'hailuoai.video',
-              'hailuoai.com',
-              'klingai.com',
-              'klingai.cn',
-              'trae.ai',
-              'trae.com',
-              'trae.cn',
-              'manus.im',
-              'manus.ai',
-              'manuscdn.com',
-              'zhipuai.cn',
-              'zhipuai.com',
-              'bigmodel.cn',
-              'bigmodel.com',
-              'chatglm.cn',
-              'chatglm.com',
-              'stepfun.com',
-              'stepfun.ai',
-              'step.ai',
-              'baichuan-ai.com',
-              'baichuan-ai.cn',
-              '01.ai',
-              'yi.ai',
-              'sensenova.cn',
-              'sensenova.com',
-              'yiyan.baidu.com',
-              'wenxin.baidu.com',
-              'hunyuan.tencent.com',
-              'yuanbao.tencent.com',
-              'modelscope.cn',
-          }
-          excluded_chinese_ai_keywords = {
-              'deepseek',
-              'kimi',
-              'moonshot',
-              'qwen',
-              'tongyi',
-              'doubao',
-              'coze',
-              'minimax',
-              'hailuo',
-              'klingai',
-              'trae',
-              'manus',
-              'zhipu',
-              'bigmodel',
-              'chatglm',
-              'stepfun',
-              'baichuan',
-              'sensenova',
-              'hunyuan',
-              'yuanbao',
-          }
-
-          def is_chinese_ai_entry(section, value):
-              value = value.strip().lower()
-              if section in ('domain_set', 'domain_suffix_set'):
-                  return any(value == root or value.endswith('.' + root)
-                             for root in excluded_chinese_ai_domains)
-              if section == 'domain_keyword_set':
-                  return value in excluded_chinese_ai_keywords
-              return False
-
-          def parse_rules(path):
-              result = {name: set() for name in section_names}
-              if not path.exists():
-                  return result
-              current = None
-              for raw in path.read_text(encoding='utf-8').splitlines():
-                  line = raw.strip()
-                  if not line or line.startswith('#'):
-                      continue
-                  if line.endswith(':') and not line.startswith('-'):
-                      key = line[:-1].strip()
-                      current = key if key in section_names else None
-                      continue
-                  if current and line.startswith('- '):
-                      result[current].add(line[2:].strip())
-              return result
-
-          excluded = {name: set() for name in section_names}
-          for file in category_files:
-              parsed = parse_rules(file)
-              for section, values in parsed.items():
-                  excluded[section].update(values)
-
-          lines = source.read_text(encoding='utf-8').splitlines()
-          out = []
-          current = None
-          removed = 0
-          existing = {name: set() for name in section_names}
-          for raw in lines:
-              stripped = raw.strip()
-              if stripped.endswith(':') and not stripped.startswith('-'):
-                  key = stripped[:-1].strip()
-                  current = key if key in section_names else None
-                  out.append(raw)
-                  continue
-              if current and stripped.startswith('- '):
-                  value = stripped[2:].strip()
-                  if value in excluded[current] or is_chinese_ai_entry(current, value):
-                      removed += 1
-                      continue
-                  existing[current].add(value)
-              out.append(raw)
-
-          # Insert custom test-site keywords into domain_keyword_set. If the source
-          # ever lacks that section, append a valid section at the end.
-          missing = sorted(custom_ip_test_keywords - existing['domain_keyword_set'])
-          if missing:
-              try:
-                  idx = next(i for i, line in enumerate(out) if line.strip() == 'domain_keyword_set:')
-                  insert_at = idx + 1
-                  while insert_at < len(out) and (out[insert_at].lstrip().startswith('- ') or not out[insert_at].strip()):
-                      insert_at += 1
-                  out[insert_at:insert_at] = [f'- {value}' for value in missing]
-              except StopIteration:
-                  if out and out[-1].strip():
-                      out.append('')
-                  out.append('domain_keyword_set:')
-                  out.extend(f'- {value}' for value in missing)
-
-          # Retain core Meta domains after upstream refresh while avoiding
-          # duplicates and preserving exclusions owned by dedicated categories.
-          def ensure_entries(section, required):
-              missing = sorted(v for v in required - existing[section] - excluded[section]
-                               if not is_chinese_ai_entry(section, v))
-              if not missing:
-                  return 0
-              try:
-                  idx = next(i for i, line in enumerate(out) if line.strip() == f'{section}:')
-                  out[idx + 1:idx + 1] = [f'- {value}' for value in missing]
-              except StopIteration:
-                  if out and out[-1].strip():
-                      out.append('')
-                  out.append(f'{section}:')
-                  out.extend(f'- {value}' for value in missing)
-              existing[section].update(missing)
-              return len(missing)
-
-          added_custom = (
-              ensure_entries('domain_suffix_set', custom_meta_suffixes | custom_ai_suffixes)
-              + ensure_entries('domain_set', custom_meta_hosts | custom_ai_hosts)
-          )
-
-          header = [
-              '# Complete OTHER proxy rules for Egern',
-              '# Source: QuixoticHeart/rule-set egern/proxy.yaml',
-              '# Excludes rules already assigned to chatgpt.yaml, google.yaml and claude.yaml.',
-              '# Excludes Apple rules from apple, apple-cn, apple-proxy, apple-tv and apns.',
-              '# Adds common IP/proxy node test sites as domain keywords.',
-              '# Retains Meta Muse/Facebook/Instagram/WhatsApp/Threads and CDN endpoints.',
-              '# Includes international AI assistants, coding and creative services.',
-              '# Excludes Chinese AI product domains and exact AI keywords.',
-              '',
-          ]
-          output.write_text('\n'.join(header + out) + '\n', encoding='utf-8')
-          print(f'Generated {output}; removed {removed} excluded rules; ensured {len(custom_ip_test_keywords)} IP-test keywords and {added_custom} Meta/AI entries.')
-          PY
-
-      - name: Commit synced rules
-        run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A -- Egern/Rules/other.yaml
-          if git diff --cached --quiet; then
-            echo 'No changes.'
-          else
-            git commit -m 'Sync complete Other Egern rules'
-            git push
-          fi
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            python scripts/sync_egern.py all
+            git add -- Egern/Rules/chatgpt.yaml Egern/Rules/claude.yaml Egern/Rules/google.yaml Egern/Rules/other.yaml
+            if git diff --cached --quiet; then
+              echo 'No changes.'
+              exit 0
+            fi
+            git commit -m 'Sync Egern all rules and exclusions'
+            if git push origin HEAD:main; then exit 0; fi
+            sleep 5
+          done
+          exit 1

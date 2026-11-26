@@ -1,44 +1,51 @@
 # Anthropic / Claude routing rules for Egern
-# Sources:
-# - Anthropic/Claude official product and IP documentation
-# - QuixoticHeart/rule-set egern/ai.yaml
-# - Cross-check against current Claude desktop/CLI dependency rules
-
+# Current Anthropic official inbound/outbound ranges; phased-out addresses excluded
+# https://platform.claude.com/docs/en/api/ip-addresses
+# Dedicated cloud endpoints are matched by domain, not all cloud-provider addresses.
 no_resolve: true
 
 domain_set:
-- anthropic-com.ghost.io
-- anthropic.com.cdn.cloudflare.net
-- servd-anthropic-website.b-cdn.net
-- cdn.growthbook.io
-- cdn.usefathom.com
+- "anthropic-com.ghost.io"
+- "anthropic.com.cdn.cloudflare.net"
+- "cdn.growthbook.io"
+- "cdn.usefathom.com"
+- "claude.googleapis.com"
+- "code.claude.com"
+- "platform.claude.com"
+- "servd-anthropic-website.b-cdn.net"
 
 domain_suffix_set:
-- anthropic.com
-- antspace.dev
-- clau.de
-- claude.ai
-- claude.app
-- claude.com
-- claude.new
-- claude.site
-- claudemcpclient.com
-- claudemcpcontent.com
-- claudepages.dev
-- claudeusercontent.com
-- modelcontextprotocol.com
-- modelcontextprotocol.io
-- modelcontextprotocol.net
-- modelcontextprotocol.org
+- "anthropic.com"
+- "anthropic.team"
+- "antspace.dev"
+- "clau.de"
+- "claude.ai"
+- "claude.app"
+- "claude.com"
+- "claude.dev"
+- "claude.new"
+- "claude.site"
+- "claudemcpclient.com"
+- "claudemcpcontent.com"
+- "claudepages.dev"
+- "claudeusercontent.com"
+- "modelcontextprotocol.com"
+- "modelcontextprotocol.io"
+- "modelcontextprotocol.net"
+- "modelcontextprotocol.org"
 
 domain_keyword_set:
-- anthropic
-- claude
+- "anthropic"
+- "claude"
 
-# Anthropic owns 160.79.104.0/21; the official inbound API/Console range is 160.79.104.0/23.
-# Routing the full /21 is deliberately fail-safe so direct-IP Anthropic traffic cannot bypass domain matching.
+domain_wildcard_set:
+- "aws-external-anthropic.*.api.aws"
+
 ip_cidr_set:
+- 153.61.208.0/20
+- 153.61.224.0/22
 - 160.79.104.0/21
+- 160.79.104.0/23
 
 ip_cidr6_set:
 - 2607:6bc0::/48

@@ -1,0 +1,46 @@
+name: Sync Claude and Claude Code rules
+
+on:
+  schedule:
+    - cron: '41 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+concurrency:
+  group: egern-main-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parser
+        run: python -m pip install PyYAML==6.0.2
+      - name: Validate and publish rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            python scripts/sync_egern.py claude
+            git add -- Egern/Rules/chatgpt.yaml Egern/Rules/claude.yaml Egern/Rules/google.yaml Egern/Rules/other.yaml
+            if git diff --cached --quiet; then
+              echo 'No changes.'
+              exit 0
+            fi
+            git commit -m 'Sync Egern claude rules and exclusions'
+            if git push origin HEAD:main; then exit 0; fi
+            sleep 5
+          done
+          exit 1
