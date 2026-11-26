@@ -1,10 +1,5 @@
-name: Network Slate 4.1
-desc: |-
-  石墨蓝灰统一深色主题，两张原生折叠小卡。使用线条盾牌和星芒图标，状态以符号表示，不使用高饱和度背景。
-  IP 标题仅显示 IP·分数，副标题保留国家旗帜及 IP 地址（较长 IPv6 缩写）；半盾图标表示评分源不足或部分标记未知。IPQuery 与 ProxyCheck 双源评分，参考纯净分为 100 减去可用风险分的最大值。
-  AI 标题仅显示 AI·已收到网页或 API HTTP 响应的服务数（不代表通过鉴权）；副标题 GPT、Claude、Gem 分别代表 ChatGPT、Claude、Gemini。✓ 网页正常且 API 正常或明确待鉴权；◐ 待确认；× 明确地区限制或未收到 HTTP 响应。不是模型调用或账号鉴权测试。
-  完整风险、运营商、ASN、各服务 HTTP 状态和耗时输出到本地脚本日志。
-  使用 Tagss、Chatgpt、Claude、Gemini 策略组，无需 API Key，不修改节点、订阅、DNS 或分流。
+name: Network Slate
+desc: 人工智能检测系统
 category: Network
 version: '4.1.0'
 tiles:
