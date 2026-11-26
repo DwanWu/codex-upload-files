@@ -2,7 +2,7 @@ name: Sync ChatGPT, Codex and Sora rules
 
 on:
   schedule:
-    - cron: '11 2 * * *'
+    - cron: '11 1 * * *'
   workflow_dispatch:
 
 permissions:
