@@ -1,10 +1,10 @@
 name: Network Slate
 desc: 人工智能检测系统
 category: Network
-version: '4.3.0'
+version: '4.4.0'
 tiles:
-  - name: wzw-ip-quality-slate-node-43
-    interval: 1800
+  - name: wzw-ip-quality-ippure-44
+    interval: 600
     collapsed: true
     title: IP
     content: 等待检测
@@ -18,74 +18,84 @@ tiles:
     icon: sparkles
     backgroundColor: '#303745'
 script-providers:
-  wzw-ip-quality-slate-node-43:
+  wzw-ip-quality-ippure-44:
     interval: 86400
     payload: |
       (function () {
-        var finished=false, primary=null, secondary=null, statusA='未完成',statusB='未完成';
+        // Source: https://ippure.com/MyIP-Info-API
+        // IPPure risk is fraudScore, lower is better. Display purity = 100 - risk.
+        // Native Stash node detail routing is intentionally preserved; no forced proxy header.
+        var finished=false;
         var slate='#303745';
-        function score(v){if(typeof v==='string'&&/^\d+(?:\.\d+)?$/.test(v.trim()))v=Number(v);return typeof v==='number'&&isFinite(v)&&v>=0&&v<=100?Math.round(v):null;}
-        function clean(v){return typeof v==='string'&&v.trim()?v.trim().replace(/\s+/g,' '):'未知';}
-        function flag(cc){return /^[A-Z]{2}$/.test(cc)?String.fromCodePoint(127397+cc.charCodeAt(0),127397+cc.charCodeAt(1))+' ':'';}
-        function merge(a,b){return a===true||b===true?true:a===false||b===false?false:null;}
-        function log(v){try{console.log('Ip details '+JSON.stringify(v));}catch(e){}}
-        function done(title,content,icon,url){if(finished)return;finished=true;$done({title:title,content:content,backgroundColor:slate,icon:icon,url:url||'https://ipquery.io/'});}
-        function request(url,timeout,cb){
-          var called=false;
-          function end(data,reason){if(called||finished)return;called=true;cb(data,reason);}
-          try{$httpClient.get({url:url,timeout:timeout,headers:{Accept:'application/json','Cache-Control':'no-cache, no-store','Pragma':'no-cache'},'auto-cookie':false,'auto-redirect':false},function(e,r,d){
-            if(finished||called)return;
-            var code=r?Number(r.status||r.statusCode):0;
-            if(e||code!==200){end(null,code?'HTTP '+code:String(e||'无响应'));return;}
-            var obj;try{obj=typeof d==='string'?JSON.parse(d):d;}catch(err){end(null,'JSON 无效');return;}
-            if(!obj||typeof obj!=='object'){end(null,'响应无效');return;}
-            end(obj,'HTTP 200');
-          });}catch(e){end(null,'请求异常');}
-        }
-        function validIp(v){return typeof v==='string'&&/^[0-9a-f:.]+$/i.test(v)&&v.length<=45&&(v.indexOf(':')>=0||/^\d{1,3}(\.\d{1,3}){3}$/.test(v)&&v.split('.').every(function(s){return Number(s)<=255;}));}
-        function render(){
+        var endpoint='https://my.ippure.com/v1/info';
+        function log(obj){try{console.log('IPPure '+JSON.stringify(obj));}catch(e){}}
+        function complete(title,content,icon,url,detail){
           if(finished)return;
-          if(!primary){log({ipquery:statusA,proxycheck:statusB});done('IP·—','查询失败或超时','exclamationmark.shield');return;}
-          var d=primary,r=d.risk||{},loc=d.location||{},isp=d.isp||{},p=secondary||{},det=p.detections||{},net=p.network||{};
-          var a=score(r.risk_score),b=score(det.risk),scores=[a,b].filter(function(v){return v!==null;}),count=scores.length;
-          var dc=merge(r.is_datacenter,det.hosting===true||String(net.type||'').toLowerCase()==='hosting'?true:det.hosting===false?false:null);
-          var proxy=merge(r.is_proxy,det.proxy),vpn=merge(r.is_vpn,det.vpn),tor=merge(r.is_tor,det.tor);
-          var scraper=det.scraper===true,compromised=det.compromised===true;
-          // Reference purity policy: documented ProxyCheck baseline points, applied only to positively detected classifications.
-          // Database risk scores remain unchanged in logs. No numerical score is fabricated when neither database supplies one.
-          var floor=Math.max(dc===true?33:0,vpn===true?50:0,tor===true||scraper?75:0,proxy===true||compromised?100:0);
-          var actual=count?Math.max.apply(null,scores):null;
-          var ref=count?Math.max(actual,floor):null,quality=ref===null?null:100-ref;
-          var hits=[dc,proxy,vpn,tor,scraper,compromised].indexOf(true)>=0;
-          var uncertain=[dc,proxy,vpn,tor].some(function(x){return x===null;});
-          var cc=clean(loc.country_code||((p.location||{}).country_code)||'').toUpperCase();
-          var detail={ip:d.ip,checkedAt:new Date().toISOString(),country:cc,city:clean(loc.city||((p.location||{}).city_name)),isp:clean(isp.isp||isp.org||net.provider),asn:clean(String(isp.asn||net.asn||'')),sources:{ipquery:statusA,proxycheck:statusB},scores:{ipquery:a,proxycheck:b},sourceCount:count,rawMaxRisk:actual,classificationFloor:floor,referenceRisk:ref,referencePurity:quality,flags:{hosting:dc,proxy:proxy,vpn:vpn,tor:tor,scraper:det.scraper===true?true:det.scraper===false?false:null,compromised:det.compromised===true?true:det.compromised===false?false:null}};
+          finished=true;
           log(detail);
-          var displayIp=d.ip;
-          if(displayIp.length>15&&displayIp.indexOf(':')>=0)displayIp=displayIp.slice(0,7)+'…'+displayIp.slice(-5);
-          var title='IP·'+(quality===null?'—':quality+(count===1?'*':''));
-          var icon=hits||ref!==null&&ref>=25?'exclamationmark.shield':quality===null||uncertain||count<2?'shield.lefthalf.filled':'checkmark.shield';
-          done(title,flag(cc)+displayIp,icon,'https://ipquery.io/ip/'+encodeURIComponent(d.ip));
+          $done({title:title,content:content,icon:icon,backgroundColor:slate,url:url||'https://ippure.com/'});
         }
-        setTimeout(function(){if(statusA==='未完成')statusA='超时';if(statusB==='未完成')statusB='超时或未查询';render();},15000);
-        request('https://api.ipquery.io/?format=json',6,function(d,why){
-          statusA=why;
-          if(!d||!validIp(d.ip)){if(d)statusA='IP 字段缺失或无效';statusB='未查询';render();return;}
-          primary=d;
-          if(score((d.risk||{}).risk_score)===null)statusA='HTTP 200 / 无有效风险分';
-          request('https://proxycheck.io/v3/'+encodeURIComponent(d.ip)+'?tag=0&ver=24-June-2026',7,function(x,reason){
-            statusB=reason;
-            if(x&&(x.status==='ok'||x.status==='warning')){
-              var key=Object.keys(x).filter(function(k){return k.toLowerCase()===d.ip.toLowerCase();})[0];
-              if(key&&x[key]&&typeof x[key]==='object'){
-                secondary=x[key];
-                if(score((secondary.detections||{}).risk)===null)statusB='HTTP 200 / 无有效风险分';
-                else if(x.status==='warning')statusB='HTTP 200 / API warning';
-              }else statusB='HTTP 200 / IP 记录缺失';
-            }else if(x)statusB='HTTP 200 / '+String(x.status||'无效状态');
-            render();
+        function failed(label,detail){
+          complete('IP·—',label,'exclamationmark.shield','https://ippure.com/',{source:'IPPure',checkedAt:new Date().toISOString(),status:'error',detail:detail});
+        }
+        function isV4(v){
+          return typeof v==='string'&&/^\d{1,3}(\.\d{1,3}){3}$/.test(v)&&v.split('.').every(function(p){return Number(p)<=255;});
+        }
+        function isV6(v){
+          return typeof v==='string'&&v.length<=45&&v.indexOf(':')>=0&&/^[0-9a-f:.]+$/i.test(v);
+        }
+        function readRisk(v){
+          if(typeof v==='string'&&/^\d+(?:\.\d+)?$/.test(v.trim()))v=Number(v);
+          return typeof v==='number'&&isFinite(v)&&v>=0&&v<=100?v:null;
+        }
+        function clean(v){
+          return typeof v==='string'&&v.trim()?v.trim().replace(/\s+/g,' '):null;
+        }
+        function flag(cc){
+          return /^[A-Z]{2}$/.test(cc)?String.fromCodePoint(127397+cc.charCodeAt(0),127397+cc.charCodeAt(1))+' ':'';
+        }
+        function bool(v){return typeof v==='boolean'?v:null;}
+        function render(d){
+          if(!d||typeof d!=='object'||Array.isArray(d)||(!isV4(d.ip)&&!isV6(d.ip))){
+            failed('返回数据无效','Missing or invalid IP in IPPure response');return;
+          }
+          var v6=isV6(d.ip);
+          // IPPure explicitly does not assign IPv6 risk coefficients.
+          var rawRisk=v6?null:readRisk(d.fraudScore);
+          var purity=rawRisk===null?null:Number((100-rawRisk).toFixed(8));
+          var cc=(clean(d.countryCode)||'').toUpperCase();
+          var residential=bool(d.isResidential),broadcast=bool(d.isBroadcast);
+          var detail={
+            source:'IPPure',endpoint:endpoint,checkedAt:new Date().toISOString(),status:rawRisk===null?'unscored':'ok',
+            ip:d.ip,country:clean(d.country),countryCode:cc||null,region:clean(d.region),city:clean(d.city),
+            asn:d.asn===undefined?null:d.asn,asOrganization:clean(d.asOrganization),
+            fraudScore:rawRisk,returnedFraudScore:d.fraudScore===undefined?null:d.fraudScore,purity:purity,
+            formula:'100 - fraudScore',isResidential:residential,isBroadcast:broadcast,
+            networkType:residential===true?'住宅网络':residential===false?'非住宅网络':'未知',
+            nativeType:broadcast===true?'广播 IP':broadcast===false?'原生 IP':'未知',
+            reason:rawRisk!==null?null:v6?'IPPure does not score IPv6':'Missing or invalid fraudScore'
+          };
+          var displayIp=d.ip;
+          if(v6&&displayIp.length>15)displayIp=displayIp.slice(0,7)+'…'+displayIp.slice(-5);
+          var icon=rawRisk===null?'shield.lefthalf.filled':rawRisk>=50?'exclamationmark.shield':'checkmark.shield';
+          var subtitle=flag(cc)+displayIp;
+          complete('IP·'+(purity===null?'—':purity),subtitle,icon,'https://ippure.com/?ip='+encodeURIComponent(d.ip),detail);
+        }
+        setTimeout(function(){failed('检测超时','IPPure request timeout');},12000);
+        try {
+          $httpClient.get({
+            url:endpoint,timeout:10,
+            headers:{Accept:'application/json','Cache-Control':'no-cache, no-store, max-age=0',Pragma:'no-cache'},
+            'auto-cookie':false,'auto-redirect':true
+          },function(error,response,data){
+            if(finished)return;
+            var code=response?Number(response.status||response.statusCode):0;
+            if(error||code!==200){failed(code?'HTTP '+code:'请求失败',String(error||'HTTP '+code));return;}
+            var d;
+            try{d=typeof data==='string'?JSON.parse(data):data;}catch(e){failed('数据格式错误','Invalid JSON');return;}
+            try{render(d);}catch(e){failed('解析失败',String(e));}
           });
-        });
+        }catch(e){failed('请求失败',String(e));}
       })();
   wzw-ai-service-slate-node-43:
     interval: 86400
