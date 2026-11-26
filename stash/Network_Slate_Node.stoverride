@@ -1,7 +1,7 @@
 name: Network Slate
 desc: 人工智能检测系统
 category: Network
-version: '4.2.0'
+version: '4.2.1'
 tiles:
   - name: wzw-ip-quality-slate-node
     interval: 1800
@@ -10,7 +10,7 @@ tiles:
     content: 等待检测
     icon: shield
     backgroundColor: '#303745'
-  - name: wzw-ai-service-slate-node
+  - name: wzw-ai-service-slate-node-421
     interval: 1800
     collapsed: true
     title: AI
@@ -84,7 +84,7 @@ script-providers:
           });
         });
       })();
-  wzw-ai-service-slate-node:
+  wzw-ai-service-slate-node-421:
     interval: 86400
     payload: |
       (function () {
@@ -98,7 +98,7 @@ script-providers:
         function finish(){
           if(finished)return;finished=true;
           var responded=0,normal=0,restricted=0,failed=0,signs=[],delays=[],detail=[];
-          var labels=['GPT','Claude','Gem'];
+          var labels=['GPT','C','Gemini'];
           services.forEach(function(s,i){
             var w=results[i].web||{text:'超时',state:'fail',http:false},a=results[i].api||{text:'超时',state:'fail',http:false};
             var has=w.http||a.http,ok=w.state==='ok'&&(a.state==='ok'||a.state==='auth'),region=w.state==='region'||a.state==='region';
