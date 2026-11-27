@@ -2,7 +2,7 @@
  * 节点体检 · NodePulse for Stash v2.0
  * Derived from Egern NodeVitals v2.0 (same score precedence and thresholds).
  * Native Tile: no MITM, no cron, no persistent IP cache.
- * A homepage Tile explicitly uses the policy passed in argument.
+ * Collapsed Tile: Stash routes requests through the node under test.
  * Ref: https://stash.wiki/script/tile
  *      https://stash.wiki/script/syntax-and-interface
  *      https://ippure.com/MyIP-Info-API
@@ -53,15 +53,7 @@ function canonicalIP(v){
  const words=halves.length===2?[...a,...Array(8-a.length-b.length).fill("0"),...b]:a;
  return words.map(x=>parseInt(x,16).toString(16).padStart(4,"0")).join(":");
 }
-function settings(){
- try{
-  const p=JSON.parse(typeof $argument==="string"?$argument:"{}");
-  const policy=clean(p.policy);
-  // Refuse to run the homepage probe without its configured policy.
-  return policy&&policy.length<=128&&!/[\u0000-\u001f\u007f]/u.test(policy)?{policy}:null;
- }catch(_){return null}
-}
-function getJSON(url,policy){
+function getJSON(url){
  return new Promise(resolve=>{
   const finish=(error,response,data)=>{
    try{
@@ -72,7 +64,7 @@ function getJSON(url,policy){
    }catch(_){resolve(null)}
   };
   try{$httpClient.get({
-   url,headers:{"User-Agent":"Mozilla/5.0","Accept":"application/json","Cache-Control":"no-cache","X-Stash-Selected-Proxy":encodeURIComponent(policy)},
+   url,headers:{"User-Agent":"Mozilla/5.0","Accept":"application/json","Cache-Control":"no-cache"},
    timeout:5,insecure:false,"auto-cookie":false,"auto-redirect":false
   },finish)}catch(_){resolve(null)}
  });
@@ -111,16 +103,14 @@ function render(result,ip){
 }
 function failed(message){return {title:"节点体检",content:message,icon:"checkmark.shield.fill",backgroundColor:COLORS.gray}}
 async function run(){
- const cfg=settings();
- if(!cfg)return failed("请配置检测策略组");
- const pure=await getJSON(PURE,cfg.policy);
+ const pure=await getJSON(PURE);
  let ip=canonicalIP(pure?.ip)?clean(pure.ip):"";
  if(!ip){
-  const fallback=await getJSON(IPIFY,cfg.policy);
+  const fallback=await getJSON(IPIFY);
   ip=canonicalIP(fallback?.ip)?clean(fallback.ip):"";
  }
  if(!ip)return render(evaluate(null,null,""),"");
- const query=await getJSON(QUERY+encodeURIComponent(ip)+"?format=json",cfg.policy);
+ const query=await getJSON(QUERY+encodeURIComponent(ip)+"?format=json");
  return render(evaluate(pure,query,ip),ip);
 }
 run().then(value=>$done(value),()=>$done(failed("暂时无法检测")));

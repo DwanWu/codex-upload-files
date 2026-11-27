@@ -1,18 +1,17 @@
 # Stash native Tile only; does not change proxy rules or the subscription.
 name: "节点体检"
-desc: "v2.0 · 复刻 Egern 节点体检指标：纯度、IP 属性、风险、地区及出口 IP；通过节点选择策略组实时检测。"
+desc: "v2.0 · 折叠面板，长按任意节点实时检测纯度、IP 属性、风险、地区及出口 IP。"
 category: "节点工具"
 version: "2.0"
 tiles:
   - name: node-vitals-v2
     interval: 600
-    argument: '{"policy":"节点选择"}'
     title: "节点体检"
     content: "等待检测"
     icon: "checkmark.shield.fill"
     backgroundColor: "#8E8E93"
-    collapsed: false
+    collapsed: true
 script-providers:
   node-vitals-v2:
-    url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/stash-rules/Stash/Tile/NodeVitals/NodeVitals.js?v=2.0
+    url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/stash-rules/Stash/Tile/NodeVitals/NodeVitals.js?v=2.0&rev=20261127-2
     interval: 1800

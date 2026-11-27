@@ -10,14 +10,14 @@ const ip="8.8.4.4",ip2="1.1.1.1";
 const p=(score,extra={})=>({ip,countryCode:"JP",fraudScore:score,isResidential:true,...extra});
 const q=(score,extra={},address=ip)=>({ip:address,location:{country_code:"JP"},risk:{risk_score:score,is_datacenter:false,is_vpn:false,is_proxy:false,is_tor:false,...extra}});
 const reply=x=>({body:JSON.stringify(x),status:200});
-async function execute(routes,arg='{"policy":"节点选择"}'){
+async function execute(routes,arg){
  const calls=[];let count=0;let resolve;
  const done=new Promise(r=>resolve=r);
  vm.runInNewContext(source,{$argument:arg,$httpClient:{get(req,cb){calls.push(req);const r=routes(req.url);if(!r)throw Error("unexpected request");cb(r.error||null,{status:r.status||200},r.body)}},$done(value){count++;resolve(value)}});
  const value=await done;
  eq(count,1);
  for(const req of calls){
-  eq(req.headers["X-Stash-Selected-Proxy"],encodeURIComponent("节点选择"));
+  eq(req.headers["X-Stash-Selected-Proxy"],undefined);
   eq(req.insecure,false);eq(req.timeout,5);eq(req["auto-cookie"],false);
  }
  return {value,calls};
@@ -47,6 +47,10 @@ r=await execute(u=>u===PURE?reply(p(20)):u.startsWith(Q)?{error:"offline"}:undef
 r=await execute(u=>u===PURE?{body:"not JSON",status:200}:u===IPIFY?reply({ip:"999.1.2.3"}):undefined);ok(r.value.content.includes("获取失败"));
 r=await execute(normal(p(14,{ip:"2001:4860::8888"}),q(5,{},"2001:4860:0:0:0:0:0:8888")));ok(r.value.content.includes("纯度 86"));ok(r.value.content.includes("2001:4860::8888"));
 r=await execute(normal(p(null,{ip:"2001:4860::8888",isResidential:undefined}),q(22,{},"2001:4860:0:0:0:0:0:8888")));ok(r.value.content.includes("纯度 78"));
-r=await execute(()=>undefined,"{}");eq(r.calls.length,0);eq(r.value.content,"请配置检测策略组");
-r=await execute(()=>undefined,"not JSON");eq(r.calls.length,0);
+// Even a stale argument must never override the node selected by Stash.
+r=await execute(normal(p(8),q(10)),'{"policy":"旧节点"}');eq(r.calls.length,2);ok(r.value.content.includes("纯度 92"));
+r=await execute(normal(p(8),q(10)),"not JSON");eq(r.calls.length,2);ok(r.value.content.includes("纯度 92"));
+const switchedPure=p(41,{ip:ip2,countryCode:"US",isResidential:false});
+r=await execute(normal(switchedPure,q(5,{is_datacenter:true},ip2)));
+eq(r.value.title,"节点体检 · 美国");ok(r.value.content.includes("纯度 59 · 机房 · 风险 中"));ok(r.value.content.includes("出口 IP "+ip2));eq(r.calls.length,2);
 console.log("Stash NodeVitals: "+checks+" assertions passed");
