@@ -396,16 +396,16 @@ async function render(ctx, now=Date.now()) {
   const title=[icon("fuelpump.circle.fill",C.red,small?13:16),t("广东油价",small?13:15,"heavy",C.main)];
   let data;
   try{data=await oilData(ctx,now)}catch(e){
-    return root([row([...title,sp(),t("待重试",10,"bold",C.red)]),sp(),t("暂无已核验油价",13,"bold",C.main),t("请检查网络后刷新",10,"medium",C.muted),sp()],30);
+    return root([row([...title,sp(),t("待重试",10,"bold",C.red)]),sp(),t("暂无油价",13,"bold",C.main),t("请检查网络后刷新",10,"medium",C.muted),sp()],30);
   }
-  const fresh=data.status==="已核验", status=data.status+" "+short(data.date);
+  const fresh=data.status==="已核验", status=fresh?short(data.date):data.status+" "+short(data.date);
   const next=data.next;
   const ms=next?Date.parse(next+"T00:00:00+08:00")+86400000-now:0;
   const mins=Math.max(0,Math.floor(ms/60000)), days=Math.floor(mins/1440), hours=Math.floor(mins%1440/60);
   const nextLabel=next?short(next)+" 24:00":"待公布";
   const countdown=next?(days?`${days}d${hours}h后`:`${hours}h${mins%60}m后`):"";
   const cfg=small?{r:10,pad:[6,2,6,2],label:9,value:13,delta:8,height:66,gap:6}:large?{r:14,pad:[12,6,12,6],label:13,value:26,delta:12,height:145,gap:12}: {r:12,pad:[9,5,9,5],label:11,value:21,delta:10,height:80,gap:8};
-  const info=[["92号","p92",C.gold,"#D4A02A"],["95号","p95",C.red,"#FF453A"],["98号参考","p98",C.blue,"#2F80ED"]];
+  const info=[["92号","p92",C.gold,"#D4A02A"],["95号","p95",C.red,"#FF453A"],["98号","p98",C.blue,"#2F80ED"]];
   function chart(key,hex){
     const ns=data.history.slice().reverse().map(x=>x[key]).filter(x=>typeof x==="number"&&Number.isFinite(x)).slice(-12);
     if(ns.length<2)return null;
