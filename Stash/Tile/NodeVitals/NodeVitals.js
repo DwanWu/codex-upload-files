@@ -98,7 +98,7 @@ function evaluate(pure,query,ip){
 function render(result,ip){
  const quality=result.purity===null?"--":String(result.purity);
  return {title:"节点体检 · "+result.country,
-  content:"纯度 "+quality+" · "+result.property+" · 风险 "+result.level+"\n出口 IP "+(ip||"获取失败"),
+  content:"纯度"+quality+"·"+result.property+"·"+result.level,
   icon:"checkmark.shield.fill",backgroundColor:result.backgroundColor};
 }
 function failed(message){return {title:"节点体检",content:message,icon:"checkmark.shield.fill",backgroundColor:COLORS.gray}}

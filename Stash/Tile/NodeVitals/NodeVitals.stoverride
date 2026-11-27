@@ -1,6 +1,6 @@
 # Stash native Tile only; does not change proxy rules or the subscription.
 name: "节点体检"
-desc: "v2.0 · 折叠面板，长按任意节点实时检测纯度、IP 属性、风险、地区及出口 IP。"
+desc: "v2.0 · 折叠面板，长按任意节点实时检测纯度、IP 属性、风险及地区，单行展示。"
 category: "节点工具"
 version: "2.0"
 tiles:
@@ -13,5 +13,5 @@ tiles:
     collapsed: true
 script-providers:
   node-vitals-v2:
-    url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/stash-rules/Stash/Tile/NodeVitals/NodeVitals.js?v=2.0&rev=20261127-2
+    url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/stash-rules/Stash/Tile/NodeVitals/NodeVitals.js?v=2.0&rev=20261127-3
     interval: 1800

@@ -24,33 +24,35 @@ async function execute(routes,arg){
 }
 const normal=(a,b)=>u=>u===PURE?reply(a):u===Q+encodeURIComponent(a.ip)+"?format=json"?reply(b):undefined;
 let r=await execute(normal(p(12),q(90)));
-eq(r.value.title,"节点体检 · 日本");ok(r.value.content.includes("纯度 88 · 住宅 · 风险 低"));eq(r.value.backgroundColor,"#DB2777");eq(r.calls.length,2);
-r=await execute(normal(p(0),q(8)));ok(r.value.content.includes("纯度 100"));eq(r.value.backgroundColor,"#1E7E44");
-r=await execute(normal(p("0"),q(8)));ok(r.value.content.includes("纯度 100"));
+eq(r.value.title,"节点体检 · 日本");ok(r.value.content.includes("纯度88·住宅·低"));eq(r.value.backgroundColor,"#DB2777");eq(r.calls.length,2);
+r=await execute(normal(p(0),q(8)));ok(r.value.content.includes("纯度100"));eq(r.value.backgroundColor,"#1E7E44");
+r=await execute(normal(p("0"),q(8)));ok(r.value.content.includes("纯度100"));
 for(const v of [null,undefined,"",false,"bad",-1,101]){
- r=await execute(normal(p(v),q(37)));ok(r.value.content.includes("纯度 63"));
+ r=await execute(normal(p(v),q(37)));ok(r.value.content.includes("纯度63"));
 }
-r=await execute(normal(p(null),q(null)));ok(r.value.content.includes("纯度 --"));
-r=await execute(normal(p(75,{isResidential:false}),q(5,{is_datacenter:true})));ok(r.value.content.includes("纯度 25 · 机房 · 风险 高"));eq(r.value.backgroundColor,"#C0392B");
-r=await execute(normal(p(10),q(0,{is_vpn:true,is_proxy:true})));ok(r.value.content.includes("风险 高"));
-r=await execute(normal(p(10),q(0,{is_vpn:true})));ok(r.value.content.includes("风险 中"));
-r=await execute(normal(p(10),q(0,{is_tor:true})));ok(r.value.content.includes("风险 高"));
+r=await execute(normal(p(null),q(null)));ok(r.value.content.includes("纯度--"));
+r=await execute(normal(p(75,{isResidential:false}),q(5,{is_datacenter:true})));ok(r.value.content.includes("纯度25·机房·高"));eq(r.value.backgroundColor,"#C0392B");
+r=await execute(normal(p(10),q(0,{is_vpn:true,is_proxy:true})));ok(r.value.content.endsWith("·高"));
+r=await execute(normal(p(10),q(0,{is_vpn:true})));ok(r.value.content.endsWith("·中"));
+r=await execute(normal(p(10),q(0,{is_tor:true})));ok(r.value.content.endsWith("·高"));
 r=await execute(normal(p(5),q(1,{is_datacenter:true})));ok(r.value.content.includes("机房"));eq(r.value.backgroundColor,"#C0392B");
-r=await execute(normal(p(null,{isResidential:undefined}),q(0,{is_datacenter:false})));ok(r.value.content.includes("纯度 100 · 非机房"));
-r=await execute(u=>u===PURE?reply(p(12)):u.startsWith(Q)?reply(q(100,{},ip2)):undefined);ok(r.value.content.includes("纯度 88"));ok(!r.value.content.includes("纯度 0"));
-r=await execute(u=>u===PURE?reply(p(null,{isResidential:undefined})):u.startsWith(Q)?reply(q(0,{},ip2)):undefined);ok(r.value.content.includes("纯度 -- · 未知 · 风险 未知"));
+r=await execute(normal(p(null,{isResidential:undefined}),q(0,{is_datacenter:false})));ok(r.value.content.includes("纯度100·非机房"));
+r=await execute(u=>u===PURE?reply(p(12)):u.startsWith(Q)?reply(q(100,{},ip2)):undefined);ok(r.value.content.includes("纯度88"));ok(!r.value.content.includes("纯度0"));
+r=await execute(u=>u===PURE?reply(p(null,{isResidential:undefined})):u.startsWith(Q)?reply(q(0,{},ip2)):undefined);ok(r.value.content.includes("纯度--·未知·未知"));
 r=await execute(u=>u===PURE?{status:503,body:"{}"}:u===IPIFY?reply({ip:ip2}):u===Q+ip2+"?format=json"?reply(q(40,{is_datacenter:true},ip2)):undefined);
-ok(r.value.content.includes("纯度 60 · 机房 · 风险 中"));ok(r.value.content.includes(ip2));eq(r.calls.length,3);
-r=await execute(u=>u===PURE?reply(p(0,{ip:"bad"})):u===IPIFY?reply({ip:ip2}):u===Q+ip2+"?format=json"?reply(q(50,{},ip2)):undefined);ok(r.value.content.includes("纯度 50"));
-r=await execute(u=>u===PURE?{status:500,body:"{}"}:u===IPIFY?{status:500,body:"{}"}:undefined);ok(r.value.content.includes("纯度 -- · 未知 · 风险 未知"));ok(r.value.content.includes("获取失败"));eq(r.calls.length,2);
-r=await execute(u=>u===PURE?reply(p(20)):u.startsWith(Q)?{error:"offline"}:undefined);ok(r.value.content.includes("纯度 80"));
-r=await execute(u=>u===PURE?{body:"not JSON",status:200}:u===IPIFY?reply({ip:"999.1.2.3"}):undefined);ok(r.value.content.includes("获取失败"));
-r=await execute(normal(p(14,{ip:"2001:4860::8888"}),q(5,{},"2001:4860:0:0:0:0:0:8888")));ok(r.value.content.includes("纯度 86"));ok(r.value.content.includes("2001:4860::8888"));
-r=await execute(normal(p(null,{ip:"2001:4860::8888",isResidential:undefined}),q(22,{},"2001:4860:0:0:0:0:0:8888")));ok(r.value.content.includes("纯度 78"));
+ok(r.value.content.includes("纯度60·机房·中"));eq(r.calls[2].url,Q+ip2+"?format=json");eq(r.calls.length,3);
+r=await execute(u=>u===PURE?reply(p(0,{ip:"bad"})):u===IPIFY?reply({ip:ip2}):u===Q+ip2+"?format=json"?reply(q(50,{},ip2)):undefined);ok(r.value.content.includes("纯度50"));
+r=await execute(u=>u===PURE?{status:500,body:"{}"}:u===IPIFY?{status:500,body:"{}"}:undefined);ok(r.value.content.includes("纯度--·未知·未知"));eq(r.value.content,"纯度--·未知·未知");eq(r.calls.length,2);
+r=await execute(u=>u===PURE?reply(p(20)):u.startsWith(Q)?{error:"offline"}:undefined);ok(r.value.content.includes("纯度80"));
+r=await execute(u=>u===PURE?{body:"not JSON",status:200}:u===IPIFY?reply({ip:"999.1.2.3"}):undefined);eq(r.value.content,"纯度--·未知·未知");
+r=await execute(normal(p(14,{ip:"2001:4860::8888"}),q(5,{},"2001:4860:0:0:0:0:0:8888")));ok(r.value.content.includes("纯度86"));eq(r.calls[1].url,Q+encodeURIComponent("2001:4860::8888")+"?format=json");
+r=await execute(normal(p(null,{ip:"2001:4860::8888",isResidential:undefined}),q(22,{},"2001:4860:0:0:0:0:0:8888")));ok(r.value.content.includes("纯度78"));
 // Even a stale argument must never override the node selected by Stash.
-r=await execute(normal(p(8),q(10)),'{"policy":"旧节点"}');eq(r.calls.length,2);ok(r.value.content.includes("纯度 92"));
-r=await execute(normal(p(8),q(10)),"not JSON");eq(r.calls.length,2);ok(r.value.content.includes("纯度 92"));
+r=await execute(normal(p(8),q(10)),'{"policy":"旧节点"}');eq(r.calls.length,2);ok(r.value.content.includes("纯度92"));
+r=await execute(normal(p(8),q(10)),"not JSON");eq(r.calls.length,2);ok(r.value.content.includes("纯度92"));
 const switchedPure=p(41,{ip:ip2,countryCode:"US",isResidential:false});
 r=await execute(normal(switchedPure,q(5,{is_datacenter:true},ip2)));
-eq(r.value.title,"节点体检 · 美国");ok(r.value.content.includes("纯度 59 · 机房 · 风险 中"));ok(r.value.content.includes("出口 IP "+ip2));eq(r.calls.length,2);
+eq(r.value.title,"节点体检 · 美国");ok(r.value.content.includes("纯度59·机房·中"));eq(r.calls[1].url,Q+ip2+"?format=json");eq(r.calls.length,2);
+r=await execute(normal(p(2),q(8)));eq(r.value.content,"纯度98·住宅·低");
+ok(!r.value.content.includes("\n"));ok(!r.value.content.includes(" "));
 console.log("Stash NodeVitals: "+checks+" assertions passed");
