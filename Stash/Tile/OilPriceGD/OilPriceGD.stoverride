@@ -1,12 +1,12 @@
 # Stash 原生折叠面板：内嵌脚本，复用现有油价自动同步数据。
 name: "广东油价"
-desc: "v2.0 · 95号优先，附92号、98号及下次调价日期；92/95为广东省最高零售限价，98为参考价；人民币元/升、北京时间。"
+desc: "v2.0 · 精简折叠面板，仅显示92号与95号汽油最高零售限价，人民币元/升。"
 category: "生活工具"
 version: "2.0"
 tiles:
   - name: oilprice-gd-v2-95
     interval: 1800
-    title: "广东油价·95号--"
+    title: "广东油价"
     content: "等待更新"
     icon: "fuelpump.fill"
     backgroundColor: "#8E8E93"
@@ -19,7 +19,7 @@ script-providers:
       /** 广东油价 · Stash 折叠面板 v2.0
        * 价格及调价日历复用 Egern 的主分支 prices.json。
        * 校验、缓存合并、周期与价格展示模型源自 425f534658322edec4b834951f91a92ab2769208。
-       * 95号优先；所有时间以北京时间计算。无额外定时任务。
+       * 仅显示92号、95号价格；调价日期仅用于后台校验。北京时间。
        */
       (function(){
       "use strict";
@@ -222,17 +222,14 @@ script-providers:
       function money(n){return price(n)?n.toFixed(2):"--"}
       function shortDate(s){return s.slice(5).replace("-","/")}
       function renderTile(snapshot,now,connected){
-        if(!snapshot)return {title:"广东油价·95号--",content:"暂无数据·待更新",icon:ICON,backgroundColor:COLORS.unknown,url:INFO};
+        if(!snapshot)return {title:"广东油价",content:"暂无数据·待更新",icon:ICON,backgroundColor:COLORS.unknown,url:INFO};
         const d=viewData(snapshot,now,connected);
         const a=d.current;
         const status=d.stale?"·旧价":!connected?"·缓存":snapshot.records[0].rank===1?"·参考":"";
-        const q98=money(a.p98.price)+(a.p98.oldDate?"旧":"");
-        const next=d.nextKind==="paused"?"暂缓调价":d.stale?"待更新":d.next?
-          (d.nextKind==="estimated"||d.nextKind==="corroborated"?"预计":"")+shortDate(d.next)+"调":"待公布";
         const delta=a.p95.delta;
         return {
-          title:"广东油价·95号"+money(a.p95.price)+"元/L"+status,
-          content:"92号"+money(a.p92.price)+"·98号"+q98+"·"+next,
+          title:"广东油价"+status,
+          content:"92·"+money(a.p92.price)+"-95·"+money(a.p95.price),
           icon:ICON,
           backgroundColor:d.stale||!connected||snapshot.records[0].rank===1?COLORS.unknown:
             Number.isFinite(delta)&&delta<0?COLORS.down:Number.isFinite(delta)&&delta>0?COLORS.up:COLORS.normal,
