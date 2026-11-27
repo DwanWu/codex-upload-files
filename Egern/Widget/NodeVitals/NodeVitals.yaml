@@ -7,7 +7,7 @@
 # ==========================================
 
 name: "节点体检"
-description: "节点体检：以同一实际出口为基准，Proxycheck v3主评分、IPPure IPv4明确标注降级、IPQuery辅助核验；支持IPv4/IPv6，不混算评分，不虚构纯度。"
+description: "节点体检：同一出口 IP 的 Proxycheck、IPPure 原始风险取保守参考；100分须双源零风险且 IPQuery 无反证，证据不足不显示满分。支持IPv4/IPv6，保留原UI。"
 
 auto_update:
   interval: 1800
@@ -19,7 +19,7 @@ scriptings:
       # 匿名接口可能拒绝代理来源，失败时自动降级为 IPPure。
       timeout: 15
       update_interval: 1800
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeVitals/NodeVitals.js?v=20261127-7
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeVitals/NodeVitals.js?v=20261127-8
 
 widgets:
   - name: 节点体检
