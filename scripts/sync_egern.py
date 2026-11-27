@@ -243,10 +243,61 @@ def other(proxy,ai,owners):
     idx=owner_index(merge(*owners))
     return pick(merge(proxy,ai,pin('other')),lambda k,v:not china(k,v) and not covered(k,v,idx))
 
+def suffix_covers(suffixes, value, include_self=True):
+    parts = value.split('.')
+    return any('.'.join(parts[i:]) in suffixes for i in range(0 if include_self else 1, len(parts)))
+
+def compact(r, protected=None):
+    """Remove only provably redundant intra-set domains and combine exact IP unions.
+    Keep the explicitly pinned domain entries; do not change regex, keyword, or wildcard semantics.
+    """
+    protected = protected or empty()
+    out = merge(r)
+    suffixes = r['domain_suffix_set']
+    out['domain_suffix_set'] = {
+        v for v in suffixes
+        if v in protected['domain_suffix_set'] or not suffix_covers(suffixes, v, False)
+    }
+    out['domain_set'] = {
+        v for v in r['domain_set']
+        if v in protected['domain_set'] or not suffix_covers(out['domain_suffix_set'], v)
+    }
+    for key, version in zip(IPS, (4, 6)):
+        out[key] = {str(n) for n in ip.collapse_addresses(ip.ip_network(v) for v in r[key])}
+        if any(ip.ip_network(v).prefixlen == 0 for v in out[key]):
+            raise ValueError('unsafe default CIDR after compaction')
+        if intervals(out[key], version) != intervals(r[key], version):
+            raise ValueError('CIDR union changed during compaction')
+    for key in ('domain_set', 'domain_suffix_set'):
+        if not out[key] <= r[key]:
+            raise ValueError('unexpected new domain during compaction')
+        for value in r[key] - out[key]:
+            if not suffix_covers(out['domain_suffix_set'], value):
+                raise ValueError(f'domain coverage lost: {key} {value}')
+    for key in set(KEYS) - set(IPS) - {'domain_set', 'domain_suffix_set'}:
+        if out[key] != r[key]:
+            raise ValueError(f'unexpected compaction of {key}')
+    return out
+
+def domain_match(r, host):
+    return (host in r['domain_set'] or suffix_covers(r['domain_suffix_set'], host)
+            or any(word in host for word in r['domain_keyword_set']))
+
+def validate_required(results):
+    """Protect official Claude/Claude Code hosts and shared dependency routing."""
+    missing = [(name, host) for name, hosts in POLICY['requiredHosts'].items()
+               for host in hosts if not domain_match(results[name], host)]
+    if missing:
+        raise ValueError(f'required domain coverage missing: {missing}')
+    print('Required host coverage passed:', sum(map(len, POLICY['requiredHosts'].values())))
+
 def guard(name,r,old):
-    if count(r)<max(5,count(old)//2):
-        raise ValueError(f'{name}: suspicious rule count {count(old)} -> {count(r)}')
-    return r
+    optimized = compact(r, pin(name))
+    previous = compact(old, pin(name))
+    if count(optimized)<max(5,count(previous)//2):
+        raise ValueError(f'{name}: suspicious compacted rule count {count(previous)} -> {count(optimized)}')
+    print(f'{name}: equivalence-checked compaction {count(r)} -> {count(optimized)}')
+    return optimized
 
 def render(name,r):
     # JSON strings are valid YAML scalars, including quoted IPv6 and regex.
@@ -275,6 +326,17 @@ def test():
     else:
         raise AssertionError('duplicate mapping accepted')
     assert parse(render('chatgpt',a),'test')==a
+    redundant = parse('domain_set:\n- api.example.com\n- keep.example.com\n- fakeexample.com\ndomain_suffix_set:\n- example.com\n- child.example.com\nip_cidr_set:\n- 10.0.0.0/25\n- 10.0.0.128/25\n- 10.0.0.0/26\nip_cidr6_set:\n- "2001:db8::/65"\n- "2001:db8:0:0:8000::/65"\n', 'compact')
+    protected = empty()
+    protected['domain_set'].add('keep.example.com')
+    c = compact(redundant, protected)
+    assert c['domain_set'] == {'keep.example.com', 'fakeexample.com'}
+    assert c['domain_suffix_set'] == {'example.com'}
+    assert c['ip_cidr_set'] == {'10.0.0.0/24'}
+    assert c['ip_cidr6_set'] == {'2001:db8::/64'}
+    assert compact(c, protected) == c
+    assert domain_match(c, 'api.example.com')
+    assert not domain_match(c, 'notexample.com')
     print('Self-tests passed')
 
 def main():
@@ -282,11 +344,12 @@ def main():
     p.add_argument('target',choices=('all','chatgpt','claude','google','other','test'))
     args=p.parse_args()
     test()
-    if args.target=='test':
-        return
-    target=args.target
     names=('chatgpt','claude','google','other','apple')
     old={k:read(k) for k in names}
+    if args.target=='test':
+        validate_required(old)
+        return
+    target=args.target
     result={k:old[k] for k in names}
     ai=source('ai',30)
     if target in ('all','chatgpt'):
@@ -302,6 +365,7 @@ def main():
     result['other']=guard('other',other(source('proxy',1000),ai,owners),old['other'])
     selected=('chatgpt','claude','google','other') if target=='all' else ('other',) if target=='other' else (target,'other')
     # Fully validate all selected outputs before changing any tracked file.
+    validate_required(result)
     texts={k:render(k,result[k]) for k in selected}
     for k,s in texts.items():
         dest=RULES/f'{k}.yaml'

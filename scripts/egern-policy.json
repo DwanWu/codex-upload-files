@@ -227,7 +227,9 @@
     ],
     "domain_set": [
       "fbcdn-a.akamaihd.net",
-      "default.exp-tas.com"
+      "default.exp-tas.com",
+      "browser-intake-us5-datadoghq.com",
+      "http-intake.logs.us5.datadoghq.com"
     ]
   },
   "cnDomains": [
@@ -310,5 +312,76 @@
     "sensenova",
     "hunyuan",
     "yuanbao"
-  ]
+  ],
+  "requiredHosts": {
+    "claude": [
+      "anthropic.com",
+      "api.anthropic.com",
+      "a-api.anthropic.com",
+      "a-cdn.anthropic.com",
+      "s-cdn.anthropic.com",
+      "assets-proxy.anthropic.com",
+      "claude.ai",
+      "a.claude.ai",
+      "a-cdn.claude.ai",
+      "assets.claude.ai",
+      "downloads.claude.ai",
+      "sample.livepreview.claude.ai",
+      "claude.com",
+      "platform.claude.com",
+      "sso.claude.com",
+      "code.claude.com",
+      "mcp-proxy.anthropic.com",
+      "bridge.claudeusercontent.com",
+      "sample.frame.claudeusercontent.com",
+      "sample.livepreview.claude.app",
+      "sample.claudemcpcontent.com",
+      "claude.googleapis.com",
+      "aws-external-anthropic.us-east-1.api.aws",
+      "releases.claude.com",
+      "statsig.anthropic.com"
+    ],
+    "google": [
+      "storage.googleapis.com",
+      "fonts.googleapis.com",
+      "fonts.gstatic.com",
+      "sample-review.googlesource.com",
+      "gemini.google.com",
+      "generativelanguage.googleapis.com",
+      "www.youtube.com",
+      "mtalk.google.com"
+    ],
+    "other": [
+      "github.com",
+      "raw.githubusercontent.com",
+      "registry.npmjs.org",
+      "formulae.brew.sh",
+      "cdnjs.cloudflare.com",
+      "cdn.jsdelivr.net",
+      "cdn.tailwindcss.com",
+      "code.jquery.com",
+      "unpkg.com",
+      "http-intake.logs.us5.datadoghq.com",
+      "browser-intake-us5-datadoghq.com",
+      "my.ippure.com",
+      "api64.ipify.org"
+    ],
+    "chatgpt": [
+      "chatgpt.com",
+      "api.openai.com",
+      "auth.openai.com",
+      "sora.com",
+      "cdn.oaistatic.com",
+      "files.oaiusercontent.com",
+      "ws.chatgpt.com"
+    ],
+    "apple": [
+      "apple-relay.apple.com",
+      "apple-relay.cloudflare.com",
+      "apple-relay.fastly-edge.com",
+      "cp4.cloudflare.com",
+      "guzzoni.apple.com",
+      "smoot.apple.com"
+    ]
+  }
 }
