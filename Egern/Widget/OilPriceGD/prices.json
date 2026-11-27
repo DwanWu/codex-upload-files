@@ -125,5 +125,12 @@
     }
   ],
   "nextWindow": "2026-12-10",
-  "pendingCycle": null
+  "pendingCycle": null,
+  "calendarNotice": {
+    "date": "2026-11-26",
+    "kind": "cycle",
+    "url": "https://www.ndrc.gov.cn/xwdt/xwfb/202611/t20261126_1409082.html"
+  },
+  "calendarHint": null,
+  "holidayYears": {}
 }
