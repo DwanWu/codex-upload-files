@@ -425,10 +425,7 @@ async function render(ctx, now=Date.now()) {
   const nearWindow=data.next&&Math.abs(Date.parse(data.next+"T16:00:00Z")-now)<=12*3600000;
   const minutes=data.stale||!fresh||nearWindow?30:60;
   if(small)return root([row([...title,sp(),t(status,9,"bold",fresh?C.muted:C.red,{minScale:.65})],3),body,row([sp(),icon("clock.fill",C.red,9),t("下轮: "+nextLabel,9,"bold",C.red,{minScale:.7})],3)],minutes);
-  const ds=[data.current.p92.delta,data.current.p95.delta].filter(Number.isFinite);
-  let trend="";
-  if(ds.length===2){const a=Math.min(...ds),b=Math.max(...ds);trend=a===b?`${a>0?"+":""}${a.toFixed(2)} 元/L`:`${a>0?"+":""}${a.toFixed(2)} 至 ${b>0?"+":""}${b.toFixed(2)} 元/L`;}
-  return root([row([...title,sp(),t("下轮: "+nextLabel+(countdown?" ("+countdown+")":""),large?12:10,"bold",C.red,{minScale:.6})],4),body,divider,sp(6),row([t(trend?"92/95 "+trend:"执行日 "+short(data.date),large?11:10,"medium",C.muted,{minScale:.65}),sp(),t(status,large?11:10,"bold",fresh?C.muted:C.red,{minScale:.7})],4)],minutes);
+  return root([row([...title,sp(),t("下轮: "+nextLabel,large?12:10,"bold",C.red,{minScale:.6})],4),body,divider,sp(6),row([t(countdown,large?11:10,"medium",C.red,{minScale:.65}),sp(),t(status,large?11:10,"bold",fresh?C.muted:C.red,{minScale:.7})],4)],minutes);
 }
 
 export default async function(ctx) { return render(ctx); }
