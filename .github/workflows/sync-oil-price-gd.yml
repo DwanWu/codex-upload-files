@@ -5,6 +5,7 @@ on:
     - cron: '37 10,16 * * *' # 18:37 and 00:37 Beijing time
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - 'Egern/Widget/OilPriceGD/OilPriceGD.js'
       - 'scripts/sync_oil_price.mjs'
@@ -20,13 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '24'
+          package-manager-cache: false
       - name: Regression tests
         run: node scripts/test_oil_price.mjs
       - name: Fetch, validate and publish changed snapshot only

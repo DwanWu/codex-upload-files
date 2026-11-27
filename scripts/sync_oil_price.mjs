@@ -1,4 +1,4 @@
-// Node.js 22+, no third-party dependencies. Same parsers as Egern.
+// Node.js 24 LTS, no third-party dependencies. Same parsers as Egern.
 import {readFile,writeFile,rename} from "node:fs/promises";
 const dir = new URL("../Egern/Widget/OilPriceGD/", import.meta.url);
 const code = await readFile(new URL("OilPriceGD.js",dir),"utf8");
@@ -18,6 +18,7 @@ async function get(url){
 const result=await api.collectSnapshot(get,original,now);
 if(!api.normalize(result.snapshot,today))throw Error("Invalid output");
 console.log(JSON.stringify(result.diagnostics));
+if(![result.diagnostics.government,result.diagnostics.mirror,result.diagnostics.national,result.diagnostics.qq,result.diagnostics.sou,result.diagnostics.bear].some(Boolean))throw Error("All sources unavailable; retain previous snapshot and report failure");
 if(result.diagnostics.stale)throw Error("New cycle not confirmed; preserve old published snapshot and fail visibly");
 const next=JSON.stringify(result.snapshot,null,2)+"\n";
 if(JSON.stringify(original)===JSON.stringify(result.snapshot)){console.log("No price changes");process.exit(0)}
