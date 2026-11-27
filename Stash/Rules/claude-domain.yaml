@@ -1,0 +1,33 @@
+# Converted from Egern/Rules/claude.yaml
+# Source main commit: 82a860fe4a954d5ce7f4f8cf9c657ac2776ebbb3
+# Source blob: 3c2d1a9e29dfca2ff16ae272878d43c16086b408
+# Source rules: QuixoticHeart/rule-set (GPL-3.0) and repository's documented official sources.
+# Stash behavior: domain; entries: 27
+payload:
+  - "anthropic-com.ghost.io"
+  - "anthropic.com.cdn.cloudflare.net"
+  - "cdn.growthbook.io"
+  - "cdn.usefathom.com"
+  - "claude.googleapis.com"
+  - "code.claude.com"
+  - "platform.claude.com"
+  - "servd-anthropic-website.b-cdn.net"
+  - "+.ant.dev"
+  - "+.anthropic.com"
+  - "+.anthropic.team"
+  - "+.antspace.dev"
+  - "+.clau.de"
+  - "+.claude.ai"
+  - "+.claude.app"
+  - "+.claude.com"
+  - "+.claude.dev"
+  - "+.claude.new"
+  - "+.claude.site"
+  - "+.claudemcpclient.com"
+  - "+.claudemcpcontent.com"
+  - "+.claudepages.dev"
+  - "+.claudeusercontent.com"
+  - "+.modelcontextprotocol.com"
+  - "+.modelcontextprotocol.io"
+  - "+.modelcontextprotocol.net"
+  - "+.modelcontextprotocol.org"

@@ -1,0 +1,15 @@
+# Converted from Egern/Rules/google.yaml
+# Source main commit: 82a860fe4a954d5ce7f4f8cf9c657ac2776ebbb3
+# Source blob: c3a2b2b810f7bb9cadd2663e09e3dc989947ae21
+# Source rules: QuixoticHeart/rule-set (GPL-3.0) and repository's documented official sources.
+# Stash behavior: classical; entries: 9
+payload:
+  - "DOMAIN-KEYWORD,alkalimakersuite-pa.clients6.google.com"
+  - "DOMAIN-KEYWORD,antigravity"
+  - "DOMAIN-KEYWORD,appspot"
+  - "DOMAIN-KEYWORD,blogspot"
+  - "DOMAIN-KEYWORD,gmail"
+  - "DOMAIN-KEYWORD,google"
+  - "DOMAIN-KEYWORD,labs.google"
+  - "DOMAIN-KEYWORD,notebooklm.google"
+  - "DOMAIN-KEYWORD,recaptcha"

@@ -1,0 +1,12 @@
+# Converted from Egern/Rules/apple.yaml
+# Source main commit: 82a860fe4a954d5ce7f4f8cf9c657ac2776ebbb3
+# Source blob: 810fb5941242883f35ad7ab6692e3a7dbc63a56b
+# Source rules: QuixoticHeart/rule-set (GPL-3.0) and repository's documented official sources.
+# Stash behavior: domain; entries: 6
+payload:
+  - "apple-relay.apple.com"
+  - "apple-relay.cloudflare.com"
+  - "apple-relay.fastly-edge.com"
+  - "cp4.cloudflare.com"
+  - "guzzoni.apple.com"
+  - "+.smoot.apple.com"
