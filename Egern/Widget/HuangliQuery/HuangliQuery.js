@@ -49,6 +49,8 @@ function readCache(raw,month,now){
   return result;
 }
 export default async function(ctx,clock=Date.now(),options={}) {
+  if(typeof clock!=="number"||!Number.isFinite(clock)||clock<0)clock=Date.now();
+  options=options&&typeof options==="object"?options:{};
   const family = String(ctx.widgetFamily || 'systemMedium').toLowerCase();
   const isSmall = family.includes('small');
   const isLarge = family.includes('large');
@@ -259,7 +261,10 @@ export default async function(ctx,clock=Date.now(),options={}) {
   };
   const local=validCalendarDay(localFallback()),matchesLocal=d=>!local||d.lMonth===local.lMonth&&d.lDate===local.lDate;
   const seed=options.bundle===false?null:validCalendarDay(BUNDLED_CALENDAR[dateKey]);
-  const preloaded=fullDay(seed)&&matchesLocal(seed)?seed:null;
+  // Bundled entries were already date-checked and cross-validated during publication.
+  // Do not let device-specific Intl formatting reject a trusted exact-date entry.
+  const preloaded=fullDay(seed)?seed:null;
+  if(preloaded&&!matchesLocal(preloaded))log("bundle","device calendar differs","using verified exact-date entry");
   let today,sourceLabel;
   if(preloaded){
     // A verified calendar entry is date-specific, not a live quote. No device network required.
@@ -331,7 +336,7 @@ export default async function(ctx,clock=Date.now(),options={}) {
     icon('calendar', C.gold, size + 1),
     text('黄历查询', size, 'heavy', C.main),
     spacer(),
-    ...(sourceLabel === '本地' || sourceLabel.includes('缓存') ? [chip(sourceLabel === '本地' ? '本地' : '缓存', C.muted)] : jiri ? [chip('吉日', C.gold)] : [])
+    ...(sourceLabel === '预载' ? [chip('预载', C.gold)] : sourceLabel === '本地' || sourceLabel.includes('缓存') ? [chip(sourceLabel === '本地' ? '本地 R2' : '缓存', C.muted)] : jiri ? [chip('吉日', C.gold)] : [])
   ], 6);
 
   const infoRow = (label, value, color = C.sub, ico = null) => row([
