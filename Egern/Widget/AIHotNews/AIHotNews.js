@@ -116,8 +116,8 @@ async function loadNews(ctx,now,need=5){
 // to a generic script, so explicit short lines and minScale provide headroom.
 const PROFILES={
  small:{count:5,budget:14.5,font:8.5,rowHeight:22,badge:15,padding:[8,9,8,9],header:12,footer:8,gap:3},
- medium:{count:5,budget:28,font:9.5,rowHeight:23,badge:22,padding:[8,12,8,12],header:14,footer:8,gap:3},
- large:{count:8,budget:24,font:12,rowHeight:36,badge:24,padding:[12,14,12,14],header:16,footer:9,gap:5},
+ medium:{count:5,budget:29,font:9.2,rowHeight:23,badge:18,padding:[8,12,8,12],header:14,footer:8,gap:3},
+ large:{count:8,budget:24,font:12,rowHeight:36,badge:20,padding:[12,14,12,14],header:16,footer:9,gap:5},
  accessory:{count:1,budget:11,font:9,rowHeight:22,badge:14,padding:[3,4,3,4],header:10,footer:7,gap:1}
 };
 function layoutProfile(f){f=String(f||"systemMedium").toLowerCase();return f.startsWith("accessory")?PROFILES.accessory:f.includes("small")?PROFILES.small:f.includes("large")?PROFILES.large:PROFILES.medium}
@@ -128,12 +128,12 @@ function wrapText(value,budget){
  if(textWidth(s)>2*budget+1)return null;
  function split(tokens){
   if(tokens.length>240)return null;
-  let best=null,diff=Infinity;
+  let best=null,bestWidth=-1;
   for(let i=1;i<tokens.length;i++){
    const a=tokens.slice(0,i).join("").trimEnd(),b=tokens.slice(i).join("").trimStart();
    if(!a||!b||/[（(【「『《〈“‘\u200d]$/u.test(a)||/^[，。！？、；：,.!?:;）)】」』》〉”’\u200d\uFE0F\p{Mark}]/u.test(b))continue;
    const wa=textWidth(a),wb=textWidth(b);
-   if(wa<=budget&&wb<=budget&&Math.abs(wa-wb)<diff){best=[a,b];diff=Math.abs(wa-wb)}
+   if(wa<=budget&&wb<=budget&&wa>bestWidth){best=[a,b];bestWidth=wa}
   }return best;
  }
  // Preserve Latin product/model names, including versions, and prefer CJK
@@ -210,9 +210,12 @@ export default async function (ctx,clock=Date.now()) {
   const icon = (name, color, size = 13) => ({
     type: 'image', src: `sf-symbol:${name}`, color, width: size, height: size
   });
-  const divider = () => ({
-    type: 'stack', height: 0.5, backgroundColor: C.divider, children: []
-  });
+  // Use an actual flexible horizontal rule; empty unbounded stacks can
+  // collapse to zero width in the widget renderer.
+  const divider=()=>row([
+    spacer(profile.badge+4),
+    {type:'stack',direction:'row',height:0.5,flex:1,backgroundColor:C.divider,children:[spacer()]}
+  ],0,{height:0.5});
   const chip = (label, color = C.blue) => ({
     type: 'stack', direction: 'row', padding: [3, 7, 3, 7], backgroundColor: C.chip,
     children: [text(label, 9, 'bold', color, { maxLines: 1 })]
@@ -222,10 +225,21 @@ export default async function (ctx,clock=Date.now()) {
   const formatClock=v=>v&&Number.isFinite(Date.parse(v))?new Date(Date.parse(v)+8*3600000).toISOString().slice(11,16):"--:--";
 
   const rankColor = rank => rank === 1 ? C.red : rank === 2 ? C.orange : rank === 3 ? C.gold : C.muted;
-  const rankBadge=rank=>({type:'stack',direction:'row',alignItems:'center',width:profile.badge,children:[text(String(rank),profile.font+0.5,'heavy',rankColor(rank),{maxLines:1,minScale:0.8})]});
+  // Do not put a flex frame around the text column. The previous renderer
+  // centered that frame despite alignItems:'start'. A natural-width text
+  // element and a trailing flexible spacer anchor content at the left.
+  const rankBadge=rank=>row([
+    text(String(rank),profile.font+0.5,'heavy',rankColor(rank),{textAlign:'left',maxLines:1,minScale:0.8}),
+    spacer()
+  ],0,{width:profile.badge,alignItems:'start'});
   const hotRow=item=>{
     const fitted=fitNews(item,profile),size=profile.font*(fitted.scale||1);
-    return row([rankBadge(item.rank),col(fitted.lines.map(line=>text(line,size,'medium',C.main,{maxLines:1,minScale:0.72})),0,{flex:1,alignItems:'start'})],4,{height:profile.rowHeight,url:item.url||HOME_URL});
+    const lines=fitted.lines.join('\n');
+    return row([
+      rankBadge(item.rank),
+      text(lines,size,'medium',C.main,{textAlign:'left',maxLines:2,minScale:0.72}),
+      spacer()
+    ],4,{height:profile.rowHeight,alignItems:'start',url:item.url||HOME_URL});
   };
 
   const header = size => row([

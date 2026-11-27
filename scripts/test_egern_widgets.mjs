@@ -68,6 +68,32 @@ for(const f of families){
  for(const item of hardCases){const fit=N.fitNews(item,p);assert.ok(fit.lines.length>=1&&fit.lines.length<=2);assert.ok(fit.lines.every(s=>N.textWidth(s)*(fit.scale||1)<=p.budget+0.00001));assert.ok(fit.lines.every(s=>!/(?:…|⋯|\.{3,}|．{3,})/.test(s)))}
  const ctx2=mock(u=>u.includes("hot-topics")?resp(200,fullHot):resp(200,storyResponse(u.split("/").pop())),new Map(),f),widget=await N.widget(ctx2,T);
  assert.equal(newsRows(widget).length,f==="systemLarge"?8:5);
+ // The iPhone screenshot showed an unwanted centered flex column. Every
+ // article must use one natural-width, explicitly left-aligned text element
+ // and a trailing flexible spacer, rather than a centered flex text frame.
+ for(const r of newsRows(widget)){
+  assert.equal(r.alignItems,"start");
+  assert.equal(r.children.length,3);
+  assert.equal(r.children[0].width,p.badge);
+  assert.equal(r.children[0].children[0].textAlign,"left");
+  const t=r.children[1];assert.equal(t.type,"text");
+  assert.equal(t.textAlign,"left");assert.equal(t.maxLines,2);
+  assert.equal(t.flex,undefined);
+  assert.equal(r.children[2].type,"spacer");assert.equal(r.children[2].length,undefined);
+  assert.ok(t.text.split("\n").length<=2);
+  assert.ok(t.text.split("\n").every(s=>N.textWidth(s)*t.font.size<=p.budget*p.font+0.0001));
+ }
+ const list=widget.children.find(x=>x.type==="stack"&&x.direction==="column"&&x.children.some(r=>r.url));
+ assert.ok(list);assert.equal(list.alignItems,"start");
+ const rules=list.children.filter(x=>x.height===0.5);
+ assert.equal(rules.length,newsRows(widget).length-1);
+ for(const rule of rules){
+  assert.equal(rule.children[0].length,p.badge+4);
+  assert.equal(rule.children[1].flex,1);
+  assert.equal(rule.children[1].height,0.5);
+  assert.equal(rule.children[1].children[0].type,"spacer");
+ }
+
  assert.ok(newsRows(widget).some(r=>textNodes(r).join("").includes("多语言")),"rendered summary "+f);
  assert.ok(textNodes(widget).every(x=>!/(?:…|⋯|\.{3,}|．{3,})/.test(x)));
  assert.equal(ctx2.calls.length,1+(f==="systemLarge"?8:5));
@@ -78,6 +104,10 @@ for(const f of families){
 assert.equal(N.fitNews({title:"模型发布",summary:"模型发布了新功能。"},N.layoutProfile("systemMedium")).kind,"summary");
 assert.equal(N.fitNews({title:"新模型正式发布",summary:"长摘要".repeat(100)},N.layoutProfile("systemSmall")).kind,"title");
 assert.equal(N.wrapText("超长英文单词"+"A".repeat(50),12),null);
+const leading=N.wrapText("甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己",11);
+assert.ok(leading&&leading.length===2);
+assert.ok(N.textWidth(leading[0])>=N.textWidth(leading[1]));
+assert.equal(leading.join(""),"甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己");
 
 function lunar(d){const p=new Intl.DateTimeFormat("zh-CN-u-ca-chinese",{year:"numeric",month:"long",day:"numeric",timeZone:"Asia/Shanghai"}).formatToParts(new Date(d+"T04:00:00Z"));return {m:H.lunarMonthText(p.find(x=>x.type==="month").value),d:H.lunarDayText(p.find(x=>x.type==="day").value)}}
 const ds=["2026-11-27","2026-11-28","2026-11-30","2026-12-01","2026-12-31","2027-01-01","2027-02-06"];
