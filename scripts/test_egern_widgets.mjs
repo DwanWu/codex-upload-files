@@ -1,7 +1,7 @@
 import {readFile} from "node:fs/promises";
 import assert from "node:assert/strict";
 const apis={};
-for(const [name,helpers] of Object.entries({"AIHotNews":"loadNews,normalizeNews,safeLink","HuangliQuery":"validCalendarDay,lunarMonthText,lunarDayText","NodeVitals":"measureNode,canonIP,score"})){
+for(const [name,helpers] of Object.entries({"AIHotNews":"loadNews,normalizeNews,safeLink","HuangliQuery":"validCalendarDay,lunarMonthText,lunarDayText","NodeVitals":"measureNode,canonIP,score,publicIP"})){
  const code=await readFile(new URL("../Egern/Widget/"+name+"/"+name+".js",import.meta.url),"utf8");
  const a=await import("data:text/javascript;base64,"+Buffer.from(code+"\nexport {"+helpers+"};").toString("base64"));
  apis[name]={...a,widget:a.default};
@@ -42,34 +42,71 @@ w=await H.widget(mock(u=>u.includes("openApiData")?resp(404,{}):resp(200,[{...se
 w=await H.widget(mock(u=>u.includes("openApiData")?resp(200,[{...prim(ds[0]),lDate:"初一"}]):resp(200,[sec(ds[0])])),T);assert.ok(flat(w).includes("农历"+lunar(ds[0]).m+"月"+lunar(ds[0]).d));
 for(const f of families){const t=Date.parse("2026-12-31T23:59:00+08:00");w=await H.widget(mock(source,new Map(),f),t);assert.equal(w.type,"widget");assert.equal(Date.parse(w.refreshAfter),t+M);assert.ok(flat(w).includes("祭祀"));w=await H.widget(mock(source,new Map(),f),Date.parse("2027-01-01T00:01:00+08:00"));assert.ok(flat(w).includes("农历"+lunar(ds[5]).m+"月"+lunar(ds[5]).d))}
 assert.equal(H.validCalendarDay({lMonth:"",lDate:"初一"}),null);assert.equal(H.lunarDayText("21"),"廿一");
-const p={ip:"203.0.113.10",countryCode:"JP",fraudScore:12,isResidential:true},q={ip:"203.0.113.10",location:{country_code:"JP"},risk:{risk_score:5,is_datacenter:false,is_vpn:false,is_proxy:false,is_tor:false}};
+// Synthetic public-IP fixtures: no network calls, labels and scores are mock values.
+const p={ip:"8.8.4.4",countryCode:"JP",fraudScore:12,isResidential:true},q={ip:"8.8.4.4",location:{country_code:"JP"},risk:{risk_score:5,is_datacenter:false,is_vpn:false,is_proxy:false,is_tor:false}};
 const pair=(a,b,env={})=>mock(u=>resp(200,u.includes("ippure")?a:b),new Map(),"systemMedium",env);
 ctx=pair(p,q,{NODE_POLICY:"节点选择"});let v=await V.measureNode(ctx);
 assert.equal(v.purity,88);assert.equal(v.property,"住宅");assert.equal(v.riskLevel,"低");assert.equal(v.region,"日本");
-assert.equal(ctx.calls.length,2);assert.equal(ctx.calls[1].u,"https://api.ipquery.io/203.0.113.10");
+assert.equal(ctx.calls.length,2);assert.equal(ctx.calls[1].u,"https://api.ipquery.io/8.8.4.4");
 assert.ok(ctx.calls.every(c=>c.o.policy==="节点选择"));assert.ok(ctx.calls.every(c=>c.o.credentials==="omit"&&c.o.insecureTls===false));
 v=await V.measureNode(pair({...p,fraudScore:null,isResidential:null},{...q,risk:{risk_score:null}}));assert.equal(v.purity,null);assert.equal(v.property,"未知");assert.equal(v.riskLevel,"未知");
 v=await V.measureNode(pair({...p,fraudScore:0},q));assert.equal(v.purity,100);
-v=await V.measureNode(pair({...p,fraudScore:"0"},q));assert.equal(v.purity,95);assert.equal(v.purityLabel,"参考纯度");
+v=await V.measureNode(pair({...p,fraudScore:"0"},q));assert.equal(v.purity,null);assert.equal(v.purityLabel,"纯度");assert.equal(v.puritySource,null);
 // A mismatched lookup must not discard valid IPPure results or mix another address's risk.
-v=await V.measureNode(pair({...p,ip:"198.51.100.22"},{...q,risk:{...q.risk,is_tor:true,risk_score:100}}));assert.equal(v.quality,"single");assert.equal(v.region,"日本");assert.equal(v.purity,88);assert.equal(v.property,"住宅");assert.equal(v.riskLevel,"未知");
-const routed=mock(u=>u.includes("ippure")?resp(200,p):u==="https://api.ipquery.io/203.0.113.10"?resp(200,q):resp(200,{...q,ip:"198.51.100.22",risk:{...q.risk,risk_score:100}}));
+v=await V.measureNode(pair({...p,ip:"9.9.9.9"},{...q,risk:{...q.risk,is_tor:true,risk_score:100}}));assert.equal(v.quality,"single");assert.equal(v.region,"日本");assert.equal(v.purity,88);assert.equal(v.property,"住宅");assert.equal(v.riskLevel,"未知");
+const routed=mock(u=>u.includes("ippure")?resp(200,p):u==="https://api.ipquery.io/8.8.4.4"?resp(200,q):resp(200,{...q,ip:"9.9.9.9",risk:{...q.risk,risk_score:100}}));
 v=await V.measureNode(routed);assert.equal(v.quality,"verified");assert.equal(v.exitIP,p.ip);assert.equal(v.riskLevel,"低");assert.equal(routed.calls.length,2);assert.ok(!routed.calls.some(c=>c.u.includes("?format=json")));
-v=await V.measureNode(pair({...p,ip:"2001:db8::1"},q));assert.equal(v.quality,"single");assert.equal(v.purity,88);assert.equal(v.riskLevel,"未知");
-ctx=pair({...p,ip:"2001:db8::1"},{...q,ip:"2001:0db8:0:0:0:0:0:1"});v=await V.measureNode(ctx);assert.equal(v.quality,"verified");assert.equal(ctx.calls[1].u,"https://api.ipquery.io/2001:db8:0:0:0:0:0:1");
+v=await V.measureNode(pair({...p,ip:"2606:4700:4700::1111"},q));assert.equal(v.quality,"single");assert.equal(v.purity,null);assert.equal(v.purityNote,"IPv6未评分");assert.equal(v.riskLevel,"未知");
+ctx=pair({...p,ip:"2606:4700:4700::1111"},{...q,ip:"2606:4700:4700:0:0:0:0:1111"});v=await V.measureNode(ctx);assert.equal(v.quality,"verified");assert.equal(ctx.calls[1].u,"https://api.ipquery.io/2606:4700:4700:0:0:0:0:1111");
 v=await V.measureNode(pair({...p,isResidential:false},q));assert.equal(v.property,"非住宅");
 v=await V.measureNode(pair(p,{...q,risk:{...q.risk,is_datacenter:true}}));assert.equal(v.property,"有差异");assert.equal(v.riskLevel,"中");
-v=await V.measureNode(pair(null,{...q,risk:{...q.risk,is_tor:true,risk_score:100}}));assert.equal(v.purity,0);assert.equal(v.riskLevel,"高");assert.equal(v.purityLabel,"参考纯度");
+v=await V.measureNode(pair(null,{...q,risk:{...q.risk,is_tor:true,risk_score:100}}));assert.equal(v.purity,null);assert.equal(v.riskLevel,"高");assert.equal(v.puritySource,null);
 ctx=mock(u=>u.includes("ippure")?resp(503,{}):u.includes("?format=json")?resp(200,{ip:q.ip}):resp(200,q));
-v=await V.measureNode(ctx);assert.equal(ctx.calls.length,3);assert.equal(v.exitIP,q.ip);assert.equal(v.purity,95);assert.equal(v.riskLevel,"低");
+v=await V.measureNode(ctx);assert.equal(ctx.calls.length,3);assert.equal(v.exitIP,q.ip);assert.equal(v.purity,null);assert.equal(v.riskLevel,"未知");
 ctx=mock(u=>u.includes("ippure")?resp(200,p):resp(503,{}));v=await V.measureNode(ctx);assert.equal(v.purity,88);assert.equal(v.property,"住宅");assert.equal(v.riskLevel,"未知");assert.equal(v.region,"日本");
 v=await V.measureNode(mock(fail));assert.equal(v.quality,"offline");assert.equal(v.purity,null);assert.equal(v.property,"未知");assert.equal(v.riskLevel,"未知");
 for(const f of families){
- const w=await V.widget(mock(u=>u.includes("ippure")?resp(200,p):resp(200,{...q,ip:"198.51.100.22"}),new Map(),f),T);
+ const w=await V.widget(mock(u=>u.includes("ippure")?resp(200,p):resp(200,{...q,ip:"9.9.9.9"}),new Map(),f),T);
  assert.ok(flat(w).includes("出口 IP"));assert.ok(!flat(w).includes("IPPure IP"));assert.ok(!flat(w).includes("出口不一致"));assert.ok(flat(w).includes('"text":"88"'));assert.ok(flat(w).includes("日本"));
 }
 for(const bad of ["1.2.3.999","javascript:1","1::2::3","2001:db8:","::ffff:1.2.3.999","127.0.0.01"])assert.equal(V.canonIP(bad),null);
-assert.equal(V.canonIP("::ffff:203.0.113.10"),"203.0.113.10");assert.equal(V.score(null),null);assert.equal(V.score(101),null);assert.equal(V.score(0),0);
-for(const f of families){ctx=mock(u=>resp(200,u.includes("ippure")?p:q),new Map(),f);w=await V.widget(ctx,T);assert.equal(w.type,"widget");assert.ok(flat(w).includes("203.0.113.10"));assert.ok(flat(w).includes("日本"));assert.ok(Number.isFinite(Date.parse(w.refreshAfter)));w=await V.widget(mock(u=>resp(200,u.includes("ippure")?{...p,ip:"198.51.100.9",countryCode:"US",fraudScore:70}:{...q,ip:"198.51.100.9",location:{country_code:"US"}}),ctx.kv,f),T+M);assert.ok(flat(w).includes("198.51.100.9"));assert.ok(!flat(w).includes("203.0.113.10"));assert.ok(flat(w).includes("美国"));assert.ok(flat(w).includes('"text":"30"'))}
+assert.equal(V.canonIP("::ffff:8.8.4.4"),"8.8.4.4");assert.equal(V.score(null),null);assert.equal(V.score(101),null);assert.equal(V.score(0),0);
+for(const f of families){ctx=mock(u=>resp(200,u.includes("ippure")?p:q),new Map(),f);w=await V.widget(ctx,T);assert.equal(w.type,"widget");assert.ok(flat(w).includes("8.8.4.4"));assert.ok(flat(w).includes("日本"));assert.ok(Number.isFinite(Date.parse(w.refreshAfter)));w=await V.widget(mock(u=>resp(200,u.includes("ippure")?{...p,ip:"1.0.0.1",countryCode:"US",fraudScore:70}:{...q,ip:"1.0.0.1",location:{country_code:"US"}}),ctx.kv,f),T+M);assert.ok(flat(w).includes("1.0.0.1"));assert.ok(!flat(w).includes("8.8.4.4"));assert.ok(flat(w).includes("美国"));assert.ok(flat(w).includes('"text":"30"'))}
+
+
+// Provider contract replay: IPPure official API example, IPQuery 1.1.1.1 public response.
+// No real user exit IP is stored or sent by the tests.
+const officialPure={ip:"104.28.123.123",asn:13335,asOrganization:"Cloudflare, Inc.",country:"United States",countryCode:"US",fraudScore:75,isResidential:false,isBroadcast:false};
+v=await V.measureNode(pair(officialPure,null));assert.equal(v.purity,25);assert.equal(v.rawFraudScore,75);assert.equal(v.puritySource,"IPPure");assert.equal(v.purityNote,"IPPure参考");assert.equal(v.property,"非住宅");assert.equal(v.riskLevel,"高");
+const publicQuery={ip:"1.1.1.1",isp:{asn:"AS13335",org:"Cloudflare, Inc."},location:{country:"Australia",country_code:"AU"},risk:{is_mobile:false,is_vpn:false,is_tor:false,is_proxy:false,is_datacenter:true,risk_score:0}};
+v=await V.measureNode(pair(null,publicQuery));assert.equal(v.exitIP,"1.1.1.1");assert.equal(v.purity,null);assert.equal(v.ipqueryRiskScore,0);assert.equal(v.property,"机房");assert.equal(v.riskLevel,"中");
+for(const value of [undefined,null,"0","100",false,true,-1,101,NaN,Infinity,{},[]]){
+ v=await V.measureNode(pair({...p,fraudScore:value},q));assert.equal(v.purity,null);assert.equal(v.rawFraudScore,null);
+}
+for(const value of [0,1,12.5,50,99,100]){
+ v=await V.measureNode(pair({...p,fraudScore:value},q));assert.equal(v.purity,100-value);assert.equal(v.rawFraudScore,value);assert.equal(v.puritySource,"IPPure");
+}
+for(const value of [0,12,100]){
+ v=await V.measureNode(pair({...p,ip:"2606:4700:4700::1111",fraudScore:value},{...q,ip:"2606:4700:4700::1111"}));
+ assert.equal(v.purity,null);assert.equal(v.purityNote,"IPv6未评分");assert.equal(v.rawFraudScore,null);
+}
+for(const bad of ["0.0.0.0","127.0.0.1","10.0.0.2","100.64.0.1","172.16.1.2","192.168.1.2","169.254.1.1","192.0.2.1","198.18.0.1","198.51.100.1","203.0.113.10","224.0.0.1","::1","fc00::1","fe80::1","2001:db8::1","::ffff:10.0.0.1"]){
+ assert.equal(V.publicIP(bad),null);
+ ctx=mock(u=>u.includes("ippure")?resp(200,{...p,ip:bad,fraudScore:0}):resp(503,{}));
+ v=await V.measureNode(ctx);assert.equal(v.purity,null);assert.equal(v.exitIP,"获取失败");
+}
+assert.equal(V.publicIP("8.8.4.4"),"8.8.4.4");assert.equal(V.publicIP("::ffff:8.8.4.4"),"8.8.4.4");assert.ok(V.publicIP("2606:4700:4700::1111"));
+// A stale shared-cache echo is not evidence of this invocation's current exit.
+ctx=mock(u=>u.includes("ippure")?resp(200,p,{"Age":"120"}):resp(200,publicQuery));
+v=await V.measureNode(ctx);assert.equal(v.exitIP,"1.1.1.1");assert.equal(v.purity,null);assert.ok(ctx.calls.every(c=>c.o.headers["Cache-Control"]==="no-cache, no-store"));
+ctx=mock(()=>resp(429,{ip:p.ip,fraudScore:0}));v=await V.measureNode(ctx);assert.equal(v.purity,null);assert.equal(v.exitIP,"获取失败");
+ctx=mock(u=>u.includes("ippure")?{status:200,text:async()=>"<html>challenge</html>"}:resp(200,publicQuery));v=await V.measureNode(ctx);assert.equal(v.purity,null);assert.equal(v.exitIP,"1.1.1.1");
+v=await V.measureNode(pair({...p,fraudScore:0},{...q,risk:{...q.risk,is_tor:true,risk_score:100}}));assert.equal(v.purity,100);assert.equal(v.rawFraudScore,0);assert.equal(v.riskLevel,"高");
+for(const f of families){
+ w=await V.widget(mock(u=>u.includes("ippure")?resp(200,officialPure):resp(503,{}),new Map(),f),T);
+ assert.ok(flat(w).includes("IPPure参考"));assert.ok(flat(w).includes('"text":"25"'));assert.ok(flat(w).includes("出口 IP"));assert.ok(!flat(w).includes("IPPure IP"));
+ w=await V.widget(mock(u=>u.includes("ippure")?resp(503,{}):resp(200,publicQuery),new Map(),f),T);
+ assert.ok(flat(w).includes("评分暂缺"));assert.ok(flat(w).includes('"text":"--"'));assert.ok(!flat(w).includes('"text":"100"'));
+}
 
 console.log("Three Egern widget regression suites passed");

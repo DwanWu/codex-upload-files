@@ -28,13 +28,45 @@ function canonIP(x){
   if(p.slice(0,5).every(v=>v==="0")&&p[5]==="ffff"){const h=parseInt(p[6],16),l=parseInt(p[7],16);return [h>>8,h&255,l>>8,l&255].join(".")}
   return p.join(":");
 }
+// Only publicly routable address ranges are meaningful as an observed Internet exit.
+// Conservatively reject private, shared, link-local, loopback and documentation networks.
+function publicIP(value){
+  const ip=canonIP(value);if(!ip)return null;
+  if(ip.includes(".")){
+    const [a,b,c]=ip.split(".").map(Number);
+    if(a===0||a===10||a===127||a>=224||a===100&&b>=64&&b<=127||a===169&&b===254||a===172&&b>=16&&b<=31||a===192&&(b===168||b===0&&(c===0||c===2)||b===88&&c===99)||a===198&&(b===18||b===19||b===51&&c===100)||a===203&&b===0&&c===113)return null;
+  }else{
+    const [a,b]=ip.split(":").map(x=>parseInt(x,16));
+    if(a<0x2000||a>0x3fff||a===0x2001&&b===0xdb8||a===0x3fff&&b<0x1000)return null;
+  }
+  return ip;
+}
 function score(v){return typeof v==="number"&&Number.isFinite(v)&&v>=0&&v<=100?v:null}
+function object(v){return !!v&&typeof v==="object"&&!Array.isArray(v)}
+// IPPure FAQ explicitly excludes IPv6 from its risk score.
+// Never replace its score with another provider's distinct risk metric.
+function pureScore(p,target){
+  if(!p||!target||target.includes(":")||publicIP(p.ip)!==target)return null;
+  return score(p.fraudScore);
+}
+function riskRecord(q){
+  if(!object(q?.risk))return false;
+  const r=q.risk;
+  return score(r.risk_score)!==null||["is_mobile","is_vpn","is_proxy","is_tor","is_datacenter"].some(k=>typeof r[k]==="boolean");
+}
+function ageHeader(resp){try{
+  const h=resp.headers,v=typeof h?.get==="function"?h.get("age"):h?.age??h?.Age;
+  return typeof v==="string"&&/^\d+$/.test(v)?Number(v):null;
+}catch(_){return null}}
 function cleanIPText(v){return typeof v==="string"?v.replace(/[\u0000-\u001f\u007f]/g," ").trim().slice(0,100):""}
 async function ipJSON(ctx,url,policy){
   try{
-    const r=await ctx.http.get(url,{headers:{"User-Agent":"Egern-NodeVitals/2.1","Accept":"application/json","Cache-Control":"no-cache"},timeout:4000,credentials:"omit",insecureTls:false,redirect:"error",...(policy?{policy}:{})});
-    if(r.status!==200)return null;const body=await r.text();if(typeof body!=="string"||body.length>200000)return null;
-    const data=JSON.parse(body);return data&&typeof data==="object"&&!Array.isArray(data)&&canonIP(data.ip)?data:null;
+    const r=await ctx.http.get(url,{headers:{"User-Agent":"Egern-NodeVitals/2.2","Accept":"application/json","Cache-Control":"no-cache, no-store","Pragma":"no-cache"},timeout:4000,credentials:"omit",insecureTls:false,redirect:"error",...(policy?{policy}:{})});
+    if(r.status!==200)return null;
+    // Caller-IP endpoints must not replay a shared CDN response for a prior request.
+    if((url===PURE_URL||url===QUERY_URL)&&(ageHeader(r)??0)>0)return null;
+    const body=await r.text();if(typeof body!=="string"||body.length>200000)return null;
+    const data=JSON.parse(body);return object(data)&&publicIP(data.ip)?data:null;
   }catch(_){return null}
 }
 async function measureNode(ctx){
@@ -43,30 +75,31 @@ async function measureNode(ctx){
   // No persisted IP or risk scores. Reject any lookup returned for another IP.
   const policy=cleanIPText(ctx.env?.NODE_POLICY);
   const pure=await ipJSON(ctx,PURE_URL,policy);
-  let p=pure,q=null,target=canonIP(p?.ip),observed=cleanIPText(p?.ip);
+  const p=pure;let q=null,target=publicIP(p?.ip),observed=cleanIPText(p?.ip);
   if(!target){
     const caller=await ipJSON(ctx,QUERY_URL,policy);
-    target=canonIP(caller?.ip);observed=cleanIPText(caller?.ip);
-    if(target&&caller?.risk&&typeof caller.risk==="object")q=caller;
+    target=publicIP(caller?.ip);observed=cleanIPText(caller?.ip);
+    if(target&&riskRecord(caller))q=caller;
   }
   if(target&&!q){
     // Canonical IPv6 is safe as a URL path segment (RFC 3986 pchar allows ":").
     const result=await ipJSON(ctx,QUERY_BASE+target,policy);
-    if(canonIP(result?.ip)===target)q=result;
+    if(publicIP(result?.ip)===target)q=result;
   }
-  const r=q?.risk||{},ps=score(p?.fraudScore),qs=score(r.risk_score);
-  const purity=ps!==null?Math.round(100-ps):qs!==null?Math.round(100-qs):null;
+  const r=object(q?.risk)?q.risk:{},ps=pureScore(p,target),qs=score(r.risk_score);
+  const purity=ps!==null?Math.round((100-ps)*100)/100:null;
+  const purityNote=ps!==null?"IPPure参考":target?.includes(":")?"IPv6未评分":"评分暂缺";
   const dc=p?.isDataCenter===true||r.is_datacenter===true,res=p?.isResidential===true;
   const property=dc&&res?"有差异":dc?"机房":res?"住宅":r.is_mobile===true?"移动":p?.isResidential===false?"非住宅":"未知";
   const complete=["is_vpn","is_proxy","is_tor","is_datacenter"].every(k=>typeof r[k]==="boolean")&&qs!==null;
   let riskLevel="未知";
   if(r.is_tor===true||r.is_vpn===true&&r.is_proxy===true||[ps,qs].some(v=>v!==null&&v>=65))riskLevel="高";
   else if(dc||r.is_vpn===true||r.is_proxy===true||[ps,qs].some(v=>v!==null&&v>=25))riskLevel="中";
-  else if(complete&&property!=="有差异")riskLevel="低";
+  else if(complete&&ps!==null&&property!=="有差异")riskLevel="低";
   const cc=cleanIPText(p?.countryCode||q?.location?.country_code||q?.location?.countryCode).toUpperCase();
   const region=COUNTRY_ZH[cc]||cleanIPText(q?.location?.country||p?.country)||"未知";
   const quality=!target?"offline":p&&q?"verified":"single";
-  return {exitIP:observed||"获取失败",region,purity,property,riskLevel,purityLabel:ps===null&&qs!==null?"参考纯度":"纯度",quality};
+  return {exitIP:observed||"获取失败",region,purity,property,riskLevel,purityLabel:"纯度",purityNote,puritySource:ps!==null?"IPPure":null,rawFraudScore:ps,ipqueryRiskScore:qs,quality};
 }
 export default async function (ctx,clock=Date.now()) {
   const family = String(ctx.widgetFamily || 'systemMedium').toLowerCase();
@@ -102,15 +135,15 @@ export default async function (ctx,clock=Date.now()) {
   const divider = () => ({ type: 'stack', height: 0.5, backgroundColor: C.divider, borderRadius: 1, children: [] });
 
   const internalIP=cleanIPText(ctx.device?.ipv4?.address)||"未连接";
-  const {exitIP,region:country,purity,property,riskLevel,purityLabel,quality}=await measureNode(ctx);
-  const refreshAfter=new Date(clock+(quality==="verified"?15:5)*60000).toISOString();
+  const {exitIP,region:country,purity,property,riskLevel,purityLabel,purityNote,quality}=await measureNode(ctx);
+  const refreshAfter=new Date(clock+(quality==="verified"&&(purity!==null||purityNote==="IPv6未评分")?15:5)*60000).toISOString();
 
   const purityColor = purity == null ? C.muted : purity >= 90 ? C.green : purity >= 80 ? C.pink : C.red;
   const propertyColor=property==='机房'||property==='非住宅'?C.red:property==='住宅'||property==='移动'?C.green:C.muted;
   const riskColor=riskLevel==='高'?C.red:riskLevel==='中'?C.pink:riskLevel==='低'?C.green:C.muted;
 
   const cards = [
-    { label: purityLabel, value: purity == null ? '--' : String(purity), color: purityColor },
+    { label: purityLabel, value: purity == null ? '--' : String(purity), color: purityColor, note: purityNote },
     { label: '属性', value: property, color: propertyColor },
     { label: '风险', value: riskLevel, color: riskColor }
   ];
@@ -123,6 +156,7 @@ export default async function (ctx,clock=Date.now()) {
       text(item.label, cfg.labelSize, 'bold', item.color, { maxLines: 1, minScale: 0.75 }),
       spacer(cfg.gap),
       text(item.value, cfg.valueSize, 'heavy', item.color, { maxLines: 1, minScale: 0.55 }),
+      ...(item.note?[spacer(2),text(item.note,Math.max(7,cfg.labelSize-2),'medium',C.muted,{maxLines:1,minScale:0.6})]:[]),
       spacer()
     ]
   });
