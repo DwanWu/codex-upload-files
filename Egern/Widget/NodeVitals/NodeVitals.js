@@ -13,7 +13,7 @@ const COUNTRY_ZH = {
     DK:'丹麦', IT:'意大利', ES:'西班牙', PT:'葡萄牙', PL:'波兰', IE:'爱尔兰', AE:'阿联酋',
     TR:'土耳其', BR:'巴西', MX:'墨西哥', AR:'阿根廷', CL:'智利', ZA:'南非', IL:'以色列'
   };
-const PURE_URL="https://my.ippure.com/v1/info",QUERY_URL="https://api.ipquery.io/?format=json";
+const PURE_URL="https://my.ippure.com/v1/info",QUERY_BASE="https://api.ipquery.io/",QUERY_URL=QUERY_BASE+"?format=json";
 function canonIP(x){
   if(typeof x!=="string")return null;let s=x.trim().toLowerCase();
   const v4=v=>/^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(v)&&v.split(".").every(n=>+n<=255);
@@ -32,18 +32,29 @@ function score(v){return typeof v==="number"&&Number.isFinite(v)&&v>=0&&v<=100?v
 function cleanIPText(v){return typeof v==="string"?v.replace(/[\u0000-\u001f\u007f]/g," ").trim().slice(0,100):""}
 async function ipJSON(ctx,url,policy){
   try{
-    const r=await ctx.http.get(url,{headers:{"User-Agent":"Egern-NodeVitals/2.0","Accept":"application/json","Cache-Control":"no-cache"},timeout:5000,credentials:"omit",insecureTls:false,redirect:"error",...(policy?{policy}:{})});
+    const r=await ctx.http.get(url,{headers:{"User-Agent":"Egern-NodeVitals/2.1","Accept":"application/json","Cache-Control":"no-cache"},timeout:4000,credentials:"omit",insecureTls:false,redirect:"error",...(policy?{policy}:{})});
     if(r.status!==200)return null;const body=await r.text();if(typeof body!=="string"||body.length>200000)return null;
     const data=JSON.parse(body);return data&&typeof data==="object"&&!Array.isArray(data)&&canonIP(data.ip)?data:null;
   }catch(_){return null}
 }
 async function measureNode(ctx){
-  // Do not cache any IP or score; both sources observe the current connection.
-  const policy=cleanIPText(ctx.env?.NODE_POLICY),[pure,query]=await Promise.all([ipJSON(ctx,PURE_URL,policy),ipJSON(ctx,QUERY_URL,policy)]);
-  const a=canonIP(pure?.ip),b=canonIP(query?.ip),same=!!a&&a===b,different=!!a&&!!b&&!same,dual=different&&a.includes(":")!==b.includes(":");
-  const exitIP=cleanIPText(pure?.ip||query?.ip)||"获取失败";
-  if(different&&!dual)return {exitIP,region:"出口不一致",purity:null,property:"未知",riskLevel:"未知",purityLabel:"纯度",quality:"conflict"};
-  const p=a?pure:null,q=(!a||same)?query:null,r=q?.risk||{},ps=score(p?.fraudScore),qs=score(r.risk_score);
+  // Anchor all fields to one address: IPPure observes the current connection;
+  // IPQuery /:ip describes that address, regardless of its own request route.
+  // No persisted IP or risk scores. Reject any lookup returned for another IP.
+  const policy=cleanIPText(ctx.env?.NODE_POLICY);
+  const pure=await ipJSON(ctx,PURE_URL,policy);
+  let p=pure,q=null,target=canonIP(p?.ip),observed=cleanIPText(p?.ip);
+  if(!target){
+    const caller=await ipJSON(ctx,QUERY_URL,policy);
+    target=canonIP(caller?.ip);observed=cleanIPText(caller?.ip);
+    if(target&&caller?.risk&&typeof caller.risk==="object")q=caller;
+  }
+  if(target&&!q){
+    // Canonical IPv6 is safe as a URL path segment (RFC 3986 pchar allows ":").
+    const result=await ipJSON(ctx,QUERY_BASE+target,policy);
+    if(canonIP(result?.ip)===target)q=result;
+  }
+  const r=q?.risk||{},ps=score(p?.fraudScore),qs=score(r.risk_score);
   const purity=ps!==null?Math.round(100-ps):qs!==null?Math.round(100-qs):null;
   const dc=p?.isDataCenter===true||r.is_datacenter===true,res=p?.isResidential===true;
   const property=dc&&res?"有差异":dc?"机房":res?"住宅":r.is_mobile===true?"移动":p?.isResidential===false?"非住宅":"未知";
@@ -53,8 +64,9 @@ async function measureNode(ctx){
   else if(dc||r.is_vpn===true||r.is_proxy===true||[ps,qs].some(v=>v!==null&&v>=25))riskLevel="中";
   else if(complete&&property!=="有差异")riskLevel="低";
   const cc=cleanIPText(p?.countryCode||q?.location?.country_code||q?.location?.countryCode).toUpperCase();
-  const region=dual?"双栈出口":COUNTRY_ZH[cc]||cleanIPText(q?.location?.country||p?.country)||"未知";
-  return {exitIP,region,purity,property,riskLevel,purityLabel:ps===null&&qs!==null?"参考纯度":"纯度",quality:dual?"dual":same?"verified":a||b?"single":"offline"};
+  const region=COUNTRY_ZH[cc]||cleanIPText(q?.location?.country||p?.country)||"未知";
+  const quality=!target?"offline":p&&q?"verified":"single";
+  return {exitIP:observed||"获取失败",region,purity,property,riskLevel,purityLabel:ps===null&&qs!==null?"参考纯度":"纯度",quality};
 }
 export default async function (ctx,clock=Date.now()) {
   const family = String(ctx.widgetFamily || 'systemMedium').toLowerCase();
@@ -91,7 +103,7 @@ export default async function (ctx,clock=Date.now()) {
 
   const internalIP=cleanIPText(ctx.device?.ipv4?.address)||"未连接";
   const {exitIP,region:country,purity,property,riskLevel,purityLabel,quality}=await measureNode(ctx);
-  const refreshAfter=new Date(clock+(quality==="offline"||quality==="conflict"?5:15)*60000).toISOString();
+  const refreshAfter=new Date(clock+(quality==="verified"?15:5)*60000).toISOString();
 
   const purityColor = purity == null ? C.muted : purity >= 90 ? C.green : purity >= 80 ? C.pink : C.red;
   const propertyColor=property==='机房'||property==='非住宅'?C.red:property==='住宅'||property==='移动'?C.green:C.muted;
@@ -120,7 +132,7 @@ export default async function (ctx,clock=Date.now()) {
     spacer(3),
     text('节点体检', titleSize, 'heavy', C.main),
     spacer(),
-    text(country, regionSize, 'heavy', quality==='conflict'?C.red:quality==='offline'||quality==='dual'?C.muted:C.green, { maxLines: 1, minScale: 0.65 })
+    text(country, regionSize, 'heavy', country==='未知'?C.muted:C.green, { maxLines: 1, minScale: 0.65 })
   ], 0);
 
   const ipInline = (label, value, size) => row([
@@ -148,7 +160,7 @@ export default async function (ctx,clock=Date.now()) {
         row([
           ipInline('内网 IP', internalIP, 7),
           spacer(),
-          ipInline(quality==='conflict'||quality==='dual'?'IPPure IP':'出口 IP', exitIP, 7)
+          ipInline('出口 IP', exitIP, 7)
         ], 0)
       ]
     };
@@ -164,7 +176,7 @@ export default async function (ctx,clock=Date.now()) {
         row([
           ipInline('内网 IP', internalIP, 11),
           spacer(),
-          ipInline(quality==='conflict'||quality==='dual'?'IPPure IP':'出口 IP', exitIP, 11)
+          ipInline('出口 IP', exitIP, 11)
         ], 0)
       ]
     };
@@ -179,7 +191,7 @@ export default async function (ctx,clock=Date.now()) {
       row([
         ipInline('内网 IP', internalIP, 9),
         spacer(),
-        ipInline(quality==='conflict'||quality==='dual'?'IPPure IP':'出口 IP', exitIP, 9)
+        ipInline('出口 IP', exitIP, 9)
       ], 0)
     ]
   };

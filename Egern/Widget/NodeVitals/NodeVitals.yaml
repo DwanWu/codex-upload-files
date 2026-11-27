@@ -7,7 +7,7 @@
 # ==========================================
 
 name: "节点体检"
-description: "节点体检居中布局：顶部标题固定，中间纯度/属性/风险结果在可用区域垂直居中，底部显示内网与本次实际出口 IP；双源交叉校验，缺失风险数据不虚构纯度。"
+description: "节点体检居中布局：顶部标题固定，中间纯度/属性/风险结果在可用区域垂直居中，底部显示内网与本次实际出口 IP；IPPure 获取出口 IP，IPQuery 定向查询同一地址；不混合不同出口的风险数据。"
 
 auto_update:
   interval: 1800
@@ -18,7 +18,7 @@ scriptings:
       # 可选：env: { NODE_POLICY: "实际策略组名称" }，默认遵循当前分流规则。
       timeout: 15
       update_interval: 1800
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeVitals/NodeVitals.js?v=20261127-3
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeVitals/NodeVitals.js?v=20261127-4
 
 widgets:
   - name: 节点体检
