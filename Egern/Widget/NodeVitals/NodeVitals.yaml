@@ -7,7 +7,7 @@
 # ==========================================
 
 name: "节点体检"
-description: "节点体检居中布局：顶部标题固定，中间纯度/属性/风险结果在可用区域垂直居中，底部显示内网与本次实际出口 IP；IPPure 获取实际出口及原始风险系数，IPv4纯度仅按100−IPPure风险值计算并标记参考；IPv6或原始评分缺失时不伪造分数。IPQuery仅辅助同IP风险及属性。"
+description: "节点体检：以同一实际出口为基准，Proxycheck v3主评分、IPPure IPv4明确标注降级、IPQuery辅助核验；支持IPv4/IPv6，不混算评分，不虚构纯度。"
 
 auto_update:
   interval: 1800
@@ -15,10 +15,11 @@ auto_update:
 scriptings:
   - generic:
       name: 节点体检
-      # 可选：env: { NODE_POLICY: "实际策略组名称" }，默认遵循当前分流规则。
+      # 可选本机私有 env：NODE_POLICY 为实际策略组名；PROXYCHECK_KEY 为自己的密钥。不要提交密钥。
+      # 匿名接口可能拒绝代理来源，失败时自动降级为 IPPure。
       timeout: 15
       update_interval: 1800
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeVitals/NodeVitals.js?v=20261127-5
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeVitals/NodeVitals.js?v=20261127-6
 
 widgets:
   - name: 节点体检

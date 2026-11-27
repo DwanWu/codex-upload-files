@@ -13,7 +13,8 @@ const COUNTRY_ZH = {
     DK:'丹麦', IT:'意大利', ES:'西班牙', PT:'葡萄牙', PL:'波兰', IE:'爱尔兰', AE:'阿联酋',
     TR:'土耳其', BR:'巴西', MX:'墨西哥', AR:'阿根廷', CL:'智利', ZA:'南非', IL:'以色列'
   };
-const PURE_URL="https://my.ippure.com/v1/info",QUERY_BASE="https://api.ipquery.io/",QUERY_URL=QUERY_BASE+"?format=json";
+const PURE_URL="https://my.ippure.com/v1/info",QUERY_BASE="https://api.ipquery.io/",QUERY_URL=QUERY_BASE+"?format=json",PROXY_BASE="https://proxycheck.io/v3/";
+const PROXY_BUDGET="NodeVitals.proxycheck.budget.v1";
 function canonIP(x){
   if(typeof x!=="string")return null;let s=x.trim().toLowerCase();
   const v4=v=>/^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(v)&&v.split(".").every(n=>+n<=255);
@@ -44,7 +45,7 @@ function publicIP(value){
 function score(v){return typeof v==="number"&&Number.isFinite(v)&&v>=0&&v<=100?v:null}
 function object(v){return !!v&&typeof v==="object"&&!Array.isArray(v)}
 // IPPure FAQ explicitly excludes IPv6 from its risk score.
-// Never replace its score with another provider's distinct risk metric.
+// Do not mix or average distinct providers; any fallback must be explicitly labeled.
 function pureScore(p,target){
   if(!p||!target||target.includes(":")||publicIP(p.ip)!==target)return null;
   return score(p.fraudScore);
@@ -59,9 +60,70 @@ function ageHeader(resp){try{
   return typeof v==="string"&&/^\d+$/.test(v)?Number(v):null;
 }catch(_){return null}}
 function cleanIPText(v){return typeof v==="string"?v.replace(/[\u0000-\u001f\u007f]/g," ").trim().slice(0,100):""}
+// Provider returns data keyed by the requested address; IPv6 may be compressed.
+// A successful HTTP status alone does not establish a valid score.
+function parseProxyCheck(body,target,now){
+  if(!object(body)||!["ok","warning"].includes(body.status)||!target||publicIP(target)!==target)return {record:null,invalid:false};
+  if(body.status==="warning"&&typeof body.message==="string"&&/disabled|violation|invalid.{0,12}key/i.test(body.message))return {record:null,invalid:false};
+  const matches=Object.keys(body).filter(k=>publicIP(k)===target);
+  if(matches.length!==1)return {record:null,invalid:true};
+  const row=body[matches[0]],d=row?.detections;
+  if(!object(row)||!object(d)||score(d.risk)===null)return {record:null,invalid:true};
+  const flags=["proxy","vpn","compromised","scraper","tor","hosting","anonymous"];
+  if(!flags.every(k=>typeof d[k]==="boolean"))return {record:null,invalid:true};
+  const positive=flags.filter(k=>k!=="hosting").some(k=>d[k]===true);
+  const history=row.detection_history;
+  // A delisted positive detection, or a future timestamp, is contradictory.
+  // Never turn a contradictory record into a definitive score.
+  if(object(history)&&history.delisted===true&&positive)return {record:null,invalid:true};
+  if((d.proxy||d.vpn||d.tor)&&!d.anonymous)return {record:null,invalid:true};
+  if((positive||d.hosting)&&d.risk===0)return {record:null,invalid:true};
+  const stamp=row.last_updated;
+  if(typeof stamp!=="string"||!/^\d{4}-\d{2}-\d{2}T.*Z$/.test(stamp)||!Number.isFinite(Date.parse(stamp))||Date.parse(stamp)>now+300000)return {record:null,invalid:true};
+  // last_updated is provider database metadata, not a guarantee of fresh observation.
+  // Accept at most 24h-old metadata; do not extend the provider's default detection TTL.
+  if(now-Date.parse(stamp)>86400000)return {record:null,invalid:true};
+  return {record:row,invalid:false};
+}
+function proxyGate(ctx,now,hasKey){
+  const day=new Date(now).toISOString().slice(0,10),limit=hasKey?800:80;
+  let old=null;try{old=ctx.storage.getJSON(PROXY_BUDGET)}catch(_){}
+  let count=old?.day===day&&Number.isInteger(old.count)&&old.count>=0?old.count:0;
+  let blockedUntil=Number.isFinite(old?.blockedUntil)&&old.blockedUntil>now&&old.blockedUntil<=now+86400000?old.blockedUntil:0;
+  const save=(n,b)=>{try{ctx.storage.setJSON(PROXY_BUDGET,{day,count:n,blockedUntil:b})}catch(_){}};
+  if(blockedUntil||count>=limit)return {allow:false,block:()=>{}};
+  count++;save(count,0);
+  return {allow:true,block:ms=>save(count,now+Math.max(60000,Math.min(86400000,ms)))};
+}
+function retryAfter(resp,now){
+  try{
+    const h=resp.headers,v=typeof h?.get==="function"?h.get("retry-after"):h?.["retry-after"]??h?.["Retry-After"];
+    if(typeof v==="string"&&/^\d+$/.test(v))return +v*1000;
+    const t=Date.parse(v);return Number.isFinite(t)&&t>now?t-now:3600000;
+  }catch(_){return 3600000}
+}
+async function proxyJSON(ctx,target,policy,now){
+  if(!target)return {record:null,invalid:false};
+  const localKey=typeof ctx.env?.PROXYCHECK_KEY==="string"?ctx.env.PROXYCHECK_KEY.trim():"";
+  const key=/^[A-Za-z0-9-]{12,128}$/.test(localKey)?localKey:"";
+  const gate=proxyGate(ctx,now,!!key);
+  if(!gate.allow)return {record:null,invalid:false};
+  try{
+    const url=PROXY_BASE+encodeURIComponent(target)+"?tag=0"+(key?"&key="+encodeURIComponent(key):"");
+    const r=await ctx.http.get(url,{headers:{"User-Agent":"Egern-NodeVitals/3.0","Accept":"application/json","Cache-Control":"no-cache, no-store","Pragma":"no-cache"},timeout:4000,credentials:"omit",insecureTls:false,redirect:"error",...(policy?{policy}:{})});
+    if([401,403,429].includes(r.status)){gate.block(Math.max(3600000,retryAfter(r,now)));return {record:null,invalid:false}}
+    if(r.status!==200)return {record:null,invalid:false};
+    if((ageHeader(r)??0)>900)return {record:null,invalid:true};
+    const body=await r.text();if(typeof body!=="string"||body.length>200000)return {record:null,invalid:true};
+    const result=JSON.parse(body);
+    if(result?.status==="denied"){gate.block(3600000);return {record:null,invalid:false}}
+    if(result?.status==="warning"&&typeof result.message==="string"&&/query limit|allowance|exhausted/i.test(result.message))gate.block(3600000);
+    return parseProxyCheck(result,target,now);
+  }catch(_){return {record:null,invalid:false}}
+}
 async function ipJSON(ctx,url,policy){
   try{
-    const r=await ctx.http.get(url,{headers:{"User-Agent":"Egern-NodeVitals/2.2","Accept":"application/json","Cache-Control":"no-cache, no-store","Pragma":"no-cache"},timeout:4000,credentials:"omit",insecureTls:false,redirect:"error",...(policy?{policy}:{})});
+    const r=await ctx.http.get(url,{headers:{"User-Agent":"Egern-NodeVitals/3.0","Accept":"application/json","Cache-Control":"no-cache, no-store","Pragma":"no-cache"},timeout:4000,credentials:"omit",insecureTls:false,redirect:"error",...(policy?{policy}:{})});
     if(r.status!==200)return null;
     // Caller-IP endpoints must not replay a shared CDN response for a prior request.
     if((url===PURE_URL||url===QUERY_URL)&&(ageHeader(r)??0)>0)return null;
@@ -69,7 +131,7 @@ async function ipJSON(ctx,url,policy){
     const data=JSON.parse(body);return object(data)&&publicIP(data.ip)?data:null;
   }catch(_){return null}
 }
-async function measureNode(ctx){
+async function measureNode(ctx,now=Date.now()){
   // Anchor all fields to one address: IPPure observes the current connection;
   // IPQuery /:ip describes that address, regardless of its own request route.
   // No persisted IP or risk scores. Reject any lookup returned for another IP.
@@ -81,25 +143,35 @@ async function measureNode(ctx){
     target=publicIP(caller?.ip);observed=cleanIPText(caller?.ip);
     if(target&&riskRecord(caller))q=caller;
   }
-  if(target&&!q){
-    // Canonical IPv6 is safe as a URL path segment (RFC 3986 pchar allows ":").
-    const result=await ipJSON(ctx,QUERY_BASE+target,policy);
-    if(publicIP(result?.ip)===target)q=result;
-  }
-  const r=object(q?.risk)?q.risk:{},ps=pureScore(p,target),qs=score(r.risk_score);
-  const purity=ps!==null?Math.round((100-ps)*100)/100:null;
-  const purityNote=ps!==null?"IPPure参考":target?.includes(":")?"IPv6未评分":"评分暂缺";
-  const dc=p?.isDataCenter===true||r.is_datacenter===true,res=p?.isResidential===true;
-  const property=dc&&res?"有差异":dc?"机房":res?"住宅":r.is_mobile===true?"移动":p?.isResidential===false?"非住宅":"未知";
+  const [lookup,proxyResult]=await Promise.all([
+    target&&!q?ipJSON(ctx,QUERY_BASE+target,policy):Promise.resolve(q),
+    proxyJSON(ctx,target,policy,now)
+  ]);
+  if(target&&publicIP(lookup?.ip)===target)q=lookup;
+  const pc=proxyResult.record,d=pc?.detections||{},type=pc?.network?.type;
+  const r=object(q?.risk)?q.risk:{},ps=pureScore(p,target),qs=score(r.risk_score),pcs=score(d.risk);
+  // Proxycheck v3 is the primary source when its actual response is valid.
+  // IPPure IPv4 is a named fallback. IPQuery never supplies a purity number.
+  const selected=pcs!==null?pcs:ps,source=pcs!==null?"Proxycheck":ps!==null?"IPPure":null;
+  const purity=selected!==null?Math.round((100-selected)*100)/100:null;
+  const purityNote=source==="Proxycheck"?"Proxycheck参考":source==="IPPure"?"IPPure参考":target?.includes(":")?"IPv6评分暂缺":"评分暂缺";
+  const dc=p?.isDataCenter===true||r.is_datacenter===true||d.hosting===true||type==="Hosting";
+  const res=p?.isResidential===true||type==="Residential";
+  const typeConflict=dc&&res||p?.isResidential===false&&type==="Residential";
+  const property=typeConflict?"有差异":dc?"机房":res?"住宅":r.is_mobile===true||type==="Wireless"?"移动":type==="Business"?"商用":p?.isResidential===false?"非住宅":"未知";
   const complete=["is_vpn","is_proxy","is_tor","is_datacenter"].every(k=>typeof r[k]==="boolean")&&qs!==null;
+  const scoreConflict=pcs!==null&&ps!==null&&Math.abs(pcs-ps)>=30;
+  const flagsConflict=!!pc&&d.anonymous===false&&(r.is_vpn===true||r.is_proxy===true||r.is_tor===true)||!!pc&&d.tor===true&&r.is_tor===false;
+  const riskNote=proxyResult.invalid?"记录有差异":scoreConflict?"评分有差异":typeConflict||flagsConflict?"来源有差异":null;
   let riskLevel="未知";
-  if(r.is_tor===true||r.is_vpn===true&&r.is_proxy===true||[ps,qs].some(v=>v!==null&&v>=65))riskLevel="高";
-  else if(dc||r.is_vpn===true||r.is_proxy===true||[ps,qs].some(v=>v!==null&&v>=25))riskLevel="中";
-  else if(complete&&ps!==null&&property!=="有差异")riskLevel="低";
-  const cc=cleanIPText(p?.countryCode||q?.location?.country_code||q?.location?.countryCode).toUpperCase();
-  const region=COUNTRY_ZH[cc]||cleanIPText(q?.location?.country||p?.country)||"未知";
-  const quality=!target?"offline":p&&q?"verified":"single";
-  return {exitIP:observed||"获取失败",region,purity,property,riskLevel,purityLabel:"纯度",purityNote,puritySource:ps!==null?"IPPure":null,rawFraudScore:ps,ipqueryRiskScore:qs,quality};
+  // Different provider scales remain distinct; positive risk evidence is not averaged away.
+  if(d.tor===true||d.compromised===true||d.proxy===true||pcs!==null&&pcs>75||r.is_tor===true||r.is_vpn===true&&r.is_proxy===true||[ps,qs].some(v=>v!==null&&v>=65))riskLevel="高";
+  else if(dc||d.vpn===true||d.anonymous===true||d.scraper===true||pcs!==null&&pcs>25||r.is_vpn===true||r.is_proxy===true||[ps,qs].some(v=>v!==null&&v>=25))riskLevel="中";
+  else if(!riskNote&&((complete&&ps!==null)||(pc&&complete)||(pc&&ps!==null))&&property!=="有差异")riskLevel="低";
+  const cc=cleanIPText(p?.countryCode||pc?.location?.country_code||q?.location?.country_code||q?.location?.countryCode).toUpperCase();
+  const region=COUNTRY_ZH[cc]||cleanIPText(pc?.location?.country_name||q?.location?.country||p?.country)||"未知";
+  const quality=!target?"offline":(p&&q||pc&&(p||q))?"verified":"single";
+  return {exitIP:observed||"获取失败",region,purity,property,riskLevel,purityLabel:"纯度",purityNote,riskNote,puritySource:source,rawFraudScore:ps,proxycheckRiskScore:pcs,ipqueryRiskScore:qs,quality};
 }
 export default async function (ctx,clock=Date.now()) {
   const family = String(ctx.widgetFamily || 'systemMedium').toLowerCase();
@@ -135,8 +207,8 @@ export default async function (ctx,clock=Date.now()) {
   const divider = () => ({ type: 'stack', height: 0.5, backgroundColor: C.divider, borderRadius: 1, children: [] });
 
   const internalIP=cleanIPText(ctx.device?.ipv4?.address)||"未连接";
-  const {exitIP,region:country,purity,property,riskLevel,purityLabel,purityNote,quality}=await measureNode(ctx);
-  const refreshAfter=new Date(clock+(quality==="verified"&&(purity!==null||purityNote==="IPv6未评分")?15:5)*60000).toISOString();
+  const {exitIP,region:country,purity,property,riskLevel,purityLabel,purityNote,riskNote,quality}=await measureNode(ctx,clock);
+  const refreshAfter=new Date(clock+(quality==="verified"&&purity!==null?30:15)*60000).toISOString();
 
   const purityColor = purity == null ? C.muted : purity >= 90 ? C.green : purity >= 80 ? C.pink : C.red;
   const propertyColor=property==='机房'||property==='非住宅'?C.red:property==='住宅'||property==='移动'?C.green:C.muted;
@@ -145,7 +217,7 @@ export default async function (ctx,clock=Date.now()) {
   const cards = [
     { label: purityLabel, value: purity == null ? '--' : String(purity), color: purityColor, note: purityNote },
     { label: '属性', value: property, color: propertyColor },
-    { label: '风险', value: riskLevel, color: riskColor }
+    { label: '风险', value: riskLevel, color: riskColor, note: riskNote }
   ];
 
   const buildCard = (item, cfg) => ({
