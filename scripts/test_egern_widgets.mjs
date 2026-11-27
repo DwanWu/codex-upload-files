@@ -141,7 +141,7 @@ const embedded=apis.HuangliQuery;
 for(const key of Object.keys(embedded.BUNDLED_CALENDAR)){
  const c=mock(fail);let data;
  const w=await embedded.widget(c,Date.parse(key+"T12:00:00+08:00"),{capture:x=>data=x});
- assert.equal(w.type,"widget");assert.equal(c.calls.length,0);assert.equal(data.source,"预载");assert.ok(embedded.fullDay(data.day));assert.ok(flat(w).includes('"text":"预载"'));
+ assert.equal(w.type,"widget");assert.equal(c.calls.length,0);assert.equal(data.source,"预载");assert.ok(embedded.fullDay(data.day));assert.ok(!flat(w).includes('"text":"预载"'));
 }
 assert.ok(Object.keys(embedded.BUNDLED_CALENDAR).length>=28);
 const apiFallback=mock(u=>u.includes("raw.githubusercontent.com")?resp(503,{}):u.includes("openApiData")?resp(200,{data:[prim(ds[0])]}):resp(200,[sec(ds[0])]));

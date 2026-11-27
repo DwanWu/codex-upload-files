@@ -13,7 +13,7 @@ auto_update:
 scriptings:
   - generic:
       name: huangli-query-v2-r2
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/refs/heads/main/Egern/Widget/HuangliQuery/HuangliQuery.js?v=2.0&rev=20261127-12
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/refs/heads/main/Egern/Widget/HuangliQuery/HuangliQuery.js?v=2.0&rev=20261127-13
       update_interval: 1800
       timeout: 40
 

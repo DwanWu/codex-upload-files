@@ -336,7 +336,7 @@ export default async function(ctx,clock=Date.now(),options={}) {
     icon('calendar', C.gold, size + 1),
     text('黄历查询', size, 'heavy', C.main),
     spacer(),
-    ...(sourceLabel === '预载' ? [chip('预载', C.gold)] : sourceLabel === '本地' || sourceLabel.includes('缓存') ? [chip(sourceLabel === '本地' ? '本地 R2' : '缓存', C.muted)] : jiri ? [chip('吉日', C.gold)] : [])
+    ...(sourceLabel === '本地' || sourceLabel.includes('缓存') ? [chip(sourceLabel === '本地' ? '本地' : '缓存', C.muted)] : jiri ? [chip('吉日', C.gold)] : [])
   ], 6);
 
   const infoRow = (label, value, color = C.sub, ico = null) => row([
@@ -415,7 +415,7 @@ export default async function(ctx,clock=Date.now(),options={}) {
           text([fetus ? `胎神 ${fetus}` : '', twelve, pengzu].filter(Boolean).join(' · '), 9, 'medium', C.muted, { maxLines: 1, minScale: 0.68 }),
           spacer(5)
         ] : []),
-        text(sourceLabel === '本地' ? '本地历法兜底 · 宜忌等待远程恢复' : `数据来源 · ${sourceLabel}`, 9, 'medium', C.muted, { maxLines: 1 })
+        text(sourceLabel === '本地' ? '本地历法兜底 · 宜忌等待远程恢复' : `数据来源 · ${sourceLabel === '预载' ? '已校验' : sourceLabel}`, 9, 'medium', C.muted, { maxLines: 1 })
       ]
     };
   }
