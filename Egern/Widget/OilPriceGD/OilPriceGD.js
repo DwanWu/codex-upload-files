@@ -1,4 +1,4 @@
-/** 广东油价 · 2026-11-27 v3.1 | 动态工作日日历、官方公告纠偏、北京时间、离线缓存、98号参考。 */
+/** 广东油价 · 2026-11-27 v2.0 | 动态工作日日历、官方公告纠偏、北京时间、离线缓存、98号参考。 */
 const DAY=86400000;
 const CAL=["2026-01-06","2026-01-20","2026-02-03","2026-02-24","2026-03-09","2026-03-23","2026-04-07","2026-04-21","2026-05-08","2026-05-21","2026-06-04","2026-06-18","2026-07-03","2026-07-17","2026-07-31","2026-08-14","2026-08-28","2026-09-11","2026-09-24","2026-10-15","2026-10-29","2026-11-12","2026-11-26","2026-12-10","2026-12-24"];
 const SRC={"gov":"https://drc.gd.gov.cn/ywgg/","mirror":"https://m.bendibao.com/show783326.html","national":"https://www.ndrc.gov.cn/xwdt/xwfb/","qq":"https://oil.qqday.com/province/440000.htm","sou":"https://www.soyoujia.cn/","bear":"https://www.xiaoxiongyouhao.com/fprice/proilprice.php?province=%E5%B9%BF%E4%B8%9C%E7%9C%81","json":"https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/OilPriceGD/prices.json"};

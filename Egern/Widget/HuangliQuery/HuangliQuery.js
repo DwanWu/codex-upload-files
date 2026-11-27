@@ -1,5 +1,5 @@
 /**
- * 黄历查询 Widget
+ * 黄历查询 Widget v2.0
  * 黄色日历图标 · 公历/农历 · 宜忌 · 干支 · 节气/节日
  * 双远程源：zqzess/openApiData + xuqssq/calendar。
  * 双源均失败时使用 Intl 中国农历做本地基础兜底。

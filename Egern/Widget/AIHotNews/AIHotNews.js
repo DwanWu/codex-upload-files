@@ -1,5 +1,5 @@
 /**
- * 智能热搜 · AIHOT
+ * 智能热搜 · AIHOT v2.0
  * 数据源：AIHOT 官方匿名只读 REST API v1
  * 主榜：/api/v1/hot-topics
  * 降级：/api/v1/items?mode=selected&window=24h&limit=8
