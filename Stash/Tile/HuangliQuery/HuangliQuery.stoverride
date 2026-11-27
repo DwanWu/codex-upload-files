@@ -1,0 +1,312 @@
+# Stash 原生首页面板；北京时间、月度缓存、双源黄历。
+name: "每日黄历"
+desc: "v2.0 · 农历、干支日及简明宜忌，双数据源与月度缓存，按北京时间更新；传统历法参考。"
+category: "生活工具"
+version: "2.0"
+tiles:
+  - name: huangli-daily-v2
+    interval: 1800
+    title: "每日黄历"
+    content: "等待更新"
+    icon: "calendar"
+    backgroundColor: "#B7791F"
+    collapsed: false
+script-providers:
+  huangli-daily-v2:
+    interval: 86400
+    payload: |
+      /** 每日黄历 · Stash 首页 Tile v2.0
+       * 双源解析与缓存移植自 Egern HuangliQuery v2.0 (blob 39e03d6e8812409acf69f30c794fe8f612ee8aa3)。
+       * 北京时间日期；今日宜忌来自同一数据源。传统历法参考。
+       */
+      (function(){
+      "use strict";
+      const CAL_KEY="stash.huangli.v2.month",DAY=86400000;
+      function validDate(s){return typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s}
+      function lunarDayText(s){
+        const v=String(s??"").trim(),n=/^\d{1,2}$/.test(v)?+v:null,z="一二三四五六七八九";
+        return n===null?v:n===10?"初十":n===20?"二十":n===30?"三十":n>=1&&n<=9?"初"+z[n-1]:n>=11&&n<=19?"十"+z[n-11]:n>=21&&n<=29?"廿"+z[n-21]:"";
+      }
+      function lunarMonthText(v){return String(v??"").trim().replace(/月$/,"").replace(/^一$/,"正").replace(/^十一$/,"冬").replace(/^十二$/,"腊")}
+      function str(v){return typeof v==="string"?v.slice(0,1000):Array.isArray(v)?v.filter(x=>typeof x==="string").slice(0,40).join(" ").slice(0,1000):""}
+      function validCalendarDay(d){
+        if(!d||typeof d!=="object")return null;
+        const out={};for(const k of ["lMonth","lDate","gzYear","gzMonth","gzDate","animal","suit","avoid","festivalList","term"])out[k]=str(d[k]);
+        out.lMonth=lunarMonthText(out.lMonth);out.lDate=lunarDayText(out.lDate);
+        if(!/^(?:闰)?(?:正|[二三四五六七八九十]|冬|腊)$/.test(out.lMonth)||!/^(?:初[一二三四五六七八九十]|十[一二三四五六七八九]|二十|廿[一二三四五六七八九]|三十)$/.test(out.lDate))return null;
+        for(const k of ["gzYear","gzMonth","gzDate"])if(!/^[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]$/.test(out[k]))out[k]="";
+        out.jiri=d.jiri===true;out.details={};
+        for(const k of ["constellation","pengzu","fetus","star","chong","sha","twelve","season","dayWuxing","jieqi"])out.details[k]=str(d.details?.[k]);
+        return out;
+      }
+      function readCache(raw,month,now){
+        if(!raw||raw.month!==month)return {month,primary:null,secondary:null};
+        const result={month,primary:null,secondary:null};
+        for(const k of ["primary","secondary"]){
+          const p=raw[k];if(!p||!Number.isFinite(p.checked)||p.checked>now||!p.days||typeof p.days!=="object")continue;
+          const days={};for(const d of Object.keys(p.days).slice(0,31))if(validDate(d)&&d.startsWith(month+"-")){const v=validCalendarDay(p.days[d]);if(v)days[d]=v}
+          result[k]={days,checked:p.checked,attempt:Number.isFinite(p.attempt)&&p.attempt<=now?p.attempt:p.checked};
+        }
+        return result;
+      }
+      
+      async function calendar(ctx,clock){
+        const now=new Date(clock+8*3600000),Y=now.getUTCFullYear(),M=now.getUTCMonth()+1,D=now.getUTCDate();
+        const WEEK="日一二三四五六"[now.getUTCDay()],P=n=>String(n).padStart(2,"0"),month=Y+"-"+P(M),dateKey=month+"-"+P(D);
+        const midnight=Date.parse(dateKey+"T00:00:00+08:00")+DAY;
+        let refreshAfter=new Date(Math.min(clock+3*3600000,midnight)).toISOString();
+      
+        const clean = s => str(s).replace(/[.。]+/g, ' ').replace(/\s+/g, ' ').trim();
+        const normalizeList = s => clean(s).replace(/\s+/g, ' · ');
+      
+        const getJson=async url=>{
+          const r=await ctx.http.get(url,{headers:{"User-Agent":"Stash-HuangliQuery/2.0","Accept":"application/json"},timeout:6500,credentials:"omit",insecureTls:false});
+          if(r.status!==200)throw Error("HTTP "+r.status);
+          const body=await r.text();if(typeof body!=="string"||body.length>2000000)throw Error("invalid body");return JSON.parse(body);
+        };
+      
+        const findPrimaryDay = (json,targetDay=D) => {
+          let found = null;
+          const seen = new Set();
+          let visited=0;
+          const walk = (obj,depth=0) => {
+            if (!obj || typeof obj !== 'object' || found || depth>30 || ++visited>15000) return;
+            if (seen.has(obj)) return;
+            seen.add(obj);
+      
+            const yy = Number(obj.year);
+            const mm = Number(obj.month);
+            const dd = Number(obj.day);
+            const looksLikeDay = Number.isFinite(yy) && Number.isFinite(mm) && Number.isFinite(dd) &&
+              (obj.suit != null || obj.avoid != null || obj.gzDate != null || obj.lDate != null);
+      
+            if (looksLikeDay && yy === Y && mm === M && dd === targetDay) {
+              found = obj;
+              return;
+            }
+      
+            if (!looksLikeDay && typeof obj.oDate==='string' && /(?:Z|[+-]\d{2}:\d{2})$/.test(obj.oDate) && (obj.suit != null || obj.avoid != null)) {
+              const d = new Date(obj.oDate);
+              if (!Number.isNaN(d.getTime())) {
+                const bj = new Date(d.getTime() + 8 * 3600000);
+                if (bj.getUTCFullYear() === Y && bj.getUTCMonth() + 1 === M && bj.getUTCDate() === targetDay) {
+                  found = obj;
+                  return;
+                }
+              }
+            }
+      
+            if (Array.isArray(obj)) {
+              for (const v of obj) walk(v,depth+1);
+            } else {
+              for (const k of Object.keys(obj)) walk(obj[k],depth+1);
+            }
+          };
+          walk(json);
+          if (!found) return null;
+          return {
+            lMonth: clean(found.lMonth),
+            lDate: clean(found.lDate),
+            gzYear: clean(found.gzYear),
+            gzMonth: clean(found.gzMonth),
+            gzDate: clean(found.gzDate),
+            animal: clean(found.animal),
+            suit: clean(found.suit),
+            avoid: clean(found.avoid),
+            festivalList: clean(found.festivalList || found.value),
+            term: clean(found.term),
+            jiri: String(found.jiri || '') === '1',
+            details: {}
+          };
+        };
+      
+        const splitLunar = value => {
+          const v = clean(value);
+          const m = v.match(/^(闰?[正一二三四五六七八九十冬腊]+月)(.+)$/);
+          return m ? { month: m[1], day: m[2] } : { month: '', day: v };
+        };
+      
+        const termFromFestival = value => {
+          const terms = '立春 雨水 惊蛰 春分 清明 谷雨 立夏 小满 芒种 夏至 小暑 大暑 立秋 处暑 白露 秋分 寒露 霜降 立冬 小雪 大雪 冬至 小寒 大寒'.split(' ');
+          const v = parseFestivalItems(value);
+          return terms.find(x => v.includes(x)) || '';
+        };
+      
+        // 节气与节日来自不同数据源；先拆分单个节日，再去掉重合节气和跨源重复项。
+        const parseFestivalItems = value => String(value ?? '')
+          .split(/[，,、;；·|\s]+/)
+          .map(v => clean(v).replace(/[（(]\d{1,2}:\d{2}(?::\d{2})?[）)]$/, ''))
+          .filter(Boolean);
+      
+        const mergeFestivalItems = (solarTerm, ...values) => {
+          const seen = new Set();
+          const items = [];
+          const termKey = clean(solarTerm);
+          for (const value of values) {
+            for (const item of parseFestivalItems(value)) {
+              if (item === termKey || seen.has(item)) continue;
+              seen.add(item);
+              items.push(item);
+            }
+          }
+          return items.join(' · ');
+        };
+      
+        const normalizeSecondaryDay = (json,targetDay=D) => {
+          const list = Array.isArray(json) ? json : [];
+          const target=month+"-"+P(targetDay);
+          const item=list.find(x=>{
+            if(!x||typeof x!=="object")return false;
+            if(validDate(x.day))return x.day===target;
+            if(!/^\d{1,2}$/.test(String(x.day))||Number(x.day)!==targetDay)return false;
+            const t=String(x.title||"").match(/(20\d{2})年\s*(\d{1,2})月(?:\s*(\d{1,2})日)?/);
+            return !!t&&+t[1]===Y&&+t[2]===M&&(!t[3]||+t[3]===targetDay);
+          });
+          if (!item) return null;
+      
+          const lunarParts = splitLunar(item.lunar);
+          const gz = clean(item.ganzhi);
+          const gm = gz.match(/([甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥])年[\s\S]*?([甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥])月\s*([甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥])日/);
+          const d = item.details || {};
+          const festival = clean(item.festival);
+          return {
+            lMonth: lunarParts.month,
+            lDate: lunarParts.day,
+            gzYear: gm?.[1] || '',
+            gzMonth: gm?.[2] || '',
+            gzDate: gm?.[3] || '',
+            animal: clean(d['生肖'] || d.zodiac),
+            suit: Array.isArray(item.yi) ? item.yi.join(' ') : clean(item.yi),
+            avoid: Array.isArray(item.ji) ? item.ji.join(' ') : clean(item.ji),
+            festivalList: festival,
+            term: termFromFestival(festival),
+            jiri: false,
+            details: {
+              constellation: clean(d['星座'] || d.constellation),
+              pengzu: clean(d['彭祖百忌']),
+              fetus: clean(d['胎神占方']),
+              star: clean(d['星宿']),
+              chong: clean(d['冲']),
+              sha: clean(d['煞']),
+              twelve: clean(d['十二神']),
+              season: clean(d['季节']),
+              dayWuxing: clean(d['日五行']),
+              jieqi: clean(d['节气'] || d.solarTerm)
+            }
+          };
+        };
+      
+        const localFallback = () => {
+          let lMonth = '', lDate = '', gzYear = '', animal = '';
+          try {
+            const date=new Date(Date.UTC(Y,M-1,D,4,0,0));
+            const parts = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', {
+              year: 'numeric', month: 'long', day: 'numeric', timeZone:'Asia/Shanghai'
+            }).formatToParts(date);
+            const byType = type => parts.find(x => x.type === type)?.value || '';
+            lMonth=lunarMonthText(byType('month'));
+            lDate=lunarDayText(byType('day'));
+            gzYear = byType('yearName');
+            const branch = gzYear.slice(-1);
+            const zodiac = { 子:'鼠', 丑:'牛', 寅:'虎', 卯:'兔', 辰:'龙', 巳:'蛇', 午:'马', 未:'羊', 申:'猴', 酉:'鸡', 戌:'狗', 亥:'猪' };
+            animal = zodiac[branch] || '';
+          } catch (_) {}
+          return {
+            lMonth, lDate, gzYear, gzMonth: '', gzDate: '', animal,
+            suit: '', avoid: '', festivalList: '', term: '', jiri: false, details: {}
+          };
+        };
+      
+        const match=(a,b)=>a.lMonth===b.lMonth&&a.lDate===b.lDate&&(!a.gzDate||!b.gzDate||a.gzDate===b.gzDate);
+        const mergeDay=(a,b)=>{
+          if(!a)return b;if(!b||!match(a,b))return a;
+          const out={...a,details:{...b.details}};
+          for(const [k,v] of Object.entries(a.details||{}))if(v)out.details[k]=v;
+          for(const k of ["gzYear","gzMonth","gzDate","animal"])if(!out[k]&&b[k])out[k]=b[k];
+          if(!out.suit&&!out.avoid){out.suit=b.suit;out.avoid=b.avoid}
+          out.term=termFromFestival(a.term)||termFromFestival(b.term)||termFromFestival(a.festivalList)||termFromFestival(b.festivalList);
+          out.festivalList=mergeFestivalItems(out.term,a.festivalList,b.festivalList,a.term,b.term);
+          return out;
+        };
+        let stored=null;try{stored=ctx.storage.getJSON(CAL_KEY)}catch(_){}
+        const cache=readCache(stored,month,clock);
+        const urls=["https://raw.githubusercontent.com/zqzess/openApiData/main/calendar_new/"+Y+"/"+Y+P(M)+".json","https://raw.githubusercontent.com/xuqssq/calendar/main/output/"+month+".json"];
+        const load=async(key,url,parse)=>{
+          const old=cache[key],today=old?.days[dateKey];
+          if(today&&clock-old.checked<DAY)return {day:today,cached:false};
+          if(old&&clock-old.attempt<30*60000)return {day:today||null,cached:!!today};
+          try{
+            const json=await getJson(url),days={},last=new Date(Date.UTC(Y,M,0)).getUTCDate();
+            for(let n=1;n<=last;n++){const d=validCalendarDay(parse(json,n));if(d)days[month+"-"+P(n)]=d}
+            if(!Object.keys(days).length)throw Error("No valid days");
+            cache[key]={days:{...old?.days,...days},checked:days[dateKey]?clock:old?.checked||0,attempt:clock};
+            return {day:cache[key].days[dateKey]||null,cached:!days[dateKey]&&!!today};
+          }catch(_){cache[key]={days:old?.days||{},checked:old?.checked||0,attempt:clock};return {day:today||null,cached:!!today}}
+        };
+        const [a,b]=await Promise.all([load("primary",urls[0],findPrimaryDay),load("secondary",urls[1],normalizeSecondaryDay)]);
+        try{ctx.storage.setJSON(CAL_KEY,cache)}catch(_){}
+        const local=validCalendarDay(localFallback()),matchesLocal=d=>!local||d.lMonth===local.lMonth&&d.lDate===local.lDate;
+        const p=a.day&&matchesLocal(a.day)?a.day:null,q=b.day&&matchesLocal(b.day)?b.day:null;
+        const today=mergeDay(p,q)||local||localFallback();
+        const conflict=p&&q&&!match(p,q);
+        const sourceLabel=conflict?"主源（有差异）":p&&q?(a.cached||b.cached?"双源缓存":"双源"):p?(a.cached?"主源缓存":"主源"):q?(b.cached?"备用缓存":"备用源"):"本地";
+        const error=sourceLabel==="本地"?"远程黄历数据暂不可用":"";
+        if(!p||!q)refreshAfter=new Date(Math.min(clock+30*60000,midnight)).toISOString();
+      
+        return {today,sourceLabel,dateKey,month,weekday:WEEK,error};
+      }
+      const ICON="calendar",GOLD="#B7791F",GRAY="#8E8E93";
+      const ctx={
+        storage:{
+          getJSON:key=>JSON.parse($persistentStore.read(key)||"null"),
+          setJSON:(key,value)=>{try{$persistentStore.write(JSON.stringify(value),key)}catch(_){}}
+        },
+        http:{get:(url,opts)=>new Promise((resolve,reject)=>{
+          try{$httpClient.get({url,headers:opts.headers,timeout:7,insecure:false,"auto-cookie":false,"auto-redirect":false},(error,response,body)=>{
+            if(error)return reject(Error("Network failure"));
+            resolve({status:Number(response?.status??response?.statusCode),text:async()=>body});
+          })}catch(e){reject(e)}
+        })}
+      };
+      function compact(value){
+        const items=[...new Set(str(value).split(/[.。·、，,；;|\s]+/u).map(s=>s.trim()).filter(s=>s&&s.length<=12&&!/[.…\r\n]/u.test(s)))];
+        const out=[];
+        let used=0;
+        for(const item of items){
+          const width=Array.from(item).length;
+          if(used+width+(out.length?1:0)>8)continue;
+          out.push(item);used+=width+(out.length>1?1:0);
+          if(out.length===2)break;
+        }
+        return out.length?out.join("·"):"暂无数据";
+      }
+      function dayTitle(today,dateKey){
+        const month=lunarMonthText(today?.lMonth),day=lunarDayText(today?.lDate);
+        return "每日黄历·"+(month&&day?month+"月"+day:dateKey.slice(5).replace("-","/"))+(today?.gzDate?"·"+today.gzDate+"日":"");
+      }
+      function render(data){
+        const d=data.today||{};
+        return {
+          title:dayTitle(d,data.dateKey),
+          content:"宜·"+compact(d.suit)+"\n忌·"+compact(d.avoid),
+          icon:ICON,
+          backgroundColor:data.sourceLabel==="本地"||data.sourceLabel.includes("缓存")||(!d.suit&&!d.avoid)?GRAY:GOLD
+        };
+      }
+      function fallback(clock){
+        const dateKey=new Date(clock+8*3600000).toISOString().slice(0,10);
+        return render({today:{},dateKey,sourceLabel:"本地"});
+      }
+      async function run(){
+        const clock=Date.now();
+        let data=await calendar(ctx,clock);
+        // If the network requests straddle Beijing midnight, recompute for the
+        // actual new date instead of rendering yesterday's auspicious activities.
+        const end=Date.now();
+        if(new Date(clock+8*3600000).toISOString().slice(0,10)!==new Date(end+8*3600000).toISOString().slice(0,10)){
+          data=await calendar(ctx,end);
+        }
+        return render(data);
+      }
+      run().then(value=>$done(value),()=>$done(fallback(Date.now())));
+      })();
