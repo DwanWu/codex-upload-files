@@ -9,7 +9,10 @@ on:
     paths:
       - 'scripts/sync_egern.py'
       - 'scripts/egern-policy.json'
-      - '.github/workflows/sync-*.yml'
+      - '.github/workflows/sync-chatgpt-voice.yml'
+      - '.github/workflows/sync-claude-rules.yml'
+      - '.github/workflows/sync-google-rules.yml'
+      - '.github/workflows/sync-other-rules.yml'
       - 'Egern/Rules/apple.yaml'
 
 permissions:

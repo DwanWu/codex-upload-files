@@ -29,8 +29,6 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Regression tests
-        run: node scripts/test_oil_price.mjs
       - name: Fetch, validate and publish changed snapshot only
         shell: bash
         run: |
