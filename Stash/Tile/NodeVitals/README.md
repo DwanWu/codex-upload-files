@@ -13,3 +13,7 @@
 ## 单行内嵌版
 
 当前 `NodeVitals.stoverride` 与 `NodeVitalsSingleLine.stoverride` 内容完全相同，使用 `script-providers.payload` 内嵌同一份已验证脚本，不另行下载脚本，不包含「风险」两字。新面板标识为 `node-vitals-v2-singleline`，旧覆写需移除或停用，以免数组合并产生重复面板。保留原评分算法及折叠属性；需要 Stash 3.2.5 或以上版本支持内嵌脚本。文档：https://stash.wiki/script/manage-script 。实际设备显示尚未验证。
+
+## 长期稳定性优化
+
+单次请求最长10秒，总请求时间预算28秒，IPPure阶段最多18秒；每次运行最多共享一次网络错误、408/425/5xx重试，429及明确拒绝不重试。保留出口备用及严格IP一致性，不使用跨节点结果缓存，不改变评分、单行样式、面板标识或刷新间隔。实际脚本运行上限仍受 Stash 控制。

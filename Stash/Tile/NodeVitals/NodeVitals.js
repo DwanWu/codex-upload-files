@@ -1,7 +1,7 @@
 /**
  * 节点体检 · NodePulse for Stash v2.0
  * Derived from Egern NodeVitals v2.0 (same score precedence and thresholds).
- * Native Tile: no MITM, no cron, no persistent IP cache.
+ * Native Tile: no MITM, no cron, no persistent IP cache; 10s request timeout, one bounded transient retry.
  * Collapsed Tile: Stash routes requests through the node under test.
  * Ref: https://stash.wiki/script/tile
  *      https://stash.wiki/script/syntax-and-interface
@@ -53,21 +53,41 @@ function canonicalIP(v){
  const words=halves.length===2?[...a,...Array(8-a.length-b.length).fill("0"),...b]:a;
  return words.map(x=>parseInt(x,16).toString(16).padStart(4,"0")).join(":");
 }
-function getJSON(url){
+const REQUEST_TIMEOUT=10,TOTAL_MS=28000;
+function requestJSON(url,deadline){
+ const remaining=Math.floor((deadline-Date.now())/1000);
+ if(remaining<1)return Promise.resolve({data:null,retryable:false});
+ const timeout=Math.min(REQUEST_TIMEOUT,remaining);
  return new Promise(resolve=>{
-  const finish=(error,response,data)=>{
-   try{
-    const status=Number(response?.status??response?.statusCode);
-    if(error||status!==200||typeof data!=="string"||data.length>1000000)return resolve(null);
-    const value=JSON.parse(data);
-    resolve(value&&typeof value==="object"&&!Array.isArray(value)?value:null);
-   }catch(_){resolve(null)}
-  };
-  try{$httpClient.get({
-   url,headers:{"User-Agent":"Mozilla/5.0","Accept":"application/json","Cache-Control":"no-cache"},
-   timeout:5,insecure:false,"auto-cookie":false,"auto-redirect":false
-  },finish)}catch(_){resolve(null)}
+  let finished=false;
+  const finish=(data,retryable=false)=>{if(!finished){finished=true;resolve({data,retryable})}};
+  try{
+   if(typeof setTimeout==="function")setTimeout(()=>finish(null,true),timeout*1000+100);
+   $httpClient.get({
+    url,headers:{"User-Agent":"Mozilla/5.0","Accept":"application/json","Cache-Control":"no-cache"},
+    timeout,insecure:false,"auto-cookie":false,"auto-redirect":false
+   },(error,response,body)=>{
+    try{
+     if(error)return finish(null,true);
+     const status=Number(response?.status??response?.statusCode);
+     if(status!==200)return finish(null,status===408||status===425||status>=500&&status<=599);
+     if(typeof body!=="string"||body.length>1000000)return finish(null);
+     const value=JSON.parse(body);
+     finish(value&&typeof value==="object"&&!Array.isArray(value)?value:null);
+    }catch(_){finish(null)}
+   });
+  }catch(_){finish(null,true)}
  });
+}
+async function getJSON(url,deadline,budget){
+ const first=await requestJSON(url,deadline);
+ // One retry shared by the entire run. Do not retry HTTP 429 or 4xx
+ // restrictions. Keep time available for the exit-IP fallback.
+ if(first.retryable&&budget.retries>0&&deadline-Date.now()>=4000){
+  budget.retries--;
+  return (await requestJSON(url,deadline)).data;
+ }
+ return first.data;
 }
 function evaluate(pure,query,ip){
  // IPPure is authoritative only when its response identifies the tested IP.
@@ -103,14 +123,16 @@ function render(result,ip){
 }
 function failed(message){return {title:"节点体检",content:message,icon:"checkmark.shield.fill",backgroundColor:COLORS.gray}}
 async function run(){
- const pure=await getJSON(PURE);
+ const deadline=Date.now()+TOTAL_MS,budget={retries:1};
+ // Give IPPure a bounded sub-budget so fallback IP and IPQuery are not starved.
+ const pure=await getJSON(PURE,Math.min(deadline,Date.now()+18000),budget);
  let ip=canonicalIP(pure?.ip)?clean(pure.ip):"";
  if(!ip){
-  const fallback=await getJSON(IPIFY);
+  const fallback=await getJSON(IPIFY,deadline,budget);
   ip=canonicalIP(fallback?.ip)?clean(fallback.ip):"";
  }
  if(!ip)return render(evaluate(null,null,""),"");
- const query=await getJSON(QUERY+encodeURIComponent(ip)+"?format=json");
+ const query=await getJSON(QUERY+encodeURIComponent(ip)+"?format=json",deadline,budget);
  return render(evaluate(pure,query,ip),ip);
 }
 run().then(value=>$done(value),()=>$done(failed("暂时无法检测")));

@@ -13,12 +13,12 @@ const reply=x=>({body:JSON.stringify(x),status:200});
 async function execute(routes,arg){
  const calls=[];let count=0;let resolve;
  const done=new Promise(r=>resolve=r);
- vm.runInNewContext(source,{$argument:arg,$httpClient:{get(req,cb){calls.push(req);const r=routes(req.url);if(!r)throw Error("unexpected request");cb(r.error||null,{status:r.status||200},r.body)}},$done(value){count++;resolve(value)}});
+ vm.runInNewContext(source,{$argument:arg,$httpClient:{get(req,cb){calls.push(req);const r=routes(req.url,calls.length);if(!r)throw Error("unexpected request");cb(r.error||null,{status:r.status||200},r.body)}},$done(value){count++;resolve(value)}});
  const value=await done;
  eq(count,1);
  for(const req of calls){
   eq(req.headers["X-Stash-Selected-Proxy"],undefined);
-  eq(req.insecure,false);eq(req.timeout,5);eq(req["auto-cookie"],false);
+  eq(req.insecure,false);ok(req.timeout>=1&&req.timeout<=10);eq(req["auto-cookie"],false);
  }
  return {value,calls};
 }
@@ -40,9 +40,9 @@ r=await execute(normal(p(null,{isResidential:undefined}),q(0,{is_datacenter:fals
 r=await execute(u=>u===PURE?reply(p(12)):u.startsWith(Q)?reply(q(100,{},ip2)):undefined);ok(r.value.content.includes("纯度88"));ok(!r.value.content.includes("纯度0"));
 r=await execute(u=>u===PURE?reply(p(null,{isResidential:undefined})):u.startsWith(Q)?reply(q(0,{},ip2)):undefined);ok(r.value.content.includes("纯度--·未知·未知"));
 r=await execute(u=>u===PURE?{status:503,body:"{}"}:u===IPIFY?reply({ip:ip2}):u===Q+ip2+"?format=json"?reply(q(40,{is_datacenter:true},ip2)):undefined);
-ok(r.value.content.includes("纯度60·机房·中"));eq(r.calls[2].url,Q+ip2+"?format=json");eq(r.calls.length,3);
+ok(r.value.content.includes("纯度60·机房·中"));eq(r.calls[3].url,Q+ip2+"?format=json");eq(r.calls.length,4);
 r=await execute(u=>u===PURE?reply(p(0,{ip:"bad"})):u===IPIFY?reply({ip:ip2}):u===Q+ip2+"?format=json"?reply(q(50,{},ip2)):undefined);ok(r.value.content.includes("纯度50"));
-r=await execute(u=>u===PURE?{status:500,body:"{}"}:u===IPIFY?{status:500,body:"{}"}:undefined);ok(r.value.content.includes("纯度--·未知·未知"));eq(r.value.content,"纯度--·未知·未知");eq(r.calls.length,2);
+r=await execute(u=>u===PURE?{status:500,body:"{}"}:u===IPIFY?{status:500,body:"{}"}:undefined);ok(r.value.content.includes("纯度--·未知·未知"));eq(r.value.content,"纯度--·未知·未知");eq(r.calls.length,3);
 r=await execute(u=>u===PURE?reply(p(20)):u.startsWith(Q)?{error:"offline"}:undefined);ok(r.value.content.includes("纯度80"));
 r=await execute(u=>u===PURE?{body:"not JSON",status:200}:u===IPIFY?reply({ip:"999.1.2.3"}):undefined);eq(r.value.content,"纯度--·未知·未知");
 r=await execute(normal(p(14,{ip:"2001:4860::8888"}),q(5,{},"2001:4860:0:0:0:0:0:8888")));ok(r.value.content.includes("纯度86"));eq(r.calls[1].url,Q+encodeURIComponent("2001:4860::8888")+"?format=json");
@@ -55,4 +55,15 @@ r=await execute(normal(switchedPure,q(5,{is_datacenter:true},ip2)));
 eq(r.value.title,"节点体检 · 美国");ok(r.value.content.includes("纯度59·机房·中"));eq(r.calls[1].url,Q+ip2+"?format=json");eq(r.calls.length,2);
 r=await execute(normal(p(2),q(8)));eq(r.value.content,"纯度98·住宅·低");
 ok(!r.value.content.includes("\n"));ok(!r.value.content.includes(" "));
+
+// Transient retry succeeds, preserves score and never forces a proxy.
+r=await execute((u,n)=>u===PURE?(n===1?{error:"timeout"}:reply(p(2))):reply(q(8)));
+eq(r.value.content,"纯度98·住宅·低");eq(r.calls.length,3);
+eq(r.calls[0].timeout,10);eq(r.calls[0].url,PURE);eq(r.calls[1].url,PURE);
+r=await execute((u,n)=>u===PURE?reply(p(null)):u.startsWith(Q)?(n===2?{status:503,body:"{}"}:reply(q(12))):undefined);
+eq(r.value.content,"纯度88·住宅·低");eq(r.calls.length,3);
+r=await execute(u=>u===PURE?{status:429,body:"{}"}:u===IPIFY?reply({ip:ip2}):reply(q(20,{},ip2)));
+eq(r.calls.length,3);eq(r.calls[1].url,IPIFY);ok(r.value.content.includes("纯度80"));
+r=await execute(u=>u===PURE?{error:"offline"}:u===IPIFY?{error:"offline"}:undefined);
+eq(r.calls.length,3);eq(r.value.content,"纯度--·未知·未知");
 console.log("Stash NodeVitals: "+checks+" assertions passed");
