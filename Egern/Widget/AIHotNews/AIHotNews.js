@@ -114,59 +114,45 @@ async function loadNews(ctx,now,need=5){
 // Apple's 430x932pt screen reference: 170x170, 364x170, 364x382.
 // Widths are conservative font-em estimates; real iOS rendering is not exposed
 // to a generic script, so explicit short lines and minScale provide headroom.
+// One line per article; conservative width budgets for the original sizes.
 const PROFILES={
- small:{count:5,budget:14.5,font:8.5,rowHeight:22,badge:15,padding:[8,9,8,9],header:12,footer:8,gap:3},
- medium:{count:5,budget:29,font:9.2,rowHeight:23,badge:18,padding:[8,12,8,12],header:14,footer:8,gap:3},
- large:{count:8,budget:24,font:12,rowHeight:36,badge:20,padding:[12,14,12,14],header:16,footer:9,gap:5},
+ small:{count:5,budget:13,font:9,rowHeight:22,badge:15,padding:[8,9,8,9],header:12,footer:8,gap:3},
+ medium:{count:5,budget:28,font:10.5,rowHeight:23,badge:18,padding:[8,12,8,12],header:14,footer:8,gap:3},
+ large:{count:8,budget:23,font:12.5,rowHeight:36,badge:20,padding:[12,14,12,14],header:16,footer:9,gap:5},
  accessory:{count:1,budget:11,font:9,rowHeight:22,badge:14,padding:[3,4,3,4],header:10,footer:7,gap:1}
 };
 function layoutProfile(f){f=String(f||"systemMedium").toLowerCase();return f.startsWith("accessory")?PROFILES.accessory:f.includes("small")?PROFILES.small:f.includes("large")?PROFILES.large:PROFILES.medium}
 function textWidth(s){let n=0;for(const c of String(s)){if(/[\p{Mark}\u200D\uFE0F]/u.test(c))continue;n+=/[\t ]/.test(c)?0.38:/[ilI1.,:;'!|]/.test(c)?0.42:/[MW@%#&]/.test(c)?0.95:/^[\x20-\x7e]$/.test(c)?0.70:/\p{Extended_Pictographic}/u.test(c)?1.65:1.06}return n}
 function wrapText(value,budget){
- const s=cleanText(value);if(!s||ELLIPSIS.test(s))return null;
- if(textWidth(s)<=budget)return [s];
- if(textWidth(s)>2*budget+1)return null;
- function split(tokens){
-  if(tokens.length>240)return null;
-  let best=null,bestWidth=-1;
-  for(let i=1;i<tokens.length;i++){
-   const a=tokens.slice(0,i).join("").trimEnd(),b=tokens.slice(i).join("").trimStart();
-   if(!a||!b||/[（(【「『《〈“‘\u200d]$/u.test(a)||/^[，。！？、；：,.!?:;）)】」』》〉”’\u200d\uFE0F\p{Mark}]/u.test(b))continue;
-   const wa=textWidth(a),wb=textWidth(b);
-   if(wa<=budget&&wb<=budget&&wa>bestWidth){best=[a,b];bestWidth=wa}
-  }return best;
- }
- // Preserve Latin product/model names, including versions, and prefer CJK
- // word boundaries when Intl.Segmenter is available.
- const tokens=s.match(/[A-Za-z0-9]+(?:[._+/#:-][A-Za-z0-9]+)*|\s+|[^\s]/gu)||[];
- let merged=[];try{
-  const seg=new Intl.Segmenter("zh-CN",{granularity:"word"});
-  for(const t of tokens){const prev=merged[merged.length-1];if(prev&&/^\p{Script=Han}+$/u.test(prev)&&/^\p{Script=Han}$/u.test(t))merged[merged.length-1]+=t;else merged.push(t)}
-  merged=merged.flatMap(t=>/^\p{Script=Han}+$/u.test(t)?[...seg.segment(t)].map(x=>x.segment):[t]);
- }catch(_){merged=tokens}
- return split(merged)||split(tokens);
+ const s=cleanText(value);return s&&!ELLIPSIS.test(s)&&textWidth(s)<=budget?[s]:null;
 }
 function balanced(s){const stack=[],pairs={"）":"（",")":"(","】":"【","」":"「","』":"『","》":"《","〉":"〈","”":"“","’":"‘"};for(const c of s){if(Object.values(pairs).includes(c))stack.push(c);else if(pairs[c]&&stack.pop()!==pairs[c])return false}return !stack.length}
 function fitNews(item,profile){
- const title=cleanText(item.title),titleLines=wrapText(title,profile.budget),candidates=[];
- const add=(text,kind)=>{text=String(text||"").trim();if(text&&balanced(text)&&!ELLIPSIS.test(text))candidates.push({text,kind})};
- const dangling=/(?:表示|指出|宣布|认为|介绍|显示|通知|包括|涉及|以及|称|据|与|及|的|将|为|在|向)$/u;
+ const title=cleanText(item.title);
+ const dangling=/(?:表示|指出|宣布|认为|介绍|显示|通知|包括|涉及|以及|称|据|与|及|的|将|为|在|向|从|以|对|把|被|和|或)$/u;
+ const valid=v=>{const s=cleanText(v);return s&&!ELLIPSIS.test(s)&&balanced(s)&&!dangling.test(s.replace(/[。！？；，,.!?;:：]+$/u,""))?s:""};
+ const fit=(values,kind)=>{
+  const candidates=[...new Set(values.map(valid).filter(Boolean))];
+  for(const scale of [1,0.88,0.82]){
+   for(const text of candidates){const lines=wrapText(text,profile.budget/scale);if(lines)return {text,kind,lines,...(scale===1?{}:{scale})}}
+  }
+  return null;
+ };
+ // Preserve genuine source sentences and natural leading clauses. Digest
+ // takes precedence over report summaries, then the original short headline.
  for(const field of [item.summary,item.reportSummary]){
-  const s=cleanSummary(field);if(!s)continue;add(s,"summary");
-  const first=s.match(/^[^。！？!?；;]+[。！？!?；;]?/u)?.[0]||"";if(first!==s)add(first,"summary");
-  // Natural clause boundary, not a fixed character cut. When the whole title
-  // already fits, only choose a leading digest clause that adds information.
-  const cuts=[];for(const m of first.matchAll(/[，,；;]/gu)){const t=first.slice(0,m.index).trim();if(textWidth(t)>=Math.max(8,titleLines?textWidth(title)+1:profile.budget)&&!dangling.test(t))cuts.push(t)}
-  for(const t of cuts.reverse())add(t,"summary");
+  const s=cleanSummary(field);if(!s)continue;
+  const first=s.match(/^[^。！？!?；;]+[。！？!?；;]?/u)?.[0]||"";
+  const full=fit([s,first],"summary");if(full)return full;
+  const cuts=[];for(const m of first.matchAll(/[，,；;]/gu)){
+   const t=first.slice(0,m.index).trim();
+   if(textWidth(t)>=Math.min(10,profile.budget*0.65)&&!/(?:通知|引述|援引|透露|告诉).{1,100}$/u.test(t))cuts.push(t);
+  }
+  const clause=fit(cuts.reverse(),"summary");if(clause)return clause;
  }
- add(title,"title");
- for(const m of title.matchAll(/[，,；;：:。！？!?]/gu)){const t=title.slice(0,m.index).trim();if(textWidth(t)>=8&&!dangling.test(t))add(t,"title")}
- for(const c of candidates){const lines=wrapText(c.text,profile.budget);if(lines)return {...c,lines}}
- // Last-resort, keep the genuine whole title at a smaller scale if it can
- // still fit the two explicit lines. No misleading mid-word truncation.
- const lines=wrapText(title,profile.budget*1.16);
- if(lines&&balanced(title))return {text:title,kind:"title",lines,scale:1/1.16};
- return {text:"查看完整新闻",kind:"link",lines:["查看完整新闻"]};
+ const headline=fit([title],"title");if(headline)return headline;
+ const parts=[];for(const m of title.matchAll(/[，,；;：:。！？!?]/gu)){const t=title.slice(0,m.index).trim();if(textWidth(t)>=Math.min(8,profile.budget*0.65))parts.push(t)}
+ return fit(parts.reverse(),"title")||{text:"查看完整新闻",kind:"link",lines:["查看完整新闻"]};
 }
 
 export default async function (ctx,clock=Date.now()) {
@@ -234,12 +220,12 @@ export default async function (ctx,clock=Date.now()) {
   ],0,{width:profile.badge,alignItems:'start'});
   const hotRow=item=>{
     const fitted=fitNews(item,profile),size=profile.font*(fitted.scale||1);
-    const lines=fitted.lines.join('\n');
+    const line=fitted.lines[0];
     return row([
       rankBadge(item.rank),
-      text(lines,size,'medium',C.main,{textAlign:'left',maxLines:2,minScale:0.72}),
+      text(line,size,'medium',C.main,{textAlign:'left',maxLines:1,minScale:0.78}),
       spacer()
-    ],4,{height:profile.rowHeight,alignItems:'start',url:item.url||HOME_URL});
+    ],4,{height:profile.rowHeight,alignItems:'center',url:item.url||HOME_URL});
   };
 
   const header = size => row([

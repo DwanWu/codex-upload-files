@@ -65,22 +65,22 @@ const hardCases=[
 ];
 for(const f of families){
  const p=N.layoutProfile(f);
- for(const item of hardCases){const fit=N.fitNews(item,p);assert.ok(fit.lines.length>=1&&fit.lines.length<=2);assert.ok(fit.lines.every(s=>N.textWidth(s)*(fit.scale||1)<=p.budget+0.00001));assert.ok(fit.lines.every(s=>!/(?:…|⋯|\.{3,}|．{3,})/.test(s)))}
+ for(const item of hardCases){const fit=N.fitNews(item,p);assert.equal(fit.lines.length,1);assert.ok(fit.lines.every(s=>N.textWidth(s)*(fit.scale||1)<=p.budget+0.00001));assert.ok(fit.lines.every(s=>!/(?:…|⋯|\.{3,}|．{3,})/.test(s)))}
  const ctx2=mock(u=>u.includes("hot-topics")?resp(200,fullHot):resp(200,storyResponse(u.split("/").pop())),new Map(),f),widget=await N.widget(ctx2,T);
  assert.equal(newsRows(widget).length,f==="systemLarge"?8:5);
  // The iPhone screenshot showed an unwanted centered flex column. Every
  // article must use one natural-width, explicitly left-aligned text element
  // and a trailing flexible spacer, rather than a centered flex text frame.
  for(const r of newsRows(widget)){
-  assert.equal(r.alignItems,"start");
+  assert.equal(r.alignItems,"center");
   assert.equal(r.children.length,3);
   assert.equal(r.children[0].width,p.badge);
   assert.equal(r.children[0].children[0].textAlign,"left");
   const t=r.children[1];assert.equal(t.type,"text");
-  assert.equal(t.textAlign,"left");assert.equal(t.maxLines,2);
+  assert.equal(t.textAlign,"left");assert.equal(t.maxLines,1);
   assert.equal(t.flex,undefined);
   assert.equal(r.children[2].type,"spacer");assert.equal(r.children[2].length,undefined);
-  assert.ok(t.text.split("\n").length<=2);
+  assert.equal(t.text.split("\n").length,1);
   assert.ok(t.text.split("\n").every(s=>N.textWidth(s)*t.font.size<=p.budget*p.font+0.0001));
  }
  const list=widget.children.find(x=>x.type==="stack"&&x.direction==="column"&&x.children.some(r=>r.url));
@@ -94,7 +94,7 @@ for(const f of families){
   assert.equal(rule.children[1].children[0].type,"spacer");
  }
 
- assert.ok(newsRows(widget).some(r=>textNodes(r).join("").includes("多语言")),"rendered summary "+f);
+ assert.ok(newsRows(widget).some(r=>/多语言|技术说明/.test(textNodes(r).join(""))),"rendered genuine summary "+f);
  assert.ok(textNodes(widget).every(x=>!/(?:…|⋯|\.{3,}|．{3,})/.test(x)));
  assert.equal(ctx2.calls.length,1+(f==="systemLarge"?8:5));
  const [top,right,bottom,left]=p.padding,expectedHeight=p.count*p.rowHeight+(p.count-1)*0.5+top+bottom+(p.header+4)+(p.footer+3)+p.gap;
@@ -104,10 +104,23 @@ for(const f of families){
 assert.equal(N.fitNews({title:"模型发布",summary:"模型发布了新功能。"},N.layoutProfile("systemMedium")).kind,"summary");
 assert.equal(N.fitNews({title:"新模型正式发布",summary:"长摘要".repeat(100)},N.layoutProfile("systemSmall")).kind,"title");
 assert.equal(N.wrapText("超长英文单词"+"A".repeat(50),12),null);
-const leading=N.wrapText("甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己",11);
-assert.ok(leading&&leading.length===2);
-assert.ok(N.textWidth(leading[0])>=N.textWidth(leading[1]));
-assert.equal(leading.join(""),"甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己");
+assert.equal(N.wrapText("甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己",11),null);
+assert.deepEqual(N.wrapText("甲乙丙丁",11),["甲乙丙丁"]);
+// Screenshot-like examples of different Chinese/Latin title lengths.
+const oneLineSamples=[
+ {title:"Nvidia 暂停向东南亚四国发运服务器",summary:"Nvidia 已通知 Dell、Supermicro 等制造伙伴，暂停向马来西亚、新加坡、泰国和印尼发运服务器。"},
+ {title:"FCC批准SpaceX部署百万颗AI卫星",summary:"美国联邦通信委员会（FCC）批准SpaceX在“Starmind”计划下部署至多100万颗搭载AI芯片的卫星，用于在轨处理AI数据。"},
+ {title:"OpenAI修复GPT-6.2计费错误并补偿用户",summary:"OpenAI承认GPT-6.2上线时计费出错，多数用户的GPT-6.2 Astra和Sol用量被错误打折，现已修复。"},
+ {title:"Sand.ai 发布 MAGI-2，上线渠道与定价说法不一",summary:"Sand.ai（三呆科技）发布视频生成模型 MAGI-2，总参数量从 114B 扩至 480B、激活参数 28B。"},
+ {title:"Anthropic 将 Claude Messages API 从 Python 迁至 Rust",summary:"Anthropic 称已将 Claude Messages API 从 Python 迁移到 Rust"}
+];
+for(const item of oneLineSamples){
+ const p=N.layoutProfile("systemMedium"),fit=N.fitNews(item,p);
+ assert.equal(fit.lines.length,1);assert.ok(fit.kind!=="link",JSON.stringify(fit));
+ assert.ok(N.textWidth(fit.lines[0])*(fit.scale||1)<=p.budget+0.00001);
+ assert.ok(!/(?:…|⋯|\.{3,}|．{3,}|\n)/.test(fit.lines[0]));
+ assert.ok([item.title,item.summary].some(s=>s.includes(fit.lines[0])));
+}
 
 function lunar(d){const p=new Intl.DateTimeFormat("zh-CN-u-ca-chinese",{year:"numeric",month:"long",day:"numeric",timeZone:"Asia/Shanghai"}).formatToParts(new Date(d+"T04:00:00Z"));return {m:H.lunarMonthText(p.find(x=>x.type==="month").value),d:H.lunarDayText(p.find(x=>x.type==="day").value)}}
 const ds=["2026-11-27","2026-11-28","2026-11-30","2026-12-01","2026-12-31","2027-01-01","2027-02-06"];
