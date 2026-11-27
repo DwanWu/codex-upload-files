@@ -281,7 +281,7 @@ function windowEnd(d){return dateOK(d)?Date.parse(d+"T00:00:00+08:00")+DAY:NaN}
 function countdownText(d,now){
   const ms=windowEnd(d)-now;if(!Number.isFinite(ms)||ms<=0)return "";
   const mins=Math.floor(ms/60000),dd=Math.floor(mins/1440),hh=Math.floor(mins%1440/60);
-  return mins===0?"不足1m":dd?dd+"d"+hh+"h后":hh+"h"+mins%60+"m后";
+  return mins===0?"不足1m":dd?dd+"d"+hh+"h":hh+"h"+mins%60+"m";
 }
 function publicationDecision(original,result,today){
   const next=result.snapshot,diag=result.diagnostics;

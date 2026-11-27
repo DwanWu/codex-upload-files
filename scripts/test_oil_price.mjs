@@ -155,8 +155,8 @@ assert.equal(api.publicationDecision(old,x,"2027-01-01").publish,true);
 assert.equal(api.publicationDecision(old,{snapshot:old,diagnostics:{}}, "2027-01-01").publish,false);
 // Midnight and time-zone boundaries.
 assert.equal(api.windowEnd("2027-01-08"),Date.parse("2027-01-09T00:00:00+08:00"));
-assert.equal(api.countdownText("2026-12-10",at("2026-11-27T15:11:00")),"13d8h后");
-assert.equal(api.countdownText("2027-01-08",at("2027-01-08T23:59:00")),"0h1m后");
+assert.equal(api.countdownText("2026-12-10",at("2026-11-27T15:11:00")),"13d8h");
+assert.equal(api.countdownText("2027-01-08",at("2027-01-08T23:59:00")),"0h1m");
 assert.equal(api.countdownText("2027-01-08",at("2027-01-08T23:59:59")),"不足1m");
 assert.equal(api.countdownText("2027-01-08",at("2027-01-09T00:00:00")),"");
 assert.equal(api.bj(Date.parse("2027-01-08T16:00:00Z")),"2027-01-09");
