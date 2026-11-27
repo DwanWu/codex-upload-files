@@ -6,7 +6,7 @@ const pattern=/const BUNDLED_CALENDAR = [^\r\n]*; \/\/ BUNDLED_CALENDAR_END/;
 if(!pattern.test(code))throw Error("Calendar marker missing");
 const api=await import("data:text/javascript;base64,"+Buffer.from(code+"\nexport {BUNDLED_CALENDAR,fullDay};").toString("base64"));
 const today=new Date(Date.now()+8*3600000);
-const updated={};let missing=0;
+const updated={};let missingCurrent=0,missingNext=0;
 for(let offset=0;offset<=1;offset++){
  const date=new Date(Date.UTC(today.getUTCFullYear(),today.getUTCMonth()+offset,1));
  const y=date.getUTCFullYear(),m=date.getUTCMonth()+1,month=y+"-"+String(m).padStart(2,"0"),last=new Date(Date.UTC(y,m,0)).getUTCDate();
@@ -21,12 +21,13 @@ for(let offset=0;offset<=1;offset++){
   await api.default(ctx,Date.parse(key+"T12:00:00+08:00"),{bundle:false,capture:r=>{if(api.fullDay(r.day))found=r.day}});
   if(found)updated[key]=found;
   else if(api.fullDay(api.BUNDLED_CALENDAR[key]))updated[key]=api.BUNDLED_CALENDAR[key];
-  else {missing++;console.warn("Missing verified calendar:",key)}
+  else {if(offset===0)missingCurrent++;else missingNext++;console.warn("Missing verified calendar:",key)}
  }
 }
 const key=today.toISOString().slice(0,10);
 if(!api.fullDay(updated[key]))throw Error("Current day not verified; preserving published script");
-if(missing)throw Error("Calendar coverage incomplete ("+missing+" days); preserving published script and retrying next run");
+if(missingCurrent)throw Error("Current month incomplete ("+missingCurrent+" days); preserving published script");
+if(missingNext)console.warn("Next month has "+missingNext+" missing days; publishing only verified entries and retrying next run");
 const next=code.replace(pattern,()=>"const BUNDLED_CALENDAR = "+JSON.stringify(updated)+"; // BUNDLED_CALENDAR_END");
 if(next===code){console.log("No calendar changes");process.exit(0)}
 const tmp=new URL("HuangliQuery.js.tmp",file);await writeFile(tmp,next,"utf8");await rename(tmp,file);console.log("Calendar days:",Object.keys(updated).length);
