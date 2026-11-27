@@ -3,25 +3,21 @@
  * 数据源：AIHOT 官方匿名只读 REST API v1
  * 主榜：/api/v1/hot-topics
  * 补足：24小时精选、必要时24小时全部动态
- * 综述：/api/v1/stories/{publicId}；按手机尺寸选择原始短句。
+ * 仅显示官方 title 字段；完整单行标题，自适应字号，不请求事件综述。
  */
 
 const API_BASE = 'https://aihot.news';
 const HOT_URL = `${API_BASE}/api/v1/hot-topics`;
 const FALLBACK_URL = `${API_BASE}/api/v1/items?mode=selected&window=24h&limit=20`;
 const RECENT_URL = `${API_BASE}/api/v1/items?mode=all&window=24h&limit=20`;
-const STORY_URL = `${API_BASE}/api/v1/stories/`;
 const HOME_URL = 'https://aihot.news/hot';
 
 
-const MIN=60000,MAX_CACHE=6*60*MIN,KEY="AIHotNews.v2.summary",STORY_TTL=60*MIN;
+// Keep the previous storage key for seamless cache migration; only title data is retained.
+const MIN=60000,MAX_CACHE=6*60*MIN,KEY="AIHotNews.v2.summary";
 const STORY_ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ELLIPSIS=/(?:…|⋯|\.{3,}|．{3,})/u;
 function cleanText(v,limit=6000){return typeof v==="string"?v.replace(/[\u0000-\u001f\u007f]+/g," ").replace(/\s+/g," ").trim().slice(0,limit):""}
-function cleanSummary(v){
- if(typeof v!=="string")return "";
- return cleanText(v.replace(/\[([^\]\n]+)\]\(https?:\/\/[^)\s]+\)/g,"$1").replace(/(?:^|\n)\s*(?:#{1,6}\s+|[-*]\s+|\d+\.\s+)/g," ").replace(/\*\*|__|<[^>]{1,120}>/g,"").replace(/https?:\/\/[^\s。；，、]+/g," "));
-}
 function safeLink(v){
  const m=cleanText(v,480).match(/^(?:https:\/\/(?:aihot\.news|aihot\.virxact\.com))?(\/(?:story|items)\/[A-Za-z0-9_-]{1,160})\/?(?:[?#][^\s]*)?$/i);
  return m?"https://aihot.news"+m[1]:HOME_URL;
@@ -29,10 +25,12 @@ function safeLink(v){
 function storyID(x,url){const id=cleanText(x?.storyPublicId||x?.storyId,160),from=url.match(/\/story\/([^/]+)$/)?.[1]||"";return STORY_ID.test(id)?id.toLowerCase():STORY_ID.test(from)?from.toLowerCase():""}
 function dateText(v){return typeof v==="string"&&Number.isFinite(Date.parse(v))?v:""}
 function normalizeItem(x,mode,now){
- const title=cleanText(x?.title||x?.name||x?.topic,480);if(!title)return null;
+ // Reject overlong or already-ellipsized source titles rather than truncate them.
+ if(typeof x?.title!=="string"||x.title.length>480)return null;
+ const title=cleanText(x.title,480);if(!title||ELLIPSIS.test(title))return null;
  const url=safeLink(x?.links?.story||x?.links?.aihot||x?.url),latestAt=dateText(mode==="hot"?x.latestAt:(x.publishedAt||x.discoveredAt||x.latestAt)),ts=Date.parse(latestAt);
  if(Number.isFinite(ts)&&(ts>now+5*MIN||mode!=="hot"&&ts<now-24*60*MIN-5*MIN))return null;
- return {title,url,id:cleanText(x?.id,160),storyId:storyID(x,url),latestAt,summary:cleanSummary(x?.summary),reportSummary:cleanSummary(x?.reportSummary)};
+ return {title,url,id:cleanText(x?.id,160),storyId:storyID(x,url),latestAt};
 }
 function uniqueNews(items,limit=10){
  const seen=new Set(),out=[];
@@ -51,20 +49,13 @@ function validCache(x,mode,now){
  if(!x||!Number.isFinite(x.checked)||x.checked>now||now-x.checked>MAX_CACHE||!Array.isArray(x.items)||x.items.length>20)return null;
  return {items:uniqueNews(x.items.map(i=>normalizeItem(i,mode,now)).filter(Boolean),20),checked:x.checked,etag:safeETag(x.etag)};
 }
-function validStory(x,now){if(!x||!Number.isFinite(x.checked)||x.checked>now||now-x.checked>MAX_CACHE)return null;const summary=cleanSummary(x.summary),reportSummary=cleanSummary(x.reportSummary);return summary||reportSummary?{summary,reportSummary,version:dateText(x.version),checked:x.checked,etag:safeETag(x.etag)}:null}
-function normalizeStory(p,id){
- if(p?.schemaVersion!==1||String(p.story?.publicId||"").toLowerCase()!==id)return null;
- const s=p.story,summary=cleanSummary(s.digest),reportSummary=cleanSummary(s.latest?.summary)||(Array.isArray(s.reports)?s.reports.slice(0,5).map(r=>cleanSummary(r?.summary)).find(Boolean)||"":"");
- return summary||reportSummary?{summary,reportSummary}:null;
-}
 function header(r,k){try{return typeof r.headers?.get==="function"?r.headers.get(k):r.headers?.[k]??r.headers?.[k.toLowerCase()]??r.headers?.[k.split("-").map(w=>w[0].toUpperCase()+w.slice(1)).join("-")]??null}catch(_){return null}}
 function retryDelay(r,now){const h=header(r,"retry-after"),d=typeof h==="string"&&/^\d+$/.test(h)?+h*1000:Date.parse(h)-now;return Math.min(24*60*MIN,Math.max(15*MIN,Number.isFinite(d)?d:0))}
-async function loadNews(ctx,now,need=5){
+async function loadNews(ctx,now,need=5,profile=null){
  need=Math.min(8,Math.max(1,Math.floor(Number(need)||5)));
  let saved={};try{saved=ctx.storage.getJSON(KEY)||{}}catch(_){}
- const stories={};for(const [id,v] of Object.entries(saved.stories||{}).slice(0,40))if(STORY_ID.test(id)){const x=validStory(v,now);if(x)stories[id]=x}
- const state={hot:validCache(saved.hot,"hot",now),selected:validCache(saved.selected,"selected",now),recent:validCache(saved.recent,"recent",now),stories,retryAt:Number.isFinite(saved.retryAt)&&saved.retryAt>now&&saved.retryAt<=now+24*60*MIN?saved.retryAt:0};
- const persist=()=>{try{state.stories=Object.fromEntries(Object.entries(state.stories).sort((a,b)=>b[1].checked-a[1].checked).slice(0,24));ctx.storage.setJSON(KEY,state)}catch(_){}};
+ const state={hot:validCache(saved.hot,"hot",now),selected:validCache(saved.selected,"selected",now),recent:validCache(saved.recent,"recent",now),retryAt:Number.isFinite(saved.retryAt)&&saved.retryAt>now&&saved.retryAt<=now+24*60*MIN?saved.retryAt:0};
+ const persist=()=>{try{ctx.storage.setJSON(KEY,state)}catch(_){}};
  async function request(url,old,timeout){
   const headers={"User-Agent":"Egern-AIHotNews/2.0","Accept":"application/json"};if(old?.etag)headers["If-None-Match"]=old.etag;
   try{const r=await ctx.http.get(url,{headers,timeout,credentials:"omit",insecureTls:false,redirect:"error"});
@@ -86,79 +77,54 @@ async function loadNews(ctx,now,need=5){
  }
  const grouped=[];
  const collect=(result,mode)=>{if(result?.entry)grouped.push({result,mode})};
- const combine=()=>uniqueNews([...grouped].sort((a,b)=>Number(b.result.ok)-Number(a.result.ok)).flatMap(g=>g.result.entry.items.map(i=>({...i,listMode:g.mode,listCached:!g.result.ok,listChecked:g.result.entry.checked}))),need);
+ const combine=()=>{
+  const candidates=[...grouped].sort((a,b)=>Number(b.result.ok)-Number(a.result.ok)).flatMap(g=>g.result.entry.items.map(i=>({...i,listMode:g.mode,listCached:!g.result.ok,listChecked:g.result.entry.checked})));
+  // Preserve source order, skip titles that cannot fit at a readable size,
+  // then fill the requested number from the next actual news items.
+  return uniqueNews(profile?candidates.filter(i=>fitNews(i,profile)!==null):candidates,need);
+ };
  const hot=await list("hot",HOT_URL);collect(hot,"hot");
  let selected=null,recent=null;
  if(!hot.ok||combine().length<need){selected=await list("selected",FALLBACK_URL);collect(selected,"selected")}
  if(combine().length<need){recent=await list("recent",RECENT_URL);collect(recent,"recent")}
- let items=combine();
+ const items=combine();
  const modes=new Set(items.map(i=>i.listMode)),mode=modes.size>1?"mixed":modes.has("selected")?"selected":modes.has("recent")?"recent":"hot";
  const cached=items.some(i=>i.listCached),checked=items.length?Math.min(...items.map(i=>i.listChecked||now)):null;
- async function hydrate(item){
-  if(!item.storyId)return item;
-  const id=item.storyId,old=state.stories[id],matches=old&&old.version===item.latestAt;
-  const use=v=>v?{...item,summary:v.summary||item.summary,reportSummary:v.reportSummary||item.reportSummary}:item;
-  if(matches&&now-old.checked<STORY_TTL)return use(old);
-  if(state.retryAt>now||item.listCached)return use(matches?old:null);
-  const r=await request(STORY_URL+id,old,5000);
-  if(r.unchanged){state.stories[id]={...old,version:item.latestAt,checked:now};return use(state.stories[id])}
-  const v=normalizeStory(r.payload,id);
-  if(v){state.stories[id]={...v,version:item.latestAt,checked:now,etag:r.etag};return use(state.stories[id])}
-  return use(matches?old:null);
- }
- for(let i=0;i<items.length;i+=4){const batch=await Promise.all(items.slice(i,i+4).map(hydrate));items.splice(i,batch.length,...batch)}
  if(!hot.ok&&!selected?.ok&&!recent?.ok&&state.retryAt<=now)state.retryAt=now+5*MIN;
  persist();
  return {items,mode,cached,syncAt:checked===null?null:new Date(checked).toISOString(),refreshAfter:new Date(now+Math.max(MIN,state.retryAt>now?state.retryAt-now:15*MIN)).toISOString(),errorText:cached?"使用最近缓存":items.length?"":"等待下一次刷新"};
 }
 // Apple's 430x932pt screen reference: 170x170, 364x170, 364x382.
 // Widths are conservative font-em estimates; real iOS rendering is not exposed
-// to a generic script, so explicit short lines and minScale provide headroom.
-// One line per article; conservative width budgets for the original sizes.
+// to a generic script. Fit the entire title, never a shortened fragment.
 const PROFILES={
- small:{count:5,budget:13,font:9,rowHeight:22,badge:15,padding:[8,9,8,9],header:12,footer:8,gap:3},
- medium:{count:5,budget:28,font:10.5,rowHeight:23,badge:18,padding:[8,12,8,12],header:14,footer:8,gap:3},
- large:{count:8,budget:23,font:12.5,rowHeight:36,badge:20,padding:[12,14,12,14],header:16,footer:9,gap:5},
- accessory:{count:1,budget:11,font:9,rowHeight:22,badge:14,padding:[3,4,3,4],header:10,footer:7,gap:1}
+ small:{count:5,budget:13,font:9,minFont:7.5,rowHeight:22,badge:15,padding:[8,9,8,9],header:12,footer:8,gap:3},
+ medium:{count:5,budget:28,font:10.5,minFont:8,rowHeight:23,badge:18,padding:[8,12,8,12],header:14,footer:8,gap:3},
+ large:{count:8,budget:23,font:12.5,minFont:9.5,rowHeight:36,badge:20,padding:[12,14,12,14],header:16,footer:9,gap:5},
+ accessory:{count:1,budget:11,font:9,minFont:7.5,rowHeight:22,badge:14,padding:[3,4,3,4],header:10,footer:7,gap:1}
 };
 function layoutProfile(f){f=String(f||"systemMedium").toLowerCase();return f.startsWith("accessory")?PROFILES.accessory:f.includes("small")?PROFILES.small:f.includes("large")?PROFILES.large:PROFILES.medium}
 function textWidth(s){let n=0;for(const c of String(s)){if(/[\p{Mark}\u200D\uFE0F]/u.test(c))continue;n+=/[\t ]/.test(c)?0.38:/[ilI1.,:;'!|]/.test(c)?0.42:/[MW@%#&]/.test(c)?0.95:/^[\x20-\x7e]$/.test(c)?0.70:/\p{Extended_Pictographic}/u.test(c)?1.65:1.06}return n}
 function wrapText(value,budget){
  const s=cleanText(value);return s&&!ELLIPSIS.test(s)&&textWidth(s)<=budget?[s]:null;
 }
-function balanced(s){const stack=[],pairs={"）":"（",")":"(","】":"【","」":"「","』":"『","》":"《","〉":"〈","”":"“","’":"‘"};for(const c of s){if(Object.values(pairs).includes(c))stack.push(c);else if(pairs[c]&&stack.pop()!==pairs[c])return false}return !stack.length}
 function fitNews(item,profile){
- const title=cleanText(item.title);
- const dangling=/(?:表示|指出|宣布|认为|介绍|显示|通知|包括|涉及|以及|称|据|与|及|的|将|为|在|向|从|以|对|把|被|和|或)$/u;
- const valid=v=>{const s=cleanText(v);return s&&!ELLIPSIS.test(s)&&balanced(s)&&!dangling.test(s.replace(/[。！？；，,.!?;:：]+$/u,""))?s:""};
- const fit=(values,kind)=>{
-  const candidates=[...new Set(values.map(valid).filter(Boolean))];
-  for(const scale of [1,0.88,0.82]){
-   for(const text of candidates){const lines=wrapText(text,profile.budget/scale);if(lines)return {text,kind,lines,...(scale===1?{}:{scale})}}
-  }
-  return null;
- };
- // Preserve genuine source sentences and natural leading clauses. Digest
- // takes precedence over report summaries, then the original short headline.
- for(const field of [item.summary,item.reportSummary]){
-  const s=cleanSummary(field);if(!s)continue;
-  const first=s.match(/^[^。！？!?；;]+[。！？!?；;]?/u)?.[0]||"";
-  const full=fit([s,first],"summary");if(full)return full;
-  const cuts=[];for(const m of first.matchAll(/[，,；;]/gu)){
-   const t=first.slice(0,m.index).trim();
-   if(textWidth(t)>=Math.min(10,profile.budget*0.65)&&!/(?:通知|引述|援引|透露|告诉).{1,100}$/u.test(t))cuts.push(t);
-  }
-  const clause=fit(cuts.reverse(),"summary");if(clause)return clause;
- }
- const headline=fit([title],"title");if(headline)return headline;
- const parts=[];for(const m of title.matchAll(/[，,；;：:。！？!?]/gu)){const t=title.slice(0,m.index).trim();if(textWidth(t)>=Math.min(8,profile.budget*0.65))parts.push(t)}
- return fit(parts.reverse(),"title")||{text:"查看完整新闻",kind:"link",lines:["查看完整新闻"]};
+ if(typeof item?.title!=="string"||item.title.length>480)return null;
+ const title=cleanText(item.title,480);
+ if(!title||ELLIPSIS.test(title))return null;
+ const w=textWidth(title);
+ if(!Number.isFinite(w)||w<=0)return null;
+ // Round down to 0.1 pt so the actual chosen size cannot exceed the budget.
+ const size=Math.min(profile.font,Math.floor((profile.budget*profile.font/w+1e-9)*10)/10);
+ if(size<profile.minFont)return null;
+ const scale=size/profile.font,lines=wrapText(title,profile.budget/scale+1e-9);
+ return lines?{text:title,kind:"title",lines,scale}:null;
 }
 
 export default async function (ctx,clock=Date.now()) {
   const family = String(ctx.widgetFamily || 'systemMedium').toLowerCase();
   const profile=layoutProfile(family),isAccessory=family.startsWith('accessory');
-  const {mode,items,syncAt,cached,refreshAfter}=await loadNews(ctx,clock,profile.count);
+  const {mode,items,syncAt,cached,refreshAfter}=await loadNews(ctx,clock,profile.count,profile);
 
   const C = {
     bg: [{ light: '#FFFDFC', dark: '#1C1C1E' }, { light: '#FFF4F0', dark: '#111113' }],
@@ -219,11 +185,11 @@ export default async function (ctx,clock=Date.now()) {
     spacer()
   ],0,{width:profile.badge,alignItems:'start'});
   const hotRow=item=>{
-    const fitted=fitNews(item,profile),size=profile.font*(fitted.scale||1);
-    const line=fitted.lines[0];
+    const fitted=fitNews(item,profile),size=profile.font*fitted.scale;
+    const line=fitted.text;
     return row([
       rankBadge(item.rank),
-      text(line,size,'medium',C.main,{textAlign:'left',maxLines:1,minScale:0.78}),
+      text(line,size,'medium',C.main,{textAlign:'left',maxLines:1,minScale:0.85}),
       spacer()
     ],4,{height:profile.rowHeight,alignItems:'center',url:item.url||HOME_URL});
   };
@@ -249,7 +215,7 @@ export default async function (ctx,clock=Date.now()) {
   }
   if(!items.length)return {type:'widget',refreshAfter,padding:profile.padding,url:HOME_URL,backgroundGradient:bg,gap:0,children:[
     header(profile.header),spacer(),
-    col([icon('wifi.exclamationmark',C.muted,20),text('暂无可用资讯',12,'heavy',C.main,{maxLines:1,minScale:0.75}),text('稍后自动刷新',10,'medium',C.muted,{maxLines:1,minScale:0.75})],5,{alignItems:'center'}),
+    col([icon('wifi.exclamationmark',C.muted,20),text('暂无可完整显示的标题',11,'heavy',C.main,{maxLines:1,minScale:0.75}),text('稍后自动刷新',10,'medium',C.muted,{maxLines:1,minScale:0.75})],5,{alignItems:'center'}),
     spacer(),footer(profile.footer)
   ]};
   const shown=items.slice(0,profile.count);

@@ -27,100 +27,95 @@ for(const status of [429,503]){const limited=mock(()=>resp(status,null,{"retry-a
 const picked=mock(u=>u.includes("hot-topics")?resp(200,{schemaVersion:1,count:0,items:[]}):resp(200,{schemaVersion:1,count:2,items:[{id:"p",title:"备用新闻",publishedAt:new Date(T-60*M).toISOString(),links:{aihot:"/items/p"}},{id:"o",title:"过期新闻",publishedAt:new Date(T-25*60*M).toISOString()}]}));n=await N.loadNews(picked,T,3);assert.equal(n.mode,"selected");assert.equal(n.items.length,1);assert.equal(n.items[0].title,"备用新闻");
 for(const f of families){const w=await N.widget(mock(()=>resp(200,hot),new Map(),f),T);assert.equal(w.type,"widget");assert.ok(flat(w).includes("智能热搜"));assert.ok(Number.isFinite(Date.parse(w.refreshAfter)))}
 
-// Real API contract and phone-size fixtures; synthetic contents, no network.
+// Official title-only list contract; no story or summary requests.
 const sid=i=>"00000000-0000-4000-8000-"+String(i).padStart(12,"0"),stamp=new Date(T-60000).toISOString();
 const newsItem=i=>({rank:i,id:"item-"+i,storyPublicId:sid(i),title:"测试模型"+i+"发布新功能",latestAt:stamp,links:{story:"https://aihot.news/story/"+sid(i)}});
 const fullHot={schemaVersion:1,count:10,items:Array.from({length:10},(_,i)=>newsItem(i+1))};
 const shortHot={...fullHot,count:3,items:fullHot.items.slice(0,3)};
-const picks={schemaVersion:1,items:[{...newsItem(1),publishedAt:stamp,summary:"重复事件不得补入"},...Array.from({length:5},(_,i)=>({id:"pick-"+i,title:"精选资讯"+(i+1),summary:"开发团队"+(i+1)+"发布了新模型，支持本地部署。",publishedAt:stamp,links:{aihot:"/items/pick-"+i}}))],page:{count:6,hasMore:false,nextCursor:null}};
-const storyResponse=id=>({schemaVersion:1,story:{publicId:id,digest:"模型"+Number(id.slice(-3))+"新增多语言推理功能。团队同时发布测试结果。",reports:[{summary:"模型发布了官方技术说明。"}]}});
-const newsRoutes=u=>u.includes("hot-topics")?resp(200,shortHot):u.includes("/items?")?resp(200,picks):resp(200,storyResponse(u.split("/").pop()),{etag:'"detail"'});
+const picks={schemaVersion:1,items:[{...newsItem(1),publishedAt:stamp,summary:"重复事件不得补入"},...Array.from({length:5},(_,i)=>({id:"pick-"+i,title:"精选资讯"+(i+1),summary:"不展示这段摘要",publishedAt:stamp,links:{aihot:"/items/pick-"+i}}))],page:{count:6,hasMore:false,nextCursor:null}};
+const newsRoutes=u=>u.includes("hot-topics")?resp(200,shortHot):u.includes("/items?")?resp(200,picks):fail();
 let nc=mock(newsRoutes),nr=await N.loadNews(nc,T,5);
-assert.equal(nr.items.length,5);assert.equal(nr.mode,"mixed");assert.equal(nr.items[0].storyId,sid(1));assert.equal(nr.items[3].id,"pick-0");assert.ok(nr.items.slice(0,3).every(i=>i.summary.includes("多语言")));assert.ok(nr.items.slice(3).every(i=>i.summary.includes("本地部署")));assert.equal(nc.calls.length,5);
-const cachedDetail=mock(fail,nc.kv);nr=await N.loadNews(cachedDetail,T+M,5);assert.equal(cachedDetail.calls.length,0);assert.equal(nr.items.length,5);assert.ok(nr.items[0].summary);
+assert.equal(nr.items.length,5);assert.equal(nr.mode,"mixed");assert.equal(nr.items[0].storyId,sid(1));assert.equal(nr.items[3].id,"pick-0");assert.ok(nr.items.every(i=>!Object.hasOwn(i,"summary")&&!Object.hasOwn(i,"reportSummary")));assert.equal(nc.calls.length,2);
+const cachedTitle=mock(fail,nc.kv);nr=await N.loadNews(cachedTitle,T+M,5);assert.equal(cachedTitle.calls.length,0);assert.equal(nr.items.length,5);assert.equal(nr.items[0].title,newsItem(1).title);
 const rerun=mock(newsRoutes,nc.kv);nr=await N.loadNews(rerun,T+15*M,5);assert.equal(rerun.calls.length,2);assert.equal(nr.items.length,5);
-const newStamp=new Date(T+16*M).toISOString(),changedList={...shortHot,items:shortHot.items.map((x,i)=>i===0?{...x,latestAt:newStamp}:x)};
-const changedCtx=mock(u=>u.includes("hot-topics")?resp(200,changedList):u.includes("/items?")?resp(200,picks):resp(200,{schemaVersion:1,story:{publicId:sid(99),digest:"错误事件摘要"}}),nc.kv);
-nr=await N.loadNews(changedCtx,T+30*M,5);assert.equal(nr.items[0].summary,"");assert.ok(nr.items[1].summary.includes("多语言"));assert.equal(changedCtx.calls.filter(c=>c.u.includes("/stories/")).length,1);
 assert.equal(N.normalizeNews({...picks,page:{count:100}},"selected",T),null);
 const selectedOnly=mock(u=>u.includes("hot-topics")?resp(503,{}):resp(200,picks));
 nr=await N.loadNews(selectedOnly,T,5);assert.equal(nr.items.length,0);assert.equal(selectedOnly.calls.length,1);
 const picksOnly=mock(u=>u.includes("hot-topics")?resp(404,{}):resp(200,picks));nr=await N.loadNews(picksOnly,T,5);assert.equal(nr.items.length,5);assert.equal(nr.mode,"selected");
-const noFill=mock(u=>u.includes("hot-topics")?resp(200,{schemaVersion:1,count:1,items:[newsItem(1)]}):u.includes("/items?")?resp(200,{schemaVersion:1,items:[],page:{count:0}}):resp(200,storyResponse(sid(1))));
-nr=await N.loadNews(noFill,T,5);assert.equal(nr.items.length,1);assert.equal(nr.mode,"hot");
-const fillRecent=mock(u=>u.includes("hot-topics")?resp(200,shortHot):u.includes("mode=selected")?resp(200,{schemaVersion:1,items:[],page:{count:0}}):u.includes("mode=all")?resp(200,picks):resp(200,storyResponse(u.split("/").pop())));
-nr=await N.loadNews(fillRecent,T,5);assert.equal(nr.items.length,5);assert.equal(nr.mode,"mixed");assert.ok(fillRecent.calls.some(c=>c.u.includes("mode=all")));
-const storiesOffline=mock(u=>u.includes("hot-topics")?resp(200,fullHot):resp(500,{}));nr=await N.loadNews(storiesOffline,T,5);assert.equal(nr.items.length,5);assert.ok(nr.items.every(i=>!i.summary&&i.title));
-const limitedStory=mock(u=>u.includes("hot-topics")?resp(200,fullHot):resp(429,{},{"Retry-After":"1800"}));nr=await N.loadNews(limitedStory,T,8);assert.equal(nr.items.length,8);assert.equal(limitedStory.calls.filter(c=>c.u.includes("/stories/")).length,4);assert.equal(Date.parse(nr.refreshAfter)-T,30*M);
+const noFill=mock(u=>u.includes("hot-topics")?resp(200,{schemaVersion:1,count:1,items:[newsItem(1)]}):resp(200,{schemaVersion:1,items:[],page:{count:0}}));
+nr=await N.loadNews(noFill,T,5);assert.equal(nr.items.length,1);assert.equal(nr.mode,"hot");assert.equal(noFill.calls.length,3);
+const fillRecent=mock(u=>u.includes("hot-topics")?resp(200,shortHot):u.includes("mode=selected")?resp(200,{schemaVersion:1,items:[],page:{count:0}}):u.includes("mode=all")?resp(200,picks):fail());
+nr=await N.loadNews(fillRecent,T,5);assert.equal(nr.items.length,5);assert.equal(nr.mode,"mixed");assert.equal(fillRecent.calls.length,3);
+const strict=mock(u=>u.includes("hot-topics")?resp(200,fullHot):fail());
+nr=await N.loadNews(strict,T,8);assert.equal(nr.items.length,8);assert.equal(strict.calls.length,1);
 function newsRows(w){const all=[];function walk(v){if(v?.type==="stack"&&v.url&&typeof v.height==="number")all.push(v);for(const c of v?.children||[])walk(c)}walk(w);return all}
 function textNodes(w){const out=[];function walk(v){if(v?.type==="text")out.push(v.text);for(const c of v?.children||[])walk(c)}walk(w);return out}
 const hardCases=[
- {title:"GPT-6.2 模型已发布",summary:"OpenAI发布模型更新，用户现在可以体验新功能。"},
- {title:"Anthropic 将 Claude Messages API 从 Python 迁至 Rust",summary:"Anthropic 宣布完成 Claude Messages API 的技术迁移，新的 Rust 实现改善请求处理性能。"},
- {title:"本地测试新闻标题",summary:"这是极长的新闻摘要内容".repeat(50)+"，需要在完整边界选择文字。"},
- {title:"包含…省略号的标题",summary:"新闻发布了新功能。更多内容……"},
- {title:"中文（带括号）模型 GPT-6.2.1 与 API 版本 2.0 正式发布",summary:"新版本支持128K上下文。"},
- {title:"A".repeat(300),summary:"https://example.com/"+"x".repeat(500)},
- {title:"发布测试……",summary:"第一句没有结束......"}
+ {title:"GPT-6.2 模型已发布",summary:"不得使用的摘要"},
+ {title:"Anthropic 将 Claude Messages API 从 Python 迁至 Rust",summary:"不得使用的摘要"},
+ {title:"中文（带括号）模型 GPT-6.2.1 与 API 版本 2.0 正式发布"},
+ {title:"Nvidia 暂停向东南亚四国发运服务器"},
+ {title:"FCC批准SpaceX部署百万颗AI卫星"},
+ {title:"OpenAI修复GPT-6.2计费错误并补偿用户"},
+ {title:"Sand.ai 发布 MAGI-2，上线渠道与定价说法不一"},
+ {title:"包含…省略号的标题"},
+ {title:"A".repeat(300)},
+ {title:"A".repeat(481)},
+ {title:"发布测试......"}
 ];
 for(const f of families){
  const p=N.layoutProfile(f);
- for(const item of hardCases){const fit=N.fitNews(item,p);assert.equal(fit.lines.length,1);assert.ok(fit.lines.every(s=>N.textWidth(s)*(fit.scale||1)<=p.budget+0.00001));assert.ok(fit.lines.every(s=>!/(?:…|⋯|\.{3,}|．{3,})/.test(s)))}
- const ctx2=mock(u=>u.includes("hot-topics")?resp(200,fullHot):resp(200,storyResponse(u.split("/").pop())),new Map(),f),widget=await N.widget(ctx2,T);
- assert.equal(newsRows(widget).length,f==="systemLarge"?8:5);
- // The iPhone screenshot showed an unwanted centered flex column. Every
- // article must use one natural-width, explicitly left-aligned text element
- // and a trailing flexible spacer, rather than a centered flex text frame.
- for(const r of newsRows(widget)){
-  assert.equal(r.alignItems,"center");
-  assert.equal(r.children.length,3);
-  assert.equal(r.children[0].width,p.badge);
-  assert.equal(r.children[0].children[0].textAlign,"left");
-  const t=r.children[1];assert.equal(t.type,"text");
-  assert.equal(t.textAlign,"left");assert.equal(t.maxLines,1);
-  assert.equal(t.flex,undefined);
+ for(const item of hardCases){
+  const fit=N.fitNews(item,p);
+  if(fit){
+   assert.equal(fit.text,item.title);
+   assert.equal(fit.kind,"title");assert.deepEqual(fit.lines,[item.title]);
+   assert.ok(N.textWidth(fit.text)*(fit.scale||1)<=p.budget+0.00001);
+   assert.ok(p.font*fit.scale>=p.minFont-0.00001);
+   assert.ok(!/(?:…|⋯|\.{3,}|．{3,}|\n)/.test(fit.text));
+  }
+ }
+ for(const invalid of hardCases.slice(-4))assert.equal(N.fitNews(invalid,p),null);
+ const ctx2=mock(u=>u.includes("hot-topics")?resp(200,fullHot):fail(),new Map(),f),widget=await N.widget(ctx2,T);
+ const rows=newsRows(widget);assert.equal(rows.length,f==="systemLarge"?8:5);
+ for(let i=0;i<rows.length;i++){
+  const r=rows[i];assert.equal(r.alignItems,"center");assert.equal(r.children.length,3);
+  assert.equal(r.children[0].width,p.badge);assert.equal(r.children[0].children[0].textAlign,"left");
+  const t=r.children[1];assert.equal(t.type,"text");assert.equal(t.text,newsItem(i+1).title);
+  assert.equal(t.textAlign,"left");assert.equal(t.maxLines,1);assert.equal(t.flex,undefined);
   assert.equal(r.children[2].type,"spacer");assert.equal(r.children[2].length,undefined);
   assert.equal(t.text.split("\n").length,1);
-  assert.ok(t.text.split("\n").every(s=>N.textWidth(s)*t.font.size<=p.budget*p.font+0.0001));
+  assert.ok(N.textWidth(t.text)*t.font.size<=p.budget*p.font+0.0001);
+  assert.ok(t.font.size>=p.minFont-0.00001);
  }
- const list=widget.children.find(x=>x.type==="stack"&&x.direction==="column"&&x.children.some(r=>r.url));
- assert.ok(list);assert.equal(list.alignItems,"start");
- const rules=list.children.filter(x=>x.height===0.5);
- assert.equal(rules.length,newsRows(widget).length-1);
- for(const rule of rules){
-  assert.equal(rule.children[0].length,p.badge+4);
-  assert.equal(rule.children[1].flex,1);
-  assert.equal(rule.children[1].height,0.5);
-  assert.equal(rule.children[1].children[0].type,"spacer");
- }
-
- assert.ok(newsRows(widget).some(r=>/多语言|技术说明/.test(textNodes(r).join(""))),"rendered genuine summary "+f);
+ const list=widget.children.find(x=>x.type==="stack"&&x.direction==="column"&&x.children.some(r=>r.url));assert.ok(list);assert.equal(list.alignItems,"start");
+ const rules=list.children.filter(x=>x.height===0.5);assert.equal(rules.length,rows.length-1);
+ for(const rule of rules){assert.equal(rule.children[0].length,p.badge+4);assert.equal(rule.children[1].flex,1);assert.equal(rule.children[1].height,0.5);assert.equal(rule.children[1].children[0].type,"spacer")}
  assert.ok(textNodes(widget).every(x=>!/(?:…|⋯|\.{3,}|．{3,})/.test(x)));
- assert.equal(ctx2.calls.length,1+(f==="systemLarge"?8:5));
+ assert.equal(ctx2.calls.length,1);
  const [top,right,bottom,left]=p.padding,expectedHeight=p.count*p.rowHeight+(p.count-1)*0.5+top+bottom+(p.header+4)+(p.footer+3)+p.gap;
- assert.ok(expectedHeight<=(f==="systemLarge"?382:170),"height "+f);
- assert.ok(p.budget*p.font+p.badge+4+left+right<(f==="systemSmall"?170:364),"width "+f);
+ assert.ok(expectedHeight<=(f==="systemLarge"?382:170));
+ assert.ok(p.budget*p.font+p.badge+8+left+right<(f==="systemSmall"?170:364));
+ const invalidHot={...fullHot,items:[{...newsItem(1),title:"太长的标题".repeat(70)},{...newsItem(2),title:"源标题……"},...fullHot.items.slice(2)]};
+ const bypass=mock(u=>u.includes("hot-topics")?resp(200,invalidHot):fail(),new Map(),f);
+ const skipped=await N.widget(bypass,T);
+ assert.equal(newsRows(skipped).length,p.count);
+ assert.equal(newsRows(skipped)[0].children[1].text,newsItem(3).title);
+ assert.equal(bypass.calls.length,1);
 }
-assert.equal(N.fitNews({title:"模型发布",summary:"模型发布了新功能。"},N.layoutProfile("systemMedium")).kind,"summary");
-assert.equal(N.fitNews({title:"新模型正式发布",summary:"长摘要".repeat(100)},N.layoutProfile("systemSmall")).kind,"title");
+const mp=N.layoutProfile("systemMedium");
+assert.equal(N.fitNews({title:"模型发布",summary:"模型发布了新功能。"},mp).text,"模型发布");
+const longfit=N.fitNews(hardCases[1],mp);assert.ok(longfit);assert.ok(longfit.scale<1);assert.equal(longfit.text,hardCases[1].title);
 assert.equal(N.wrapText("超长英文单词"+"A".repeat(50),12),null);
-assert.equal(N.wrapText("甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己",11),null);
 assert.deepEqual(N.wrapText("甲乙丙丁",11),["甲乙丙丁"]);
-// Screenshot-like examples of different Chinese/Latin title lengths.
-const oneLineSamples=[
- {title:"Nvidia 暂停向东南亚四国发运服务器",summary:"Nvidia 已通知 Dell、Supermicro 等制造伙伴，暂停向马来西亚、新加坡、泰国和印尼发运服务器。"},
- {title:"FCC批准SpaceX部署百万颗AI卫星",summary:"美国联邦通信委员会（FCC）批准SpaceX在“Starmind”计划下部署至多100万颗搭载AI芯片的卫星，用于在轨处理AI数据。"},
- {title:"OpenAI修复GPT-6.2计费错误并补偿用户",summary:"OpenAI承认GPT-6.2上线时计费出错，多数用户的GPT-6.2 Astra和Sol用量被错误打折，现已修复。"},
- {title:"Sand.ai 发布 MAGI-2，上线渠道与定价说法不一",summary:"Sand.ai（三呆科技）发布视频生成模型 MAGI-2，总参数量从 114B 扩至 480B、激活参数 28B。"},
- {title:"Anthropic 将 Claude Messages API 从 Python 迁至 Rust",summary:"Anthropic 称已将 Claude Messages API 从 Python 迁移到 Rust"}
-];
-for(const item of oneLineSamples){
- const p=N.layoutProfile("systemMedium"),fit=N.fitNews(item,p);
- assert.equal(fit.lines.length,1);assert.ok(fit.kind!=="link",JSON.stringify(fit));
- assert.ok(N.textWidth(fit.lines[0])*(fit.scale||1)<=p.budget+0.00001);
- assert.ok(!/(?:…|⋯|\.{3,}|．{3,}|\n)/.test(fit.lines[0]));
- assert.ok([item.title,item.summary].some(s=>s.includes(fit.lines[0])));
-}
+const unfitHot={schemaVersion:1,count:3,items:[{...newsItem(1),title:"长标题".repeat(100)},newsItem(2),newsItem(3)]};
+const topUp=mock(u=>u.includes("hot-topics")?resp(200,unfitHot):resp(200,picks),new Map(),"systemMedium");
+const topUpWidget=await N.widget(topUp,T);assert.equal(newsRows(topUpWidget).length,5);assert.equal(topUp.calls.length,2);
+assert.equal(newsRows(topUpWidget)[0].children[1].text,newsItem(2).title);
+const oldKey="AIHotNews.v2.summary",oldKV=new Map([[oldKey,JSON.stringify({hot:{items:fullHot.items.map(x=>({...x,summary:"旧摘要",reportSummary:"旧综述"})),checked:T,etag:""},stories:{[sid(1)]:{summary:"旧详情",checked:T}},retryAt:0})]]);
+const migrated=mock(fail,oldKV,"systemMedium");const migratedWidget=await N.widget(migrated,T+M);
+assert.equal(newsRows(migratedWidget).length,5);assert.equal(migrated.calls.length,0);assert.ok(!oldKV.get(oldKey).includes("旧摘要"));assert.ok(!oldKV.get(oldKey).includes("旧详情"));
+assert.ok(!Object.hasOwn(JSON.parse(oldKV.get(oldKey)),"stories"));
 
 function lunar(d){const p=new Intl.DateTimeFormat("zh-CN-u-ca-chinese",{year:"numeric",month:"long",day:"numeric",timeZone:"Asia/Shanghai"}).formatToParts(new Date(d+"T04:00:00Z"));return {m:H.lunarMonthText(p.find(x=>x.type==="month").value),d:H.lunarDayText(p.find(x=>x.type==="day").value)}}
 const ds=["2026-11-27","2026-11-28","2026-11-30","2026-12-01","2026-12-31","2027-01-01","2027-02-06"];
