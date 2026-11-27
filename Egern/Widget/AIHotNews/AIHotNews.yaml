@@ -1,13 +1,13 @@
 # ==========================================
 # 📌 模块名称: 智能热搜
 # 🔥 数据来源: AIHOT 官方 REST API v1
-# ✨ 主榜: 当前 AI 热点 Top 10
-# 🧭 降级: 过去 24 小时 AIHOT 精选
+# ✨ 主榜: 当前 AI 热点 Top 10 + 事件综述
+# 🧭 补足: 过去 24 小时 AIHOT 精选与动态
 # 🔄 刷新: Widget 约 15 分钟请求刷新
 # ==========================================
 
 name: "智能热搜"
-description: "v2.0 · 直接读取 AIHOT 官方热点榜，展示当前 AI 圈热门事件排行；热点接口不可用时自动降级为过去 24 小时精选，支持 ETag、限流退避和最多6小时本地缓存。"
+description: "v2.0 · 热榜与事件摘要，条数不足由24小时精选及最新动态补充；小号/中号5条、大号8条，按尺寸显示完整短句，无省略号。支持ETag、限流退避、6小时缓存。"
 
 auto_update:
   interval: 1800
@@ -15,9 +15,9 @@ auto_update:
 scriptings:
   - generic:
       name: 智能热搜
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/AIHotNews/AIHotNews.js?v=2.0
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/AIHotNews/AIHotNews.js?v=2.0&rev=20261127-6
       update_interval: 1800
-      timeout: 20
+      timeout: 35
 
 widgets:
   - name: 智能热搜

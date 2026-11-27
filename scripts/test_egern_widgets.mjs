@@ -1,7 +1,7 @@
 import {readFile} from "node:fs/promises";
 import assert from "node:assert/strict";
 const apis={};
-for(const [name,helpers] of Object.entries({"AIHotNews":"loadNews,normalizeNews,safeLink","HuangliQuery":"validCalendarDay,lunarMonthText,lunarDayText","NodeVitals":""})){
+for(const [name,helpers] of Object.entries({"AIHotNews":"loadNews,normalizeNews,safeLink,fitNews,layoutProfile,textWidth,wrapText","HuangliQuery":"validCalendarDay,lunarMonthText,lunarDayText","NodeVitals":""})){
  const code=await readFile(new URL("../Egern/Widget/"+name+"/"+name+".js",import.meta.url),"utf8");
  const a=await import("data:text/javascript;base64,"+Buffer.from(code+"\nexport {"+helpers+"};").toString("base64"));
  apis[name]={...a,widget:a.default};
@@ -14,18 +14,71 @@ function mock(fn,kv=new Map(),widgetFamily="systemMedium",env={}){
 }
 const flat=JSON.stringify, families=["systemSmall","systemMedium","systemLarge"];
 const hot={schemaVersion:1,count:4,items:[{rank:3,id:"c",title:"AI 第三条",links:{story:"https://aihot.news/story/c"}},{rank:1,id:"a",title:"AI 第一条",links:{aihot:"/items/a"}},{rank:2,id:"a",title:"AI 第一条",links:{story:"/story/a"}},{rank:4,id:"bad",title:"测试链接",links:{story:"https://evil.example/story/x"}}]};
-let ctx=mock(()=>resp(200,hot,{etag:'"abc"'})),n=await N.loadNews(ctx,T);
+let ctx=mock(()=>resp(200,hot,{etag:'"abc"'})),n=await N.loadNews(ctx,T,3);
 assert.equal(n.items.length,3);assert.equal(n.items[0].title,"AI 第一条");assert.equal(n.items[0].url,"https://aihot.news/items/a");assert.equal(n.items[2].url,"https://aihot.news/hot");assert.equal(ctx.calls.length,1);assert.ok(ctx.calls[0].u.startsWith("https://aihot.news/"));
 for(const [a,b] of [["javascript:alert(1)","https://aihot.news/hot"],["https://aihot.virxact.com/story/c","https://aihot.news/story/c"],["https://aihot.news.evil.com/story/c","https://aihot.news/hot"]])assert.equal(N.safeLink(a),b);
 assert.equal(N.normalizeNews({items:[]},"hot",T),null);assert.equal(N.normalizeNews({...hot,count:99},"hot",T),null);
-let cache=mock(fail,ctx.kv);n=await N.loadNews(cache,T+M);assert.equal(cache.calls.length,0);assert.equal(n.items.length,3);
-let etag=mock((u,o)=>{assert.equal(o.headers["If-None-Match"],'"abc"');return resp(304,null)},ctx.kv);n=await N.loadNews(etag,T+15*M);assert.equal(n.items.length,3);assert.equal(n.cached,false);assert.equal(etag.calls.length,1);
-let offline=mock(fail,ctx.kv);n=await N.loadNews(offline,T+30*M);assert.equal(n.cached,true);assert.equal(n.items.length,3);assert.equal(offline.calls.length,2);
-let backoff=mock(fail,ctx.kv);n=await N.loadNews(backoff,T+31*M);assert.equal(backoff.calls.length,0);assert.equal(n.cached,true);
-n=await N.loadNews(mock(fail,ctx.kv),T+7*60*M);assert.equal(n.items.length,0);
-for(const status of [429,503]){const limited=mock(()=>resp(status,null,{"retry-after":"1800"}));n=await N.loadNews(limited,T);assert.equal(limited.calls.length,1);assert.equal(Date.parse(n.refreshAfter)-T,30*M);const next=mock(fail,limited.kv);await N.loadNews(next,T+M);assert.equal(next.calls.length,0)}
-const picked=mock(u=>u.includes("hot-topics")?resp(200,{schemaVersion:1,count:0,items:[]}):resp(200,{schemaVersion:1,count:2,items:[{id:"p",title:"备用新闻",publishedAt:new Date(T-60*M).toISOString(),links:{aihot:"/items/p"}},{id:"o",title:"过期新闻",publishedAt:new Date(T-25*60*M).toISOString()}]}));n=await N.loadNews(picked,T);assert.equal(n.mode,"selected");assert.equal(n.items.length,1);assert.equal(n.items[0].title,"备用新闻");
+let cache=mock(fail,ctx.kv);n=await N.loadNews(cache,T+M,3);assert.equal(cache.calls.length,0);assert.equal(n.items.length,3);
+let etag=mock((u,o)=>{assert.equal(o.headers["If-None-Match"],'"abc"');return resp(304,null)},ctx.kv);n=await N.loadNews(etag,T+15*M,3);assert.equal(n.items.length,3);assert.equal(n.cached,false);assert.equal(etag.calls.length,1);
+let offline=mock(fail,ctx.kv);n=await N.loadNews(offline,T+30*M,3);assert.equal(n.cached,true);assert.equal(n.items.length,3);assert.equal(offline.calls.length,2);
+let backoff=mock(fail,ctx.kv);n=await N.loadNews(backoff,T+31*M,3);assert.equal(backoff.calls.length,0);assert.equal(n.cached,true);
+n=await N.loadNews(mock(fail,ctx.kv),T+7*60*M,3);assert.equal(n.items.length,0);
+for(const status of [429,503]){const limited=mock(()=>resp(status,null,{"retry-after":"1800"}));n=await N.loadNews(limited,T,3);assert.equal(limited.calls.length,1);assert.equal(Date.parse(n.refreshAfter)-T,30*M);const next=mock(fail,limited.kv);await N.loadNews(next,T+M,3);assert.equal(next.calls.length,0)}
+const picked=mock(u=>u.includes("hot-topics")?resp(200,{schemaVersion:1,count:0,items:[]}):resp(200,{schemaVersion:1,count:2,items:[{id:"p",title:"备用新闻",publishedAt:new Date(T-60*M).toISOString(),links:{aihot:"/items/p"}},{id:"o",title:"过期新闻",publishedAt:new Date(T-25*60*M).toISOString()}]}));n=await N.loadNews(picked,T,3);assert.equal(n.mode,"selected");assert.equal(n.items.length,1);assert.equal(n.items[0].title,"备用新闻");
 for(const f of families){const w=await N.widget(mock(()=>resp(200,hot),new Map(),f),T);assert.equal(w.type,"widget");assert.ok(flat(w).includes("智能热搜"));assert.ok(Number.isFinite(Date.parse(w.refreshAfter)))}
+
+// Real API contract and phone-size fixtures; synthetic contents, no network.
+const sid=i=>"00000000-0000-4000-8000-"+String(i).padStart(12,"0"),stamp=new Date(T-60000).toISOString();
+const newsItem=i=>({rank:i,id:"item-"+i,storyPublicId:sid(i),title:"测试模型"+i+"发布新功能",latestAt:stamp,links:{story:"https://aihot.news/story/"+sid(i)}});
+const fullHot={schemaVersion:1,count:10,items:Array.from({length:10},(_,i)=>newsItem(i+1))};
+const shortHot={...fullHot,count:3,items:fullHot.items.slice(0,3)};
+const picks={schemaVersion:1,items:[{...newsItem(1),publishedAt:stamp,summary:"重复事件不得补入"},...Array.from({length:5},(_,i)=>({id:"pick-"+i,title:"精选资讯"+(i+1),summary:"开发团队"+(i+1)+"发布了新模型，支持本地部署。",publishedAt:stamp,links:{aihot:"/items/pick-"+i}}))],page:{count:6,hasMore:false,nextCursor:null}};
+const storyResponse=id=>({schemaVersion:1,story:{publicId:id,digest:"模型"+Number(id.slice(-3))+"新增多语言推理功能。团队同时发布测试结果。",reports:[{summary:"模型发布了官方技术说明。"}]}});
+const newsRoutes=u=>u.includes("hot-topics")?resp(200,shortHot):u.includes("/items?")?resp(200,picks):resp(200,storyResponse(u.split("/").pop()),{etag:'"detail"'});
+let nc=mock(newsRoutes),nr=await N.loadNews(nc,T,5);
+assert.equal(nr.items.length,5);assert.equal(nr.mode,"mixed");assert.equal(nr.items[0].storyId,sid(1));assert.equal(nr.items[3].id,"pick-0");assert.ok(nr.items.slice(0,3).every(i=>i.summary.includes("多语言")));assert.ok(nr.items.slice(3).every(i=>i.summary.includes("本地部署")));assert.equal(nc.calls.length,5);
+const cachedDetail=mock(fail,nc.kv);nr=await N.loadNews(cachedDetail,T+M,5);assert.equal(cachedDetail.calls.length,0);assert.equal(nr.items.length,5);assert.ok(nr.items[0].summary);
+const rerun=mock(newsRoutes,nc.kv);nr=await N.loadNews(rerun,T+15*M,5);assert.equal(rerun.calls.length,2);assert.equal(nr.items.length,5);
+const newStamp=new Date(T+16*M).toISOString(),changedList={...shortHot,items:shortHot.items.map((x,i)=>i===0?{...x,latestAt:newStamp}:x)};
+const changedCtx=mock(u=>u.includes("hot-topics")?resp(200,changedList):u.includes("/items?")?resp(200,picks):resp(200,{schemaVersion:1,story:{publicId:sid(99),digest:"错误事件摘要"}}),nc.kv);
+nr=await N.loadNews(changedCtx,T+30*M,5);assert.equal(nr.items[0].summary,"");assert.ok(nr.items[1].summary.includes("多语言"));assert.equal(changedCtx.calls.filter(c=>c.u.includes("/stories/")).length,1);
+assert.equal(N.normalizeNews({...picks,page:{count:100}},"selected",T),null);
+const selectedOnly=mock(u=>u.includes("hot-topics")?resp(503,{}):resp(200,picks));
+nr=await N.loadNews(selectedOnly,T,5);assert.equal(nr.items.length,0);assert.equal(selectedOnly.calls.length,1);
+const picksOnly=mock(u=>u.includes("hot-topics")?resp(404,{}):resp(200,picks));nr=await N.loadNews(picksOnly,T,5);assert.equal(nr.items.length,5);assert.equal(nr.mode,"selected");
+const noFill=mock(u=>u.includes("hot-topics")?resp(200,{schemaVersion:1,count:1,items:[newsItem(1)]}):u.includes("/items?")?resp(200,{schemaVersion:1,items:[],page:{count:0}}):resp(200,storyResponse(sid(1))));
+nr=await N.loadNews(noFill,T,5);assert.equal(nr.items.length,1);assert.equal(nr.mode,"hot");
+const fillRecent=mock(u=>u.includes("hot-topics")?resp(200,shortHot):u.includes("mode=selected")?resp(200,{schemaVersion:1,items:[],page:{count:0}}):u.includes("mode=all")?resp(200,picks):resp(200,storyResponse(u.split("/").pop())));
+nr=await N.loadNews(fillRecent,T,5);assert.equal(nr.items.length,5);assert.equal(nr.mode,"mixed");assert.ok(fillRecent.calls.some(c=>c.u.includes("mode=all")));
+const storiesOffline=mock(u=>u.includes("hot-topics")?resp(200,fullHot):resp(500,{}));nr=await N.loadNews(storiesOffline,T,5);assert.equal(nr.items.length,5);assert.ok(nr.items.every(i=>!i.summary&&i.title));
+const limitedStory=mock(u=>u.includes("hot-topics")?resp(200,fullHot):resp(429,{},{"Retry-After":"1800"}));nr=await N.loadNews(limitedStory,T,8);assert.equal(nr.items.length,8);assert.equal(limitedStory.calls.filter(c=>c.u.includes("/stories/")).length,4);assert.equal(Date.parse(nr.refreshAfter)-T,30*M);
+function newsRows(w){const all=[];function walk(v){if(v?.type==="stack"&&v.url&&typeof v.height==="number")all.push(v);for(const c of v?.children||[])walk(c)}walk(w);return all}
+function textNodes(w){const out=[];function walk(v){if(v?.type==="text")out.push(v.text);for(const c of v?.children||[])walk(c)}walk(w);return out}
+const hardCases=[
+ {title:"GPT-6.2 模型已发布",summary:"OpenAI发布模型更新，用户现在可以体验新功能。"},
+ {title:"Anthropic 将 Claude Messages API 从 Python 迁至 Rust",summary:"Anthropic 宣布完成 Claude Messages API 的技术迁移，新的 Rust 实现改善请求处理性能。"},
+ {title:"本地测试新闻标题",summary:"这是极长的新闻摘要内容".repeat(50)+"，需要在完整边界选择文字。"},
+ {title:"包含…省略号的标题",summary:"新闻发布了新功能。更多内容……"},
+ {title:"中文（带括号）模型 GPT-6.2.1 与 API 版本 2.0 正式发布",summary:"新版本支持128K上下文。"},
+ {title:"A".repeat(300),summary:"https://example.com/"+"x".repeat(500)},
+ {title:"发布测试……",summary:"第一句没有结束......"}
+];
+for(const f of families){
+ const p=N.layoutProfile(f);
+ for(const item of hardCases){const fit=N.fitNews(item,p);assert.ok(fit.lines.length>=1&&fit.lines.length<=2);assert.ok(fit.lines.every(s=>N.textWidth(s)*(fit.scale||1)<=p.budget+0.00001));assert.ok(fit.lines.every(s=>!/(?:…|⋯|\.{3,}|．{3,})/.test(s)))}
+ const ctx2=mock(u=>u.includes("hot-topics")?resp(200,fullHot):resp(200,storyResponse(u.split("/").pop())),new Map(),f),widget=await N.widget(ctx2,T);
+ assert.equal(newsRows(widget).length,f==="systemLarge"?8:5);
+ assert.ok(newsRows(widget).some(r=>textNodes(r).join("").includes("多语言")),"rendered summary "+f);
+ assert.ok(textNodes(widget).every(x=>!/(?:…|⋯|\.{3,}|．{3,})/.test(x)));
+ assert.equal(ctx2.calls.length,1+(f==="systemLarge"?8:5));
+ const [top,right,bottom,left]=p.padding,expectedHeight=p.count*p.rowHeight+(p.count-1)*0.5+top+bottom+(p.header+4)+(p.footer+3)+p.gap;
+ assert.ok(expectedHeight<=(f==="systemLarge"?382:170),"height "+f);
+ assert.ok(p.budget*p.font+p.badge+4+left+right<(f==="systemSmall"?170:364),"width "+f);
+}
+assert.equal(N.fitNews({title:"模型发布",summary:"模型发布了新功能。"},N.layoutProfile("systemMedium")).kind,"summary");
+assert.equal(N.fitNews({title:"新模型正式发布",summary:"长摘要".repeat(100)},N.layoutProfile("systemSmall")).kind,"title");
+assert.equal(N.wrapText("超长英文单词"+"A".repeat(50),12),null);
+
 function lunar(d){const p=new Intl.DateTimeFormat("zh-CN-u-ca-chinese",{year:"numeric",month:"long",day:"numeric",timeZone:"Asia/Shanghai"}).formatToParts(new Date(d+"T04:00:00Z"));return {m:H.lunarMonthText(p.find(x=>x.type==="month").value),d:H.lunarDayText(p.find(x=>x.type==="day").value)}}
 const ds=["2026-11-27","2026-11-28","2026-11-30","2026-12-01","2026-12-31","2027-01-01","2027-02-06"];
 function prim(d){const l=lunar(d),[y,m,n]=d.split("-");return {year:y,month:m,day:n,lMonth:l.m,lDate:l.d,gzYear:"丙午",gzMonth:"己亥",gzDate:"甲子",animal:"马",suit:"祭祀.出行",avoid:"动土",festivalList:"测试节日",jiri:"1"}}
