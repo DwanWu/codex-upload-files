@@ -154,7 +154,7 @@ async function measureNode(ctx,now=Date.now()){
   // IPPure IPv4 is a named fallback. IPQuery never supplies a purity number.
   const selected=pcs!==null?pcs:ps,source=pcs!==null?"Proxycheck":ps!==null?"IPPure":null;
   const purity=selected!==null?Math.round((100-selected)*100)/100:null;
-  const purityNote=source==="Proxycheck"?"Proxycheck参考":source==="IPPure"?"IPPure参考":target?.includes(":")?"IPv6评分暂缺":"评分暂缺";
+  const purityNote=source==="Proxycheck"?"":source==="IPPure"?"IPPure参考":target?.includes(":")?"IPv6评分暂缺":"评分暂缺";
   const dc=p?.isDataCenter===true||r.is_datacenter===true||d.hosting===true||type==="Hosting";
   const res=p?.isResidential===true||type==="Residential";
   const typeConflict=dc&&res||p?.isResidential===false&&type==="Residential";

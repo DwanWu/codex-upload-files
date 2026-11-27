@@ -19,7 +19,7 @@ scriptings:
       # 匿名接口可能拒绝代理来源，失败时自动降级为 IPPure。
       timeout: 15
       update_interval: 1800
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeVitals/NodeVitals.js?v=20261127-6
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeVitals/NodeVitals.js?v=20261127-7
 
 widgets:
   - name: 节点体检

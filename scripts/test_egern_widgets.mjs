@@ -121,7 +121,7 @@ const pcBody=(ip,row,status="ok")=>({status,[ip]:row});
 const tri=(pure,query,proxy,env={},kv=new Map())=>mock(u=>u.includes("ippure")?resp(200,pure):u.includes("proxycheck.io")?resp(200,proxy):resp(200,query),kv,"systemMedium",env);
 ctx=tri(p,q,pcBody(p.ip,rowPC(18)));
 v=await V.measureNode(ctx,nowPC);
-assert.equal(v.exitIP,p.ip);assert.equal(v.purity,82);assert.equal(v.puritySource,"Proxycheck");assert.equal(v.purityNote,"Proxycheck参考");assert.equal(v.proxycheckRiskScore,18);assert.equal(v.rawFraudScore,12);assert.equal(v.ipqueryRiskScore,5);assert.equal(v.riskLevel,"低");assert.equal(v.riskNote,null);assert.equal(ctx.calls.length,3);
+assert.equal(v.exitIP,p.ip);assert.equal(v.purity,82);assert.equal(v.puritySource,"Proxycheck");assert.equal(v.purityNote,"");assert.equal(v.proxycheckRiskScore,18);assert.equal(v.rawFraudScore,12);assert.equal(v.ipqueryRiskScore,5);assert.equal(v.riskLevel,"低");assert.equal(v.riskNote,null);assert.equal(ctx.calls.length,3);
 assert.ok(ctx.calls.every(c=>c.o.credentials==="omit"&&c.o.insecureTls===false&&c.o.redirect==="error"));
 v=await V.measureNode(tri({...p,fraudScore:80},q,pcBody(p.ip,rowPC(10))),nowPC);
 assert.equal(v.purity,90);assert.equal(v.puritySource,"Proxycheck");assert.equal(v.riskNote,"评分有差异");assert.equal(v.riskLevel,"高");
@@ -168,7 +168,7 @@ const limitKV=new Map([["NodeVitals.proxycheck.budget.v1",JSON.stringify({day:"2
 ctx=tri(p,q,pcBody(p.ip,rowPC(0)),{},limitKV);v=await V.measureNode(ctx,nowPC);assert.equal(v.purity,88);assert.ok(!ctx.calls.some(c=>c.u.includes("proxycheck.io")));
 for(const f of families){
  w=await V.widget(mock(u=>u.includes("ippure")?resp(200,p):u.includes("proxycheck")?resp(200,pcBody(p.ip,rowPC(18))):resp(200,q),new Map(),f),nowPC);
- assert.ok(flat(w).includes("Proxycheck参考"));assert.ok(flat(w).includes('"text":"82"'));assert.ok(flat(w).includes("出口 IP"));assert.equal(Date.parse(w.refreshAfter),nowPC+30*60000);
+ assert.ok(!flat(w).includes("Proxycheck参考"));assert.ok(flat(w).includes('"text":"82"'));assert.ok(flat(w).includes("出口 IP"));assert.equal(Date.parse(w.refreshAfter),nowPC+30*60000);
 }
 
 console.log("Three Egern widget regression suites passed");
