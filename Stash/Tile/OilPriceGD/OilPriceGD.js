@@ -1,7 +1,7 @@
 /** 广东油价 · Stash 折叠面板 v2.0
  * 价格及调价日历复用 Egern 的主分支 prices.json。
  * 校验、缓存合并、周期与价格展示模型源自 425f534658322edec4b834951f91a92ab2769208。
- * 仅显示92号、95号价格；调价日期仅用于后台校验。北京时间。
+ * 标题显示下次调价日期（月/日），正文仅显示92号、95号价格。北京时间。
  */
 (function(){
 "use strict";
@@ -209,8 +209,9 @@ function renderTile(snapshot,now,connected){
   const a=d.current;
   const status=d.stale?"·旧价":!connected?"·缓存":snapshot.records[0].rank===1?"·参考":"";
   const delta=a.p95.delta;
+  const next=d.nextKind==="paused"?"暂缓":d.next?(d.nextKind==="estimated"||d.nextKind==="corroborated"?"预计":"")+shortDate(d.next):"待公布";
   return {
-    title:"广东油价"+status,
+    title:"广东油价·"+next+status,
     content:"92·"+money(a.p92.price)+"-95·"+money(a.p95.price),
     icon:ICON,
     backgroundColor:d.stale||!connected||snapshot.records[0].rank===1?COLORS.unknown:
