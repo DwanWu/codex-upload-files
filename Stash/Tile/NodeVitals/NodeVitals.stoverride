@@ -1,10 +1,10 @@
 # Stash native Tile only; does not change proxy rules or the subscription.
 name: "节点体检"
-desc: "v2.0 · 折叠面板，长按任意节点实时检测纯度、IP 属性、风险及地区，单行展示。"
+desc: "v2.0 · 单行折叠面板，显示纯度·属性·风险；长按节点实时检测。"
 category: "节点工具"
 version: "2.0"
 tiles:
-  - name: node-vitals-v2
+  - name: node-vitals-v2-compact
     interval: 600
     title: "节点体检"
     content: "等待检测"
@@ -12,6 +12,6 @@ tiles:
     backgroundColor: "#8E8E93"
     collapsed: true
 script-providers:
-  node-vitals-v2:
-    url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/stash-rules/Stash/Tile/NodeVitals/NodeVitals.js?v=2.0&rev=20261127-3
+  node-vitals-v2-compact:
+    url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/stash-rules/Stash/Tile/NodeVitals/NodeVitalsCompact.js?v=2.0
     interval: 1800

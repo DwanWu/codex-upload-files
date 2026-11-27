@@ -7,3 +7,5 @@
 安装 NodeVitals.stoverride 后启用覆写。验证命令：node Stash/Tile/NodeVitals/test_NodeVitals.mjs。测试覆盖模拟 HTTP、评分、切换 IP、异常及不强制策略头；实际 Stash iOS 折叠显示和长按节点转发仍需设备验证。
 
 文档：https://stash.wiki/script/tile ；https://stash.wiki/script/syntax-and-interface ；https://ippure.com/MyIP-Info-API
+
+为避免旧版 Stash 磁盘脚本和 Tile 缓存，覆写改用 `node-vitals-v2-compact` 与独立脚本路径 `NodeVitalsCompact.js`。保留旧 `NodeVitals.js` 兼容已有订阅；两份脚本本次内容完全一致。旧覆写应更新或移除后重新导入，不与旧版重复启用。

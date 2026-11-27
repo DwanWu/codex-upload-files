@@ -1,7 +1,7 @@
 import {readFile} from "node:fs/promises";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-const source=await readFile(new URL("./NodeVitals.js",import.meta.url),"utf8");
+const source=await readFile(new URL("./NodeVitalsCompact.js",import.meta.url),"utf8");
 let checks=0;
 const eq=(a,b)=>{checks++;assert.equal(a,b)};
 const ok=x=>{checks++;assert.ok(x)};
