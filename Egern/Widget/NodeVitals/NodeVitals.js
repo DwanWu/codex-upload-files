@@ -15,6 +15,9 @@ const COUNTRY_ZH = {
   };
 const PURE_URL="https://my.ippure.com/v1/info",QUERY_BASE="https://api.ipquery.io/",QUERY_URL=QUERY_BASE+"?format=json",PROXY_BASE="https://proxycheck.io/v3/";
 const PROXY_BUDGET="NodeVitals.proxycheck.budget.v1";
+// Three sequential request stages at most; keep the module timeout above 24s.
+// A 4s limit cut off valid provider responses during the live integration check.
+const HTTP_TIMEOUT=8000;
 function canonIP(x){
   if(typeof x!=="string")return null;let s=x.trim().toLowerCase();
   const v4=v=>/^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(v)&&v.split(".").every(n=>+n<=255);
@@ -45,7 +48,7 @@ function publicIP(value){
 function score(v){return typeof v==="number"&&Number.isFinite(v)&&v>=0&&v<=100?v:null}
 function object(v){return !!v&&typeof v==="object"&&!Array.isArray(v)}
 // IPPure FAQ explicitly excludes IPv6 from its risk score.
-// Do not mix or average distinct providers; any fallback must be explicitly labeled.
+// Keep raw provider scores distinct; the UI uses a documented conservative rule.
 function pureScore(p,target){
   if(!p||!target||target.includes(":")||publicIP(p.ip)!==target)return null;
   return score(p.fraudScore);
@@ -70,20 +73,15 @@ function parseProxyCheck(body,target,now){
   const row=body[matches[0]],d=row?.detections;
   if(!object(row)||!object(d)||score(d.risk)===null)return {record:null,invalid:true};
   const flags=["proxy","vpn","compromised","scraper","tor","hosting","anonymous"];
-  if(!flags.every(k=>typeof d[k]==="boolean"))return {record:null,invalid:true};
-  const positive=flags.filter(k=>k!=="hosting").some(k=>d[k]===true);
-  const history=row.detection_history;
-  // A delisted positive detection, or a future timestamp, is contradictory.
-  // Never turn a contradictory record into a definitive score.
-  if(object(history)&&history.delisted===true&&positive)return {record:null,invalid:true};
-  if((d.proxy||d.vpn||d.tor)&&!d.anonymous)return {record:null,invalid:true};
-  if((positive||d.hosting)&&d.risk===0)return {record:null,invalid:true};
+  // The v3 contract allows unknown fields to be null. Missing flags remain
+  // unknown, not false; they do not erase an independently valid numeric score.
+  if(flags.some(k=>d[k]!=null&&typeof d[k]!=="boolean"))return {record:null,invalid:true};
+  // detection_history describes past delisting; a new positive detection can
+  // coexist with it. Current detections and their risk must remain usable.
   const stamp=row.last_updated;
-  if(typeof stamp!=="string"||!/^\d{4}-\d{2}-\d{2}T.*Z$/.test(stamp)||!Number.isFinite(Date.parse(stamp))||Date.parse(stamp)>now+300000)return {record:null,invalid:true};
-  // last_updated is provider database metadata, not a guarantee of fresh observation.
-  // Require recent metadata for a zero score. A positive risk is generated live by
-  // the API even when network metadata was last updated earlier; retain it.
-  if(d.risk===0&&now-Date.parse(stamp)>86400000)return {record:null,invalid:true};
+  if(stamp!=null&&(typeof stamp!=="string"||!/^\d{4}-\d{2}-\d{2}T.*Z$/.test(stamp)||!Number.isFinite(Date.parse(stamp))||Date.parse(stamp)>now+300000))return {record:null,invalid:true};
+  // last_updated is database metadata, not the score's observation timestamp.
+  // Freshness checks use the HTTP response Age, equally for zero/nonzero scores.
   return {record:row,invalid:false};
 }
 function proxyGate(ctx,now,hasKey){
@@ -111,7 +109,7 @@ async function proxyJSON(ctx,target,policy,now){
   if(!gate.allow)return {record:null,invalid:false};
   try{
     const url=PROXY_BASE+encodeURIComponent(target)+"?tag=0"+(key?"&key="+encodeURIComponent(key):"");
-    const r=await ctx.http.get(url,{headers:{"User-Agent":"Egern-NodeVitals/3.1","Accept":"application/json","Cache-Control":"no-cache, no-store","Pragma":"no-cache"},timeout:4000,credentials:"omit",insecureTls:false,redirect:"error",...(policy?{policy}:{})});
+    const r=await ctx.http.get(url,{headers:{"User-Agent":"Egern-NodeVitals/3.2","Accept":"application/json","Cache-Control":"no-cache, no-store","Pragma":"no-cache"},timeout:HTTP_TIMEOUT,credentials:"omit",insecureTls:false,redirect:"error",...(policy?{policy}:{})});
     if([401,403,429].includes(r.status)){gate.block(Math.max(3600000,retryAfter(r,now)));return {record:null,invalid:false}}
     if(r.status!==200)return {record:null,invalid:false};
     if((ageHeader(r)??0)>900)return {record:null,invalid:true};
@@ -124,7 +122,7 @@ async function proxyJSON(ctx,target,policy,now){
 }
 async function ipJSON(ctx,url,policy){
   try{
-    const r=await ctx.http.get(url,{headers:{"User-Agent":"Egern-NodeVitals/3.1","Accept":"application/json","Cache-Control":"no-cache, no-store","Pragma":"no-cache"},timeout:4000,credentials:"omit",insecureTls:false,redirect:"error",...(policy?{policy}:{})});
+    const r=await ctx.http.get(url,{headers:{"User-Agent":"Egern-NodeVitals/3.2","Accept":"application/json","Cache-Control":"no-cache, no-store","Pragma":"no-cache"},timeout:HTTP_TIMEOUT,credentials:"omit",insecureTls:false,redirect:"error",...(policy?{policy}:{})});
     if(r.status!==200)return null;
     // Caller-IP endpoints must not replay a shared CDN response for a prior request.
     if((url===PURE_URL||url===QUERY_URL)&&(ageHeader(r)??0)>0)return null;
@@ -163,24 +161,21 @@ async function measureNode(ctx,now=Date.now()){
   // manufacture a deduction, or let a zero from one provider hide positive evidence.
   const available=[{source:"Proxycheck",value:pcs},{source:"IPPure",value:ps}].filter(x=>x.value!==null).sort((a,b)=>b.value-a.value);
   const best=available[0]||null;
-  const queryClear=complete&&qs===0&&["is_vpn","is_proxy","is_tor","is_datacenter"].every(k=>r[k]===false);
-  const proxyClear=!!pc&&["proxy","vpn","compromised","scraper","tor","hosting","anonymous"].every(k=>d[k]===false)&&["Residential","Business","Wireless"].includes(type);
-  const attackEvidence=object(pc?.attack_history)?Object.values(pc.attack_history).some(x=>typeof x==="number"&&x>0):Array.isArray(pc?.attack_history)?pc.attack_history.some(x=>typeof x==="number"&&x>0||object(x)&&Object.values(x).some(v=>typeof v==="number"&&v>0)):false;
-  // A full score needs two real zero scores for the same IP, independently
-  // corroborated by IPQuery, with no known contrary evidence. IPv6 cannot
-  // reach 100 via IPPure because its IPv6 score is unsupported.
-  const fullAllowed=ps===0&&pcs===0&&queryClear&&proxyClear&&!dc&&!typeConflict&&!flagsConflict&&!proxyResult.invalid&&!attackEvidence;
-  const zeroUnverified=!!best&&best.value===0&&!fullAllowed;
-  const selected=zeroUnverified?null:best?.value??null,source=selected===null?null:best.source;
+  const proxyClear=!!pc&&["proxy","vpn","compromised","scraper","tor","hosting","anonymous"].every(k=>d[k]===false);
+  // Zero is a valid provider result, not missing data. An unavailable backup
+  // must not erase it. 100 is the inverse reference score, never a safety guarantee.
+  const selected=best?.value??null,source=best?.source??null;
   // Keep a positive source risk from rounding up to a displayed 100.
   const purity=selected===null?null:selected===0?100:Math.min(99.99,Math.round((100-selected)*100)/100);
-  const purityNote=zeroUnverified?"零分待核验":source==="Proxycheck"?"":source==="IPPure"?"IPPure参考":target?.includes(":")?"IPv6评分暂缺":"评分暂缺";
-  const riskNote=proxyResult.invalid?"记录有差异":scoreConflict?"评分有差异":typeConflict||flagsConflict?"来源有差异":zeroUnverified?"满分未核验":null;
+  const purityNote=source==="Proxycheck"?"":source==="IPPure"?"IPPure参考":target?.includes(":")?"IPv6评分暂缺":"评分暂缺";
+  const riskNote=proxyResult.invalid?"记录有差异":scoreConflict?"评分有差异":typeConflict||flagsConflict?"来源有差异":null;
   let riskLevel="未知";
   // Different provider scales remain distinct; positive risk evidence is not averaged away.
   if(d.tor===true||d.compromised===true||d.proxy===true||pcs!==null&&pcs>75||r.is_tor===true||r.is_vpn===true&&r.is_proxy===true||[ps,qs].some(v=>v!==null&&v>=65))riskLevel="高";
   else if(dc||d.vpn===true||d.anonymous===true||d.scraper===true||pcs!==null&&pcs>25||r.is_vpn===true||r.is_proxy===true||[ps,qs].some(v=>v!==null&&v>=25))riskLevel="中";
-  else if(!riskNote&&((complete&&ps!==null)||(pc&&complete)||(pc&&ps!==null))&&property!=="有差异")riskLevel="低";
+  // A valid low-risk result is usable without requiring every backup to succeed.
+  // Unknown Proxycheck flags alone cannot establish a clear detection result.
+  else if(!riskNote&&(ps!==null||complete||proxyClear)&&property!=="有差异")riskLevel="低";
   const cc=cleanIPText(p?.countryCode||pc?.location?.country_code||q?.location?.country_code||q?.location?.countryCode).toUpperCase();
   const region=COUNTRY_ZH[cc]||cleanIPText(pc?.location?.country_name||q?.location?.country||p?.country)||"未知";
   const quality=!target?"offline":(p&&q||pc&&(p||q))?"verified":"single";
@@ -315,3 +310,4 @@ export default async function (ctx,clock=Date.now()) {
     ]
   };
 }
+

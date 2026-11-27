@@ -50,10 +50,10 @@ assert.equal(v.purity,88);assert.equal(v.property,"住宅");assert.equal(v.riskL
 assert.equal(ctx.calls.length,3);assert.ok(ctx.calls.some(c=>c.u==="https://api.ipquery.io/8.8.4.4"));assert.ok(ctx.calls.some(c=>c.u==="https://proxycheck.io/v3/8.8.4.4?tag=0"));
 assert.ok(ctx.calls.every(c=>c.o.policy==="节点选择"));assert.ok(ctx.calls.every(c=>c.o.credentials==="omit"&&c.o.insecureTls===false));
 v=await V.measureNode(pair({...p,fraudScore:null,isResidential:null},{...q,risk:{risk_score:null}}));assert.equal(v.purity,null);assert.equal(v.property,"未知");assert.equal(v.riskLevel,"未知");
-v=await V.measureNode(pair({...p,fraudScore:0},q));assert.equal(v.purity,null);assert.equal(v.purityNote,"零分待核验");
+v=await V.measureNode(pair({...p,fraudScore:0},q));assert.equal(v.purity,100);assert.equal(v.puritySource,"IPPure");assert.equal(v.riskLevel,"低");assert.equal(v.riskNote,null);
 v=await V.measureNode(pair({...p,fraudScore:"0"},q));assert.equal(v.purity,null);assert.equal(v.purityLabel,"纯度");assert.equal(v.puritySource,null);
 // A mismatched lookup must not discard valid IPPure results or mix another address's risk.
-v=await V.measureNode(pair({...p,ip:"9.9.9.9"},{...q,risk:{...q.risk,is_tor:true,risk_score:100}}));assert.equal(v.quality,"single");assert.equal(v.region,"日本");assert.equal(v.purity,88);assert.equal(v.property,"住宅");assert.equal(v.riskLevel,"未知");
+v=await V.measureNode(pair({...p,ip:"9.9.9.9"},{...q,risk:{...q.risk,is_tor:true,risk_score:100}}));assert.equal(v.quality,"single");assert.equal(v.region,"日本");assert.equal(v.purity,88);assert.equal(v.property,"住宅");assert.equal(v.riskLevel,"低");
 const routed=mock(u=>u.includes("ippure")?resp(200,p):u==="https://api.ipquery.io/8.8.4.4"?resp(200,q):resp(200,{...q,ip:"9.9.9.9",risk:{...q.risk,risk_score:100}}));
 v=await V.measureNode(routed);assert.equal(v.quality,"verified");assert.equal(v.exitIP,p.ip);assert.equal(v.riskLevel,"低");assert.equal(routed.calls.length,3);assert.ok(!routed.calls.some(c=>c.u.includes("?format=json")));
 v=await V.measureNode(pair({...p,ip:"2606:4700:4700::1111"},q));assert.equal(v.quality,"single");assert.equal(v.purity,null);assert.equal(v.purityNote,"IPv6评分暂缺");assert.equal(v.riskLevel,"未知");
@@ -62,8 +62,8 @@ v=await V.measureNode(pair({...p,isResidential:false},q));assert.equal(v.propert
 v=await V.measureNode(pair(p,{...q,risk:{...q.risk,is_datacenter:true}}));assert.equal(v.property,"有差异");assert.equal(v.riskLevel,"中");
 v=await V.measureNode(pair(null,{...q,risk:{...q.risk,is_tor:true,risk_score:100}}));assert.equal(v.purity,null);assert.equal(v.riskLevel,"高");assert.equal(v.puritySource,null);
 ctx=mock(u=>u.includes("ippure")?resp(503,{}):u.includes("?format=json")?resp(200,{ip:q.ip}):resp(200,q));
-v=await V.measureNode(ctx);assert.equal(ctx.calls.length,4);assert.equal(v.exitIP,q.ip);assert.equal(v.purity,null);assert.equal(v.riskLevel,"未知");
-ctx=mock(u=>u.includes("ippure")?resp(200,p):resp(503,{}));v=await V.measureNode(ctx);assert.equal(v.purity,88);assert.equal(v.property,"住宅");assert.equal(v.riskLevel,"未知");assert.equal(v.region,"日本");
+v=await V.measureNode(ctx);assert.equal(ctx.calls.length,4);assert.equal(v.exitIP,q.ip);assert.equal(v.purity,null);assert.equal(v.riskLevel,"低");
+ctx=mock(u=>u.includes("ippure")?resp(200,p):resp(503,{}));v=await V.measureNode(ctx);assert.equal(v.purity,88);assert.equal(v.property,"住宅");assert.equal(v.riskLevel,"低");assert.equal(v.region,"日本");
 v=await V.measureNode(mock(fail));assert.equal(v.quality,"offline");assert.equal(v.purity,null);assert.equal(v.property,"未知");assert.equal(v.riskLevel,"未知");
 for(const f of families){
  const w=await V.widget(mock(u=>u.includes("ippure")?resp(200,p):resp(200,{...q,ip:"9.9.9.9"}),new Map(),f),T);
@@ -84,7 +84,7 @@ for(const value of [undefined,null,"0","100",false,true,-1,101,NaN,Infinity,{},[
  v=await V.measureNode(pair({...p,fraudScore:value},q));assert.equal(v.purity,null);assert.equal(v.rawFraudScore,null);
 }
 for(const value of [0,1,12.5,50,99,100]){
- v=await V.measureNode(pair({...p,fraudScore:value},q));assert.equal(v.purity,value===0?null:100-value);assert.equal(v.rawFraudScore,value);assert.equal(v.puritySource,value===0?null:"IPPure");
+ v=await V.measureNode(pair({...p,fraudScore:value},q));assert.equal(v.purity,100-value);assert.equal(v.rawFraudScore,value);assert.equal(v.puritySource,"IPPure");
 }
 for(const value of [0,12,100]){
  v=await V.measureNode(pair({...p,ip:"2606:4700:4700::1111",fraudScore:value},{...q,ip:"2606:4700:4700::1111"}));
@@ -101,7 +101,7 @@ ctx=mock(u=>u.includes("ippure")?resp(200,p,{"Age":"120"}):resp(200,publicQuery)
 v=await V.measureNode(ctx);assert.equal(v.exitIP,"1.1.1.1");assert.equal(v.purity,null);assert.ok(ctx.calls.every(c=>c.o.headers["Cache-Control"]==="no-cache, no-store"));
 ctx=mock(()=>resp(429,{ip:p.ip,fraudScore:0}));v=await V.measureNode(ctx);assert.equal(v.purity,null);assert.equal(v.exitIP,"获取失败");
 ctx=mock(u=>u.includes("ippure")?{status:200,text:async()=>"<html>challenge</html>"}:resp(200,publicQuery));v=await V.measureNode(ctx);assert.equal(v.purity,null);assert.equal(v.exitIP,"1.1.1.1");
-v=await V.measureNode(pair({...p,fraudScore:0},{...q,risk:{...q.risk,is_tor:true,risk_score:100}}));assert.equal(v.purity,null);assert.equal(v.rawFraudScore,0);assert.equal(v.riskLevel,"高");
+v=await V.measureNode(pair({...p,fraudScore:0},{...q,risk:{...q.risk,is_tor:true,risk_score:100}}));assert.equal(v.purity,100);assert.equal(v.rawFraudScore,0);assert.equal(v.riskLevel,"高");
 for(const f of families){
  w=await V.widget(mock(u=>u.includes("ippure")?resp(200,officialPure):resp(503,{}),new Map(),f),T);
  assert.ok(flat(w).includes("IPPure参考"));assert.ok(flat(w).includes('"text":"25"'));assert.ok(flat(w).includes("出口 IP"));assert.ok(!flat(w).includes("IPPure IP"));
@@ -135,11 +135,10 @@ const v6="2606:4700:4700::1111",v6canon=V.publicIP(v6);
 ctx=tri({...p,ip:v6,fraudScore:0},{...q,ip:v6},pcBody(v6,rowPC(45)));
 v=await V.measureNode(ctx,nowPC);assert.equal(v.purity,55);assert.equal(v.puritySource,"Proxycheck");assert.equal(v.rawFraudScore,null);assert.ok(ctx.calls.some(c=>c.u==="https://proxycheck.io/v3/"+encodeURIComponent(v6canon)+"?tag=0"));
 v=await V.measureNode(tri(null,q,pcBody(q.ip,rowPC(20))),nowPC);assert.equal(v.purity,80);assert.equal(v.puritySource,"Proxycheck");assert.equal(v.riskLevel,"低");
-// Replay the contradictory public resolver response observed on 27 Nov 2026.
-// Do not treat an anonymous=true but delisted=true record as authoritative.
-const inconsistent=rowPC(100,{network:{type:"Business"},detection_history:{delisted:true,delist_datetime:"2026-11-20T02:47:02Z"}});
-inconsistent.detections.anonymous=true;
-v=await V.measureNode(tri(p,q,pcBody(p.ip,inconsistent)),nowPC);assert.equal(v.purity,88);assert.equal(v.puritySource,"IPPure");assert.equal(v.proxycheckRiskScore,null);assert.equal(v.riskNote,"记录有差异");assert.equal(v.riskLevel,"未知");
+// Historical delisting does not invalidate a current positive detection or score.
+const relisted=rowPC(100,{network:{type:"Business"},detection_history:{delisted:true,delist_datetime:"2026-11-20T02:47:02Z"}});
+relisted.detections.anonymous=true;
+v=await V.measureNode(tri(p,q,pcBody(p.ip,relisted)),nowPC);assert.equal(v.purity,0);assert.equal(v.puritySource,"Proxycheck");assert.equal(v.proxycheckRiskScore,100);assert.equal(v.riskNote,"评分有差异");assert.equal(v.riskLevel,"高");
 for(const bad of [
  pcBody("9.9.9.9",rowPC(0)),
  pcBody(p.ip,rowPC("0")),
@@ -147,15 +146,15 @@ for(const bad of [
  pcBody(p.ip,rowPC(101)),
  pcBody(p.ip,rowPC(0,{last_updated:"invalid"})),
  pcBody(p.ip,rowPC(0,{last_updated:new Date(nowPC+3600000).toISOString()})),
- pcBody(p.ip,rowPC(0,{last_updated:new Date(nowPC-2*86400000).toISOString()})),
  {status:"denied",[p.ip]:rowPC(0)},
  {status:"warning",message:"Your API Key has been disabled",[p.ip]:rowPC(0)}
 ]){
  v=await V.measureNode(tri({...p,fraudScore:12},q,bad),nowPC);
  assert.equal(v.purity,88);assert.equal(v.puritySource,"IPPure");assert.equal(v.proxycheckRiskScore,null);
 }
-const malformed=rowPC(0);malformed.detections.proxy=true;malformed.detections.anonymous=true;
-v=await V.measureNode(tri(p,q,pcBody(p.ip,malformed)),nowPC);assert.equal(v.purity,88);assert.equal(v.riskNote,"记录有差异");
+// A provider score is not discarded because a separate positive flag exists.
+const positiveZero=rowPC(0);positiveZero.detections.proxy=true;positiveZero.detections.anonymous=true;
+v=await V.measureNode(tri(p,q,pcBody(p.ip,positiveZero)),nowPC);assert.equal(v.purity,88);assert.equal(v.proxycheckRiskScore,0);assert.equal(v.riskLevel,"高");assert.equal(v.riskNote,null);
 const budgetKV=new Map();
 ctx=mock(u=>u.includes("ippure")?resp(200,p):u.includes("proxycheck")?resp(429,{},{"Retry-After":"7200"}):resp(200,q),budgetKV);
 v=await V.measureNode(ctx,nowPC);assert.equal(v.purity,88);assert.equal(v.puritySource,"IPPure");
@@ -172,7 +171,7 @@ for(const f of families){
 }
 
 
-// Full-score regression: mock independent source responses to the same address.
+// Zero-risk and fallback regression: mock independent responses to the same address.
 // A zero in one provider must not override another provider's positive score.
 const p0={...p,fraudScore:0},q0={...q,risk:{...q.risk,risk_score:0}};
 v=await V.measureNode(tri(p,q0,pcBody(p.ip,rowPC(0))),nowPC);
@@ -199,10 +198,11 @@ for(const [a,b,c] of [
  [p0,q0,pcBody(p.ip,rowPC(0,{last_updated:new Date(nowPC-2*86400000).toISOString()}))]
 ]){
  v=await V.measureNode(tri(a,b,c),nowPC);
- assert.equal(v.purity,null);assert.equal(v.puritySource,null);assert.equal(v.purityNote,"零分待核验");
+ assert.equal(v.purity,100);assert.ok(["IPPure","Proxycheck"].includes(v.puritySource));
+ assert.ok(![v.purityNote,v.riskNote].includes("零分待核验"));assert.ok(![v.purityNote,v.riskNote].includes("满分未核验"));
 }
 const ipv6Clean=tri({...p0,ip:v6},{...q0,ip:v6},pcBody(v6,rowPC(0)));
-v=await V.measureNode(ipv6Clean,nowPC);assert.equal(v.purity,null);assert.equal(v.purityNote,"零分待核验");
+v=await V.measureNode(ipv6Clean,nowPC);assert.equal(v.purity,100);assert.equal(v.puritySource,"Proxycheck");assert.equal(v.rawFraudScore,null);assert.equal(v.riskLevel,"低");
 v=await V.measureNode(tri({...p,fraudScore:0.001},q0,pcBody(p.ip,rowPC(0))),nowPC);
 assert.equal(v.purity,99.99);assert.equal(v.rawFraudScore,0.001);
 v=await V.measureNode(tri(p0,q0,pcBody(p.ip,rowPC(55,{last_updated:new Date(nowPC-3*86400000).toISOString()}))),nowPC);
@@ -219,7 +219,85 @@ for(const f of families){
  const cf=mock(u=>u.includes("ippure")?resp(200,{...p,fraudScore:75}):u.includes("proxycheck")?resp(200,pcBody(p.ip,rowPC(0))):resp(200,q0),new Map(),f);
  w=await V.widget(cf,nowPC);assert.ok(flat(w).includes('"text":"25"'));assert.ok(!flat(w).includes('"text":"100"'));assert.ok(!flat(w).includes("Proxycheck参考"));assert.ok(flat(w).includes("出口 IP"));
  const unc=mock(u=>u.includes("ippure")?resp(200,p0):u.includes("proxycheck")?resp(429,{}):resp(200,q0),new Map(),f);
- w=await V.widget(unc,nowPC);assert.ok(flat(w).includes("零分待核验"));assert.ok(flat(w).includes('"text":"--"'));assert.ok(!flat(w).includes('"text":"100"'));
+ w=await V.widget(unc,nowPC);assert.ok(!flat(w).includes("零分待核验"));assert.ok(!flat(w).includes("满分未核验"));assert.ok(flat(w).includes('"text":"100"'));assert.ok(flat(w).includes('"text":"低"'));
 }
 
+// Sanitized response shapes captured from real API requests on 27 Nov 2026.
+// The mobile address is replaced by a pre-existing synthetic fixture address;
+// these are offline replays and do not claim to reproduce the phone's routing.
+const mobileQuery={ip:p.ip,location:{country_code:"CN",country:"China"},risk:{is_mobile:false,is_vpn:false,is_tor:false,is_proxy:false,is_datacenter:false,risk_score:0}};
+const mobileRecord={
+ network:{type:"Wireless"},location:{country_code:"CN",country_name:"China"},
+ detections:{proxy:false,vpn:false,compromised:false,scraper:false,tor:false,hosting:false,anonymous:false,risk:0,confidence:100,first_seen:null,last_seen:null,times_seen:null},
+ detection_history:null,attack_history:null,operator:null,last_updated:"2026-11-27T04:00:26Z"
+};
+const mobileResponse=pcBody(p.ip,mobileRecord);
+const mobileFallback=(family="systemMedium",env={})=>mock(u=>u.includes("ippure")?resp(503,{}):u.includes("proxycheck.io")?resp(200,mobileResponse):resp(200,mobileQuery),new Map(),family,env);
+ctx=mobileFallback("systemMedium",{NODE_POLICY:"实测策略组"});
+v=await V.measureNode(ctx,nowPC);
+assert.equal(v.exitIP,p.ip);assert.equal(v.purity,100);assert.equal(v.property,"移动");assert.equal(v.region,"中国");assert.equal(v.riskLevel,"低");assert.equal(v.purityNote,"");assert.equal(v.riskNote,null);
+assert.equal(v.rawFraudScore,null);assert.equal(v.proxycheckRiskScore,0);assert.equal(v.ipqueryRiskScore,0);
+assert.equal(ctx.calls.length,3);assert.ok(ctx.calls.some(c=>c.u==="https://api.ipquery.io/?format=json"));assert.ok(ctx.calls.every(c=>c.o.policy==="实测策略组"));
+assert.ok(ctx.calls.some(c=>c.u==="https://proxycheck.io/v3/"+p.ip+"?tag=0"));
+for(const family of families){
+ w=await V.widget(mobileFallback(family),nowPC);
+ assert.ok(flat(w).includes('"text":"100"'));assert.ok(flat(w).includes('"text":"低"'));assert.ok(flat(w).includes('"text":"移动"'));
+ assert.ok(!flat(w).includes("零分待核验"));assert.ok(!flat(w).includes("满分未核验"));assert.ok(!flat(w).includes("Proxycheck参考"));
+}
+ctx=mobileFallback();await V.measureNode(ctx,nowPC);assert.ok(ctx.calls.every(c=>!Object.hasOwn(c.o,"policy")));
+ctx=mock((u,o)=>{assert.equal(o.policy,"不存在的策略组");throw Error("unknown policy")},new Map(),"systemMedium",{NODE_POLICY:"不存在的策略组"});
+v=await V.measureNode(ctx,nowPC);assert.equal(v.quality,"offline");assert.equal(v.purity,null);assert.ok(ctx.calls.every(c=>c.o.policy!=="DIRECT"));
+
+// A real public VPN response can have delisted history and a current positive flag.
+const vpnIP="185.159.157.1";
+const vpnQuery={ip:vpnIP,location:{country_code:"CH"},risk:{is_mobile:false,is_vpn:true,is_tor:false,is_proxy:false,is_datacenter:true,risk_score:15}};
+const vpnRecord={...rowPC(50),network:{type:"Hosting"},location:{country_code:"CH"},detection_history:{delisted:true,delist_datetime:"2026-11-26T21:23:02Z"},attack_history:null};
+vpnRecord.detections={...vpnRecord.detections,vpn:true,hosting:true,anonymous:true};
+v=await V.measureNode(tri(null,vpnQuery,pcBody(vpnIP,vpnRecord)),nowPC);
+assert.equal(v.purity,50);assert.equal(v.proxycheckRiskScore,50);assert.equal(v.riskLevel,"中");assert.equal(v.property,"机房");assert.equal(v.region,"瑞士");assert.equal(v.riskNote,null);
+const resolverRecord={...rowPC(33),network:{type:"Hosting"},location:{country_code:"AU"},detection_history:{delisted:true,delist_datetime:"2026-11-18T12:35:42Z"}};
+resolverRecord.detections.hosting=true;
+v=await V.measureNode(tri(null,publicQuery,pcBody(publicQuery.ip,resolverRecord)),nowPC);
+assert.equal(v.purity,67);assert.equal(v.proxycheckRiskScore,33);assert.equal(v.ipqueryRiskScore,0);assert.equal(v.riskLevel,"中");
+
+// Valid zero is data; missing/invalid scores stay missing. Metadata age is not
+// the score's observation time, and optional unknown flags are never false.
+for(const stamp of [undefined,null,new Date(nowPC-90*86400000).toISOString()]){
+ v=await V.measureNode(tri({ip:p.ip},null,pcBody(p.ip,rowPC(0,{last_updated:stamp}))),nowPC);
+ assert.equal(v.proxycheckRiskScore,0);assert.equal(v.purity,100);assert.equal(v.riskLevel,"低");assert.equal(v.riskNote,null);
+}
+for(const detections of [{risk:0},{risk:0,proxy:null,vpn:null,tor:null,compromised:null,scraper:null,hosting:null,anonymous:null}]){
+ v=await V.measureNode(tri({ip:p.ip},null,pcBody(p.ip,rowPC(0,{detections}))),nowPC);
+ assert.equal(v.proxycheckRiskScore,0);assert.equal(v.purity,100);assert.equal(v.riskLevel,"未知");assert.equal(v.riskNote,null);
+}
+for(const value of [undefined,null,"0","100",false,true,-1,101,NaN,Infinity,{},[]]){
+ const badScore=rowPC(0);badScore.detections.risk=value;
+ v=await V.measureNode(tri({ip:p.ip},null,pcBody(p.ip,badScore)),nowPC);
+ assert.equal(v.proxycheckRiskScore,null);assert.equal(v.purity,null);assert.equal(v.puritySource,null);
+}
+for(const value of ["false",0,1,{},[]]){
+ const badFlag=rowPC(0);badFlag.detections.proxy=value;
+ v=await V.measureNode(tri(p,q,pcBody(p.ip,badFlag)),nowPC);
+ assert.equal(v.proxycheckRiskScore,null);assert.equal(v.purity,88);assert.equal(v.riskNote,"记录有差异");assert.equal(v.riskLevel,"未知");
+}
+ctx=mock(u=>u.includes("ippure")?resp(200,{ip:p.ip}):u.includes("proxycheck")?resp(200,pcBody(p.ip,rowPC(0)),{"Age":"901"}):resp(503,{}));
+v=await V.measureNode(ctx,nowPC);assert.equal(v.purity,null);assert.equal(v.proxycheckRiskScore,null);assert.equal(v.riskLevel,"未知");
+
+// The module must outlive the slowest valid fallback path: primary echo,
+// backup echo, then parallel lookups. Use the actual request options so a
+// future HTTP timeout change cannot silently exceed Egern's script deadline.
+const timedCtx=mock(u=>u.includes("ippure")?resp(503,{}):u.includes("?format=json")?resp(200,{ip:p.ip}):u.includes("proxycheck")?resp(200,pcBody(p.ip,rowPC(0))):resp(200,q0));
+await V.measureNode(timedCtx,nowPC);
+assert.equal(timedCtx.calls.length,4);
+assert.ok(timedCtx.calls.every(c=>Number.isFinite(c.o.timeout)&&c.o.timeout>0));
+const requestBudget=url=>timedCtx.calls.find(c=>c.u===url)?.o.timeout;
+const criticalPathMs=requestBudget("https://my.ippure.com/v1/info")+requestBudget("https://api.ipquery.io/?format=json")+Math.max(requestBudget("https://api.ipquery.io/"+p.ip),requestBudget("https://proxycheck.io/v3/"+p.ip+"?tag=0"));
+const moduleYaml=await readFile(new URL("../Egern/Widget/NodeVitals/NodeVitals.yaml",import.meta.url),"utf8");
+const scriptBudgetMs=Number(moduleYaml.match(/- generic:[\s\S]*?\n[ \t]+timeout:[ \t]*(\d+)[ \t]*(?:\n|$)/)?.[1])*1000;
+assert.ok(Number.isFinite(criticalPathMs)&&Number.isFinite(scriptBudgetMs));
+assert.ok(scriptBudgetMs>=criticalPathMs+1000,`Module timeout ${scriptBudgetMs} ms must cover request path ${criticalPathMs} ms plus parsing headroom`);
+const envSchema=moduleYaml.match(/^env_schema:\n(?:[ \t].*\n|\n)*/m)?.[0]||"";
+assert.match(envSchema,/^  NODE_POLICY:\s*$/m,"Expose the supported node policy in the module settings");
+
 console.log("Three Egern widget regression suites passed");
+

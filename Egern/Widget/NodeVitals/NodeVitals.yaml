@@ -7,7 +7,15 @@
 # ==========================================
 
 name: "节点体检"
-description: "节点体检：同一出口 IP 的 Proxycheck、IPPure 原始风险取保守参考；100分须双源零风险且 IPQuery 无反证，证据不足不显示满分。支持IPv4/IPv6，保留原UI。"
+description: "节点体检：按同一出口 IP 查询真实风险，纯度为有效原始风险的反向参考分。有效零分正常显示，接口失败不填满分；可在模块设置指定检测策略。"
+
+env_schema:
+  NODE_POLICY:
+    name: 检测策略
+    description: 填写要检测的节点或策略组完整名称；留空不指定策略，不能保证跟随所选节点。
+  PROXYCHECK_KEY:
+    name: Proxycheck 密钥
+    description: 可选，填写自己的 API 密钥；留空使用匿名查询。
 
 auto_update:
   interval: 1800
@@ -15,12 +23,13 @@ auto_update:
 scriptings:
   - generic:
       name: 节点体检
-      # 可选本机私有 env：NODE_POLICY 为实际策略组名；PROXYCHECK_KEY 为自己的密钥。不要提交密钥。
+      # 在模块设置填写上述环境变量，无需编辑或上传带密钥的远程脚本。
       # 匿名接口可能拒绝代理来源，失败时自动降级为 IPPure。
-      timeout: 15
+      timeout: 30
       update_interval: 1800
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeVitals/NodeVitals.js?v=20261127-8
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/NodeVitals/NodeVitals.js?v=20261127-9
 
 widgets:
   - name: 节点体检
     script_name: 节点体检
+
