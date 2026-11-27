@@ -1,0 +1,61 @@
+import {readFileSync} from "node:fs";
+import vm from "node:vm";
+import assert from "node:assert/strict";
+const source=readFileSync(new URL("AICheck.js",import.meta.url),"utf8");
+let checks=0;
+const eq=(a,b)=>{checks++;assert.equal(a,b)};
+const ok=v=>{checks++;assert.ok(v)};
+const O="https://api.openai.com/v1/models",C="https://api.anthropic.com/v1/models?limit=1",G="https://generativelanguage.googleapis.com/v1beta/models?pageSize=1";
+const oAuth={status:401,body:{error:{message:"You didn't provide an API key.",type:"invalid_request_error",code:null}}};
+const cAuth={status:401,body:{type:"error",error:{type:"authentication_error",message:"x-api-key header is required"}}};
+const gAuth={status:403,body:{error:{code:403,status:"PERMISSION_DENIED",message:"Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API."}}};
+const normal={[O]:oAuth,[C]:cAuth,[G]:gAuth};
+const standard='{"ChatGPT":"ChatGPT","Claude":"Claude","Gemini":"Google"}';
+async function execute(routes,arg=standard,expectedGroups=["ChatGPT","Claude","Google"],expectedCalls=3){
+ const calls=[];
+ let doneCount=0;
+ const result=await new Promise(resolve=>{
+  vm.runInNewContext(source,{$argument:arg,$httpClient:{get(req,cb){
+   calls.push(req);
+   const res=routes[req.url];
+   if(!res)throw Error("Unexpected request "+req.url);
+   const body=typeof res.body==="string"?res.body:JSON.stringify(res.body??{});
+   cb(res.error??null,{status:res.status},body);
+  }},$done(v){doneCount++;resolve(v)}});
+ });
+ eq(doneCount,1);eq(calls.length,expectedCalls);eq(result.icon,"brain.head.profile");
+ ok(!result.content.includes("\n"));
+ ok(/^智能检测·[0-3]\/3$/.test(result.title));
+ ok(/^ChatGPT[✓!×?]·Claude[✓!×?]·Gemini[✓!×?]$/.test(result.content));
+ calls.forEach((r,i)=>{
+  eq(r.url,[O,C,G][i]);eq(r.headers["X-Stash-Selected-Proxy"],encodeURIComponent(expectedGroups[i]));
+  eq(r.insecure,false);eq(r.timeout,6);eq(r["auto-cookie"],false);eq(r["auto-redirect"],false);
+  ok(!Object.keys(r.headers).some(k=>/^(authorization|x-api-key|cookie)$/i.test(k)));
+ });
+ return result;
+}
+let r=await execute(normal);eq(r.title,"智能检测·3/3");eq(r.content,"ChatGPT✓·Claude✓·Gemini✓");eq(r.backgroundColor,"#1E7E44");
+r=await execute({...normal,[O]:{status:403,body:{error:{code:"unsupported_country_region_territory",message:"Country, region, or territory not supported"}}}});
+eq(r.title,"智能检测·2/3");eq(r.content,"ChatGPT!·Claude✓·Gemini✓");
+r=await execute({...normal,[C]:{status:403,body:"<html>Access denied</html>"}});
+eq(r.content,"ChatGPT✓·Claude!·Gemini✓");
+r=await execute({...normal,[G]:{status:403,body:{error:{code:403,status:"PERMISSION_DENIED",message:"User location is not supported for the API use."}}}});
+eq(r.content,"ChatGPT✓·Claude✓·Gemini!");
+r=await execute({...normal,[G]:{status:400,body:{error:{code:400,status:"INVALID_ARGUMENT",message:"API key not valid. Please pass a valid API key.",details:[{reason:"API_KEY_INVALID"}]}}}});
+eq(r.title,"智能检测·3/3");
+r=await execute({...normal,[O]:{status:401,body:{error:{message:"Unexpected failure"}}},[C]:{status:200,body:"<html>challenge</html>"},[G]:{status:302,body:""}});
+eq(r.title,"智能检测·0/3");eq(r.content,"ChatGPT?·Claude?·Gemini?");eq(r.backgroundColor,"#8E8E93");
+r=await execute({...normal,[O]:{status:429,body:{}},[C]:{status:503,body:{}},[G]:{status:200,body:{models:[]}}});
+eq(r.content,"ChatGPT!·Claude×·Gemini✓");
+r=await execute({[O]:{error:"timeout"},[C]:{error:"TLS"},[G]:{error:"offline"}});
+eq(r.title,"智能检测·0/3");eq(r.backgroundColor,"#C0392B");eq(r.content,"ChatGPT×·Claude×·Gemini×");
+r=await execute(normal,'{"ChatGPT":"美国节点","Claude":"Claude","Gemini":"Google"}',["美国节点","Claude","Google"]);eq(r.title,"智能检测·3/3");
+r=await execute(normal,'{"ChatGPT":""}',[],0);eq(r.content,"ChatGPT?·Claude?·Gemini?");
+r=await execute(normal,"invalid",[],0);eq(r.title,"智能检测·0/3");
+r=await execute(normal,'{"Gemini":"\\n"}',[],0);eq(r.title,"智能检测·0/3");
+r=await execute(normal,"null",[],0);eq(r.title,"智能检测·0/3");
+r=await execute({...normal,[O]:{status:200,body:{data:[]}},[C]:{status:200,body:{data:[]}}});
+eq(r.title,"智能检测·3/3");
+r=await execute({...normal,[G]:{status:403,body:{error:{code:403,status:"PERMISSION_DENIED",message:"Access denied"}}}});
+eq(r.content,"ChatGPT✓·Claude✓·Gemini!");
+console.log("Stash AICheck: "+checks+" assertions passed");
