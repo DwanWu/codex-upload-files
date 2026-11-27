@@ -5,17 +5,17 @@
 # ==========================================
 
 name: "黄历查询"
-description: "双远程数据源并带本地农历兜底；显示公历、农历、干支、生肖、宜忌、节气节日，大号补充冲煞、星宿、胎神、彭祖百忌等。"
+description: "双远程数据源、月度缓存、北京时间午夜刷新并带本地农历兜底；显示公历、农历、干支、生肖、宜忌、节气节日，大号补充冲煞、星宿、胎神、彭祖百忌等。"
 
 auto_update:
-  interval: 21600
+  interval: 3600
 
 scriptings:
   - generic:
       name: 黄历查询
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/HuangliQuery/HuangliQuery.js?v=20261008-1
-      update_interval: 10800
-      timeout: 25
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/HuangliQuery/HuangliQuery.js?v=20261127-2
+      update_interval: 3600
+      timeout: 20
 
 widgets:
   - name: 黄历查询

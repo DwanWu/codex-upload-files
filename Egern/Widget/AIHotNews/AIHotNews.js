@@ -5,16 +5,77 @@
  * 降级：/api/v1/items?mode=selected&window=24h&limit=8
  */
 
-const API_BASE = 'https://aihot.virxact.com';
+const API_BASE = 'https://aihot.news';
 const HOT_URL = `${API_BASE}/api/v1/hot-topics`;
 const FALLBACK_URL = `${API_BASE}/api/v1/items?mode=selected&window=24h&limit=8`;
 const HOME_URL = 'https://aihot.news/hot';
 
-export default async function (ctx) {
+
+const KEY="AIHotNews.v2", MIN=60000, MAX_CACHE=6*60*MIN;
+function cleanText(v){return typeof v==="string"?v.replace(/[\u0000-\u001f\u007f]+/g," ").replace(/\s+/g," ").trim().slice(0,240):""}
+function safeLink(v){
+  const m=cleanText(v).match(/^(?:https:\/\/(?:aihot\.news|aihot\.virxact\.com))?(\/(?:story|items)\/[A-Za-z0-9_-]{1,160})\/?(?:[?#][^\s]*)?$/i);
+  return m?"https://aihot.news"+m[1]:HOME_URL;
+}
+function normalizeNews(p,mode,now){
+  if(!p||p.schemaVersion!==1||!Array.isArray(p.items)||p.items.length>100||p.count!==undefined&&p.count!==p.items.length)return null;
+  const ids=new Set(),titles=new Set(),out=[];
+  const rank=(x,i)=>Number.isInteger(x?.rank)&&x.rank>0?x.rank:1000+i;
+  const raw=p.items.map((x,i)=>({x,i})).sort((a,b)=>mode==="hot"?rank(a.x,a.i)-rank(b.x,b.i):a.i-b.i);
+  for(const {x} of raw){
+    const title=cleanText(x?.title);if(!title)continue;
+    const url=safeLink(x?.links?.story||x?.links?.aihot),tk=title.toLowerCase().replace(/[\s\p{P}]/gu,"");
+    const id=cleanText(x?.storyPublicId||x?.id)||(url!==HOME_URL?url:tk);
+    if(ids.has(id)||titles.has(tk)||url!==HOME_URL&&ids.has(url))continue;
+    const ts=Date.parse(mode==="hot"?x.latestAt:(x.publishedAt||x.discoveredAt));
+    if(Number.isFinite(ts)&&(ts>now+5*MIN||mode==="selected"&&ts<now-24*60*MIN-5*MIN))continue;
+    ids.add(id);if(url!==HOME_URL)ids.add(url);titles.add(tk);out.push({rank:out.length+1,title,url});
+    if(out.length>=10)break;
+  }
+  return out;
+}
+function safeETag(v){return typeof v==="string"&&v.length<=256&&!/[\r\n]/.test(v)?v:""}
+function validCache(x,now){
+  if(!x||!Number.isFinite(x.checked)||x.checked>now||now-x.checked>MAX_CACHE||!Array.isArray(x.items)||x.items.length>10)return null;
+  if(!x.items.every(i=>i&&cleanText(i.title)&&typeof i.url==="string"))return null;
+  return {items:x.items.map((i,n)=>({rank:n+1,title:cleanText(i.title),url:safeLink(i.url)})),checked:x.checked,etag:safeETag(x.etag)};
+}
+function header(r,k){try{return typeof r.headers?.get==="function"?r.headers.get(k):r.headers?.[k]??r.headers?.[k.toLowerCase()]??null}catch(_){return null}}
+async function loadNews(ctx,now){
+  let saved={};try{saved=ctx.storage.getJSON(KEY)||{}}catch(_){}
+  const state={hot:validCache(saved.hot,now),selected:validCache(saved.selected,now),retryAt:Number.isFinite(saved.retryAt)&&saved.retryAt>now?saved.retryAt:0};
+  const persist=()=>{try{ctx.storage.setJSON(KEY,state)}catch(_){}};
+  const output=(e,mode,cached,delay,errorText="")=>({items:e?.items||[],mode,cached,syncAt:e?new Date(e.checked).toISOString():null,refreshAfter:new Date(now+Math.max(MIN,delay)).toISOString(),errorText});
+  const fallback=()=>state.hot?.items.length?["hot",state.hot]:state.selected?.items.length?["selected",state.selected]:["hot",null];
+  if(state.retryAt){const [m,e]=fallback();return output(e,m,true,state.retryAt-now,"等待重试")}
+  if(state.hot?.items.length&&now-state.hot.checked<10*MIN)return output(state.hot,"hot",false,15*MIN-(now-state.hot.checked));
+  async function request(mode,url){
+    const old=state[mode],headers={"User-Agent":"Egern-AIHotNews/2.0","Accept":"application/json"};if(old?.etag)headers["If-None-Match"]=old.etag;
+    try{
+      const r=await ctx.http.get(url,{headers,timeout:6500,credentials:"omit",insecureTls:false,redirect:"error"});
+      if(r.status===429||r.status===503){const h=header(r,"retry-after"),d=typeof h==="string"&&/^\d+$/.test(h)?+h*1000:Date.parse(h)-now;state.retryAt=now+Math.max(15*MIN,Number.isFinite(d)?d:0);return {limited:true}}
+      if(r.status===304&&old){old.checked=now;return {entry:old}}
+      if(r.status!==200)return {};
+      const body=await r.text();if(typeof body!=="string"||body.length>1000000)return {};
+      const items=normalizeNews(JSON.parse(body),mode,now);if(!items)return {};
+      state[mode]={items,checked:now,etag:safeETag(header(r,"etag"))};return {entry:state[mode]};
+    }catch(_){return {}}
+  }
+  const hot=await request("hot",HOT_URL);
+  if(hot.entry?.items.length){persist();return output(hot.entry,"hot",false,15*MIN)}
+  if(!hot.limited){
+    if(state.selected?.items.length&&now-state.selected.checked<10*MIN){persist();return output(state.selected,"selected",false,15*MIN)}
+    const picked=await request("selected",FALLBACK_URL);
+    if(picked.entry?.items.length){persist();return output(picked.entry,"selected",false,15*MIN)}
+  }
+  if(!state.retryAt)state.retryAt=now+5*MIN;
+  persist();const [m,e]=fallback();return output(e,m,true,state.retryAt-now,e?"使用最近缓存":"等待下一次刷新");
+}
+export default async function (ctx,clock=Date.now()) {
   const family = String(ctx.widgetFamily || 'systemMedium').toLowerCase();
   const isSmall = family.includes('small');
   const isLarge = family.includes('large');
-  const refreshAfter = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  const {mode,items,errorText,syncAt,cached,refreshAfter}=await loadNews(ctx,clock);
 
   const C = {
     bg: [{ light: '#FFFDFC', dark: '#1C1C1E' }, { light: '#FFF4F0', dark: '#111113' }],
@@ -60,82 +121,8 @@ export default async function (ctx) {
     children: [text(label, 9, 'bold', color, { maxLines: 1 })]
   });
 
-  const clean = value => String(value || '').replace(/\s+/g, ' ').trim();
-  const num = value => {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : 0;
-  };
-
-  const formatClock = value => {
-    if (!value) return '--:--';
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return '--:--';
-    const t = new Date(d.getTime() + 8 * 3600 * 1000);
-    const p = n => String(n).padStart(2, '0');
-    return `${p(t.getUTCHours())}:${p(t.getUTCMinutes())}`;
-  };
-
-  const normalizeAIHotUrl = value => {
-    const url = clean(value);
-    if (!url) return HOME_URL;
-    const story = url.match(/\/story\/([^/?#]+)/i);
-    if (story) return `https://aihot.news/story/${story[1]}`;
-    const item = url.match(/\/items\/([^/?#]+)/i);
-    if (item) return `https://aihot.news/items/${item[1]}`;
-    return url;
-  };
-
-  const getJson = async url => {
-    const resp = await ctx.http.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache'
-      },
-      timeout: 8000
-    });
-    return JSON.parse(await resp.text());
-  };
-
-  let mode = 'hot';
-  let items = [];
-  let errorText = '';
-  let syncAt = null;
-
-  try {
-    const payload = await getJson(HOT_URL);
-    const raw = Array.isArray(payload?.items) ? payload.items : [];
-    items = raw.map((item, index) => ({
-      rank: num(item?.rank) || index + 1,
-      title: clean(item?.title || item?.name || item?.topic || item?.latest) || 'AI 热点',
-      sourceCount: num(item?.sourceCount),
-      signalCount: num(item?.signalCount),
-      latestAt: item?.latestAt || null,
-      url: normalizeAIHotUrl(item?.links?.story)
-    })).sort((a, b) => a.rank - b.rank);
-    if (items.length) syncAt = new Date().toISOString();
-  } catch (e) {
-    errorText = e?.message || String(e);
-  }
-
-  if (!items.length) {
-    mode = 'selected';
-    try {
-      const payload = await getJson(FALLBACK_URL);
-      const raw = Array.isArray(payload?.items) ? payload.items : [];
-      items = raw.map((item, index) => ({
-        rank: index + 1,
-        title: clean(item?.title) || 'AI 精选',
-        sourceCount: 1,
-        signalCount: 0,
-        latestAt: item?.publishedAt || item?.discoveredAt || null,
-        url: normalizeAIHotUrl(item?.links?.aihot)
-      }));
-      if (items.length) syncAt = new Date().toISOString();
-    } catch (e) {
-      errorText = e?.message || String(e);
-    }
-  }
+  const clean=cleanText;
+  const formatClock=v=>v&&Number.isFinite(Date.parse(v))?new Date(Date.parse(v)+8*3600000).toISOString().slice(11,16):"--:--";
 
   const rankColor = rank => rank === 1 ? C.red : rank === 2 ? C.orange : rank === 3 ? C.gold : C.muted;
   const rankBadge = (rank, compact = false) => ({
@@ -164,13 +151,13 @@ export default async function (ctx) {
     icon('flame.fill', C.blue, size + 1),
     text('智能热搜', size, 'heavy', C.main),
     spacer(),
-    chip(mode === 'hot' ? '热榜' : '精选', C.blue)
+    chip(cached && items.length ? '缓存' : mode === 'hot' ? '热榜' : '精选', cached && items.length ? C.muted : C.blue)
   ], 6);
 
   const footer = size => row([
     text('AIHOT', size, 'medium', C.muted, { maxLines: 1 }),
     spacer(),
-    text(syncAt ? formatClock(syncAt) : '--:--', size, 'medium', C.muted, { maxLines: 1 })
+    text(syncAt ? (cached ? new Date(Date.parse(syncAt)+8*3600000).toISOString().slice(5,10)+' '+formatClock(syncAt) : formatClock(syncAt)) : '--:--', size, 'medium', C.muted, { maxLines: 1 })
   ]);
 
   if (!items.length) {

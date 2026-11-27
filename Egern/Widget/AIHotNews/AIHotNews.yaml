@@ -7,12 +7,15 @@
 # ==========================================
 
 name: "智能热搜"
-description: "直接读取 AIHOT 官方热点榜，展示当前 AI 圈热门事件排行；热点接口不可用时自动降级为过去 24 小时精选。"
+description: "直接读取 AIHOT 官方热点榜，展示当前 AI 圈热门事件排行；热点接口不可用时自动降级为过去 24 小时精选，支持 ETag、限流退避和最多6小时本地缓存。"
+
+auto_update:
+  interval: 1800
 
 scriptings:
   - generic:
       name: 智能热搜
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/AIHotNews/AIHotNews.js?v=20260910-4
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/AIHotNews/AIHotNews.js?v=20261127-5
       update_interval: 1800
       timeout: 20
 

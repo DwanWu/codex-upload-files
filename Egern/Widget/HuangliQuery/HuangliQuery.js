@@ -5,7 +5,36 @@
  * 双源均失败时使用 Intl 中国农历做本地基础兜底。
  */
 
-export default async function(ctx) {
+
+const CAL_KEY="HuangliQuery.v2",DAY=86400000;
+function validDate(s){return typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s}
+function lunarDayText(s){
+  const v=String(s??"").trim(),n=/^\d{1,2}$/.test(v)?+v:null,z="一二三四五六七八九";
+  return n===null?v:n===10?"初十":n===20?"二十":n===30?"三十":n>=1&&n<=9?"初"+z[n-1]:n>=11&&n<=19?"十"+z[n-11]:n>=21&&n<=29?"廿"+z[n-21]:"";
+}
+function lunarMonthText(v){return String(v??"").trim().replace(/月$/,"").replace(/^一$/,"正").replace(/^十一$/,"冬").replace(/^十二$/,"腊")}
+function str(v){return typeof v==="string"?v.slice(0,1000):Array.isArray(v)?v.filter(x=>typeof x==="string").slice(0,40).join(" ").slice(0,1000):""}
+function validCalendarDay(d){
+  if(!d||typeof d!=="object")return null;
+  const out={};for(const k of ["lMonth","lDate","gzYear","gzMonth","gzDate","animal","suit","avoid","festivalList","term"])out[k]=str(d[k]);
+  out.lMonth=lunarMonthText(out.lMonth);out.lDate=lunarDayText(out.lDate);
+  if(!/^(?:闰)?(?:正|[二三四五六七八九十]|冬|腊)$/.test(out.lMonth)||!/^(?:初[一二三四五六七八九十]|十[一二三四五六七八九]|二十|廿[一二三四五六七八九]|三十)$/.test(out.lDate))return null;
+  for(const k of ["gzYear","gzMonth","gzDate"])if(!/^[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]$/.test(out[k]))out[k]="";
+  out.jiri=d.jiri===true;out.details={};
+  for(const k of ["constellation","pengzu","fetus","star","chong","sha","twelve","season","dayWuxing","jieqi"])out.details[k]=str(d.details?.[k]);
+  return out;
+}
+function readCache(raw,month,now){
+  if(!raw||raw.month!==month)return {month,primary:null,secondary:null};
+  const result={month,primary:null,secondary:null};
+  for(const k of ["primary","secondary"]){
+    const p=raw[k];if(!p||!Number.isFinite(p.checked)||p.checked>now||!p.days||typeof p.days!=="object")continue;
+    const days={};for(const d of Object.keys(p.days).slice(0,31))if(validDate(d)&&d.startsWith(month+"-")){const v=validCalendarDay(p.days[d]);if(v)days[d]=v}
+    result[k]={days,checked:p.checked,attempt:Number.isFinite(p.attempt)&&p.attempt<=now?p.attempt:p.checked};
+  }
+  return result;
+}
+export default async function(ctx,clock=Date.now()) {
   const family = String(ctx.widgetFamily || 'systemMedium').toLowerCase();
   const isSmall = family.includes('small');
   const isLarge = family.includes('large');
@@ -36,39 +65,26 @@ export default async function(ctx) {
     children: [text(label, 9, 'bold', color, { maxLines: 1 })]
   });
 
-  // 固定按中国标准时间显示黄历日期。
-  const tzOffset = new Date().getTimezoneOffset();
-  const now = new Date(Date.now() + (tzOffset + 480) * 60000);
-  const Y = now.getFullYear();
-  const M = now.getMonth() + 1;
-  const D = now.getDate();
-  const WEEK = '日一二三四五六'[now.getDay()];
-  const P = n => String(n).padStart(2, '0');
-  const refreshAfter = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
+  const now=new Date(clock+8*3600000),Y=now.getUTCFullYear(),M=now.getUTCMonth()+1,D=now.getUTCDate();
+  const WEEK="日一二三四五六"[now.getUTCDay()],P=n=>String(n).padStart(2,"0"),month=Y+"-"+P(M),dateKey=month+"-"+P(D);
+  const midnight=Date.parse(dateKey+"T00:00:00+08:00")+DAY;
+  let refreshAfter=new Date(Math.min(clock+3*3600000,midnight)).toISOString();
 
-  const clean = s => String(s ?? '').replace(/[.。]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const clean = s => str(s).replace(/[.。]+/g, ' ').replace(/\s+/g, ' ').trim();
   const normalizeList = s => clean(s).replace(/\s+/g, ' · ');
 
-  const getJson = async (url, timeout = 10000) => {
-    const sep = url.includes('?') ? '&' : '?';
-    const resp = await ctx.http.get(`${url}${sep}t=${Date.now()}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
-        'Accept': 'application/json,text/plain,*/*',
-        'Cache-Control': 'no-cache'
-      },
-      timeout
-    });
-    const status = Number(resp?.status || 200);
-    if (status >= 400) throw new Error(`HTTP ${status}`);
-    return JSON.parse(await resp.text());
+  const getJson=async url=>{
+    const r=await ctx.http.get(url,{headers:{"User-Agent":"Egern-HuangliQuery/2.0","Accept":"application/json"},timeout:6500,credentials:"omit",insecureTls:false});
+    if(r.status!==200)throw Error("HTTP "+r.status);
+    const body=await r.text();if(typeof body!=="string"||body.length>2000000)throw Error("invalid body");return JSON.parse(body);
   };
 
-  const findPrimaryDay = json => {
+  const findPrimaryDay = (json,targetDay=D) => {
     let found = null;
     const seen = new Set();
-    const walk = obj => {
-      if (!obj || typeof obj !== 'object' || found) return;
+    let visited=0;
+    const walk = (obj,depth=0) => {
+      if (!obj || typeof obj !== 'object' || found || depth>30 || ++visited>15000) return;
       if (seen.has(obj)) return;
       seen.add(obj);
 
@@ -78,16 +94,16 @@ export default async function(ctx) {
       const looksLikeDay = Number.isFinite(yy) && Number.isFinite(mm) && Number.isFinite(dd) &&
         (obj.suit != null || obj.avoid != null || obj.gzDate != null || obj.lDate != null);
 
-      if (looksLikeDay && yy === Y && mm === M && dd === D) {
+      if (looksLikeDay && yy === Y && mm === M && dd === targetDay) {
         found = obj;
         return;
       }
 
-      if (obj.oDate && (obj.suit != null || obj.avoid != null)) {
+      if (!looksLikeDay && typeof obj.oDate==='string' && /(?:Z|[+-]\d{2}:\d{2})$/.test(obj.oDate) && (obj.suit != null || obj.avoid != null)) {
         const d = new Date(obj.oDate);
         if (!Number.isNaN(d.getTime())) {
           const bj = new Date(d.getTime() + 8 * 3600000);
-          if (bj.getUTCFullYear() === Y && bj.getUTCMonth() + 1 === M && bj.getUTCDate() === D) {
+          if (bj.getUTCFullYear() === Y && bj.getUTCMonth() + 1 === M && bj.getUTCDate() === targetDay) {
             found = obj;
             return;
           }
@@ -95,9 +111,9 @@ export default async function(ctx) {
       }
 
       if (Array.isArray(obj)) {
-        for (const v of obj) walk(v);
+        for (const v of obj) walk(v,depth+1);
       } else {
-        for (const k of Object.keys(obj)) walk(obj[k]);
+        for (const k of Object.keys(obj)) walk(obj[k],depth+1);
       }
     };
     walk(json);
@@ -126,7 +142,7 @@ export default async function(ctx) {
 
   const termFromFestival = value => {
     const terms = '立春 雨水 惊蛰 春分 清明 谷雨 立夏 小满 芒种 夏至 小暑 大暑 立秋 处暑 白露 秋分 寒露 霜降 立冬 小雪 大雪 冬至 小寒 大寒'.split(' ');
-    const v = clean(value);
+    const v = parseFestivalItems(value);
     return terms.find(x => v.includes(x)) || '';
   };
 
@@ -150,9 +166,16 @@ export default async function(ctx) {
     return items.join(' · ');
   };
 
-  const normalizeSecondaryDay = json => {
+  const normalizeSecondaryDay = (json,targetDay=D) => {
     const list = Array.isArray(json) ? json : [];
-    const item = list.find(x => Number(x?.day) === D);
+    const target=month+"-"+P(targetDay);
+    const item=list.find(x=>{
+      if(!x||typeof x!=="object")return false;
+      if(validDate(x.day))return x.day===target;
+      if(!/^\d{1,2}$/.test(String(x.day))||Number(x.day)!==targetDay)return false;
+      const t=String(x.title||"").match(/(20\d{2})年\s*(\d{1,2})月(?:\s*(\d{1,2})日)?/);
+      return !!t&&+t[1]===Y&&+t[2]===M&&(!t[3]||+t[3]===targetDay);
+    });
     if (!item) return null;
 
     const lunarParts = splitLunar(item.lunar);
@@ -166,14 +189,14 @@ export default async function(ctx) {
       gzYear: gm?.[1] || '',
       gzMonth: gm?.[2] || '',
       gzDate: gm?.[3] || '',
-      animal: clean(d['生肖']),
+      animal: clean(d['生肖'] || d.zodiac),
       suit: Array.isArray(item.yi) ? item.yi.join(' ') : clean(item.yi),
       avoid: Array.isArray(item.ji) ? item.ji.join(' ') : clean(item.ji),
       festivalList: festival,
       term: termFromFestival(festival),
       jiri: false,
       details: {
-        constellation: clean(d['星座']),
+        constellation: clean(d['星座'] || d.constellation),
         pengzu: clean(d['彭祖百忌']),
         fetus: clean(d['胎神占方']),
         star: clean(d['星宿']),
@@ -182,7 +205,7 @@ export default async function(ctx) {
         twelve: clean(d['十二神']),
         season: clean(d['季节']),
         dayWuxing: clean(d['日五行']),
-        jieqi: clean(d['节气'])
+        jieqi: clean(d['节气'] || d.solarTerm)
       }
     };
   };
@@ -190,13 +213,13 @@ export default async function(ctx) {
   const localFallback = () => {
     let lMonth = '', lDate = '', gzYear = '', animal = '';
     try {
-      const date = new Date(Y, M - 1, D, 12, 0, 0);
+      const date=new Date(Date.UTC(Y,M-1,D,4,0,0));
       const parts = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', {
-        year: 'numeric', month: 'long', day: 'numeric'
+        year: 'numeric', month: 'long', day: 'numeric', timeZone:'Asia/Shanghai'
       }).formatToParts(date);
       const byType = type => parts.find(x => x.type === type)?.value || '';
-      lMonth = byType('month');
-      lDate = byType('day');
+      lMonth=lunarMonthText(byType('month'));
+      lDate=lunarDayText(byType('day'));
       gzYear = byType('yearName');
       const branch = gzYear.slice(-1);
       const zodiac = { 子:'鼠', 丑:'牛', 寅:'虎', 卯:'兔', 辰:'龙', 巳:'蛇', 午:'马', 未:'羊', 申:'猴', 酉:'鸡', 戌:'狗', 亥:'猪' };
@@ -208,66 +231,52 @@ export default async function(ctx) {
     };
   };
 
-  const mergeDay = (primary, secondary) => {
-    if (!primary) return secondary;
-    if (!secondary) return primary;
-    const merged = { ...primary, details: { ...(secondary.details || {}), ...(primary.details || {}) } };
-    for (const key of ['lMonth','lDate','gzYear','gzMonth','gzDate','animal','suit','avoid','festivalList','term']) {
-      if (!clean(merged[key]) && clean(secondary[key])) merged[key] = secondary[key];
-    }
-    merged.festivalList = mergeFestivalItems(merged.term || secondary.term, primary.festivalList, secondary.festivalList);
-    return merged;
+  const match=(a,b)=>a.lMonth===b.lMonth&&a.lDate===b.lDate&&(!a.gzDate||!b.gzDate||a.gzDate===b.gzDate);
+  const mergeDay=(a,b)=>{
+    if(!a)return b;if(!b||!match(a,b))return a;
+    const out={...a,details:{...b.details}};
+    for(const [k,v] of Object.entries(a.details||{}))if(v)out.details[k]=v;
+    for(const k of ["gzYear","gzMonth","gzDate","animal"])if(!out[k]&&b[k])out[k]=b[k];
+    if(!out.suit&&!out.avoid){out.suit=b.suit;out.avoid=b.avoid}
+    out.term=termFromFestival(a.term)||termFromFestival(b.term)||termFromFestival(a.festivalList)||termFromFestival(b.festivalList);
+    out.festivalList=mergeFestivalItems(out.term,a.festivalList,b.festivalList,a.term,b.term);
+    return out;
   };
-
-  let today = null;
-  let sourceLabel = '';
-  let error = '';
-
-  const primaryUrl = `https://raw.githubusercontent.com/zqzess/openApiData/main/calendar_new/${Y}/${Y}${P(M)}.json`;
-  const secondaryUrl = `https://raw.githubusercontent.com/xuqssq/calendar/main/output/${Y}-${P(M)}.json`;
-  const results = await Promise.allSettled([
-    getJson(primaryUrl),
-    getJson(secondaryUrl)
-  ]);
-
-  let primaryDay = null;
-  let secondaryDay = null;
-  const errors = [];
-
-  if (results[0].status === 'fulfilled') {
-    primaryDay = findPrimaryDay(results[0].value);
-    if (!primaryDay) errors.push('主源未找到今日数据');
-  } else {
-    errors.push(`主源：${results[0].reason?.message || results[0].reason}`);
-  }
-
-  if (results[1].status === 'fulfilled') {
-    secondaryDay = normalizeSecondaryDay(results[1].value);
-    if (!secondaryDay) errors.push('备用源未找到今日数据');
-  } else {
-    errors.push(`备用源：${results[1].reason?.message || results[1].reason}`);
-  }
-
-  if (primaryDay || secondaryDay) {
-    today = mergeDay(primaryDay, secondaryDay);
-    sourceLabel = primaryDay && secondaryDay ? '双源' : primaryDay ? '主源' : '备用源';
-    error = errors.join('；');
-  } else {
-    today = localFallback();
-    sourceLabel = '本地';
-    error = errors.join('；') || '远程黄历数据暂不可用';
-  }
+  let stored=null;try{stored=ctx.storage.getJSON(CAL_KEY)}catch(_){}
+  const cache=readCache(stored,month,clock);
+  const urls=["https://raw.githubusercontent.com/zqzess/openApiData/main/calendar_new/"+Y+"/"+Y+P(M)+".json","https://raw.githubusercontent.com/xuqssq/calendar/main/output/"+month+".json"];
+  const load=async(key,url,parse)=>{
+    const old=cache[key],today=old?.days[dateKey];
+    if(today&&clock-old.checked<DAY)return {day:today,cached:false};
+    if(old&&clock-old.attempt<30*60000)return {day:today||null,cached:!!today};
+    try{
+      const json=await getJson(url),days={},last=new Date(Date.UTC(Y,M,0)).getUTCDate();
+      for(let n=1;n<=last;n++){const d=validCalendarDay(parse(json,n));if(d)days[month+"-"+P(n)]=d}
+      if(!Object.keys(days).length)throw Error("No valid days");
+      cache[key]={days:{...old?.days,...days},checked:days[dateKey]?clock:old?.checked||0,attempt:clock};
+      return {day:cache[key].days[dateKey]||null,cached:!days[dateKey]&&!!today};
+    }catch(_){cache[key]={days:old?.days||{},checked:old?.checked||0,attempt:clock};return {day:today||null,cached:!!today}}
+  };
+  const [a,b]=await Promise.all([load("primary",urls[0],findPrimaryDay),load("secondary",urls[1],normalizeSecondaryDay)]);
+  try{ctx.storage.setJSON(CAL_KEY,cache)}catch(_){}
+  const local=validCalendarDay(localFallback()),matchesLocal=d=>!local||d.lMonth===local.lMonth&&d.lDate===local.lDate;
+  const p=a.day&&matchesLocal(a.day)?a.day:null,q=b.day&&matchesLocal(b.day)?b.day:null;
+  const today=mergeDay(p,q)||local||localFallback();
+  const conflict=p&&q&&!match(p,q);
+  const sourceLabel=conflict?"主源（有差异）":p&&q?(a.cached||b.cached?"双源缓存":"双源"):p?(a.cached?"主源缓存":"主源"):q?(b.cached?"备用缓存":"备用源"):"本地";
+  const error=sourceLabel==="本地"?"远程黄历数据暂不可用":"";
+  if(!p||!q)refreshAfter=new Date(Math.min(clock+30*60000,midnight)).toISOString();
 
   const lunarMonth = clean(today?.lMonth);
   const lunarDay = clean(today?.lDate);
-  const lunar = lunarMonth || lunarDay ? `农历${lunarMonth}${lunarMonth.includes('月') ? '' : '月'}${lunarDay}` : '农历数据暂缺';
+  const lunar = lunarMonth && lunarDay ? `农历${lunarMonth}${lunarMonth.includes('月') ? '' : '月'}${lunarDay}` : '农历数据暂缺';
   const ganzhi = [today?.gzYear ? `${today.gzYear}年` : '', today?.gzMonth ? `${today.gzMonth}月` : '', today?.gzDate ? `${today.gzDate}日` : '']
     .filter(Boolean).join(' ');
   const animal = clean(today?.animal);
   const yi = normalizeList(today?.suit) || '暂无数据';
   const ji = normalizeList(today?.avoid) || '暂无数据';
-  const term = clean(today?.term) || termFromFestival(today?.festivalList);
-  const festival = mergeFestivalItems(term, today?.festivalList || today?.value);
+  const term=termFromFestival(today?.term)||termFromFestival(today?.festivalList);
+  const festival=mergeFestivalItems(term,today?.festivalList||today?.value,today?.term);
   const extra = [term, festival].filter(Boolean).join(' · ');
   const jiri = today?.jiri === true || String(today?.jiri || '') === '1';
   const details = today?.details || {};
@@ -283,7 +292,7 @@ export default async function(ctx) {
     icon('calendar', C.gold, size + 1),
     text('黄历查询', size, 'heavy', C.main),
     spacer(),
-    ...(jiri ? [chip('吉日', C.gold)] : [])
+    ...(sourceLabel === '本地' || sourceLabel.includes('缓存') ? [chip(sourceLabel === '本地' ? '本地' : '缓存', C.muted)] : jiri ? [chip('吉日', C.gold)] : [])
   ], 6);
 
   const infoRow = (label, value, color = C.sub, ico = null) => row([
@@ -387,7 +396,7 @@ export default async function(ctx) {
       row([
         text(extra || clash || (sourceLabel === '本地' ? '本地历法兜底' : '今日黄历'), 9, 'bold', (extra || clash) ? C.cyan : C.muted, { maxLines: 1, minScale: 0.72 }),
         spacer(),
-        text(`${P(now.getHours())}:${P(now.getMinutes())}`, 9, 'bold', C.muted)
+        text(`${P(now.getUTCHours())}:${P(now.getUTCMinutes())}`, 9, 'bold', C.muted)
       ])
     ]
   };

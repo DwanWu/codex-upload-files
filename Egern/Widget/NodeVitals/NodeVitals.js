@@ -5,7 +5,58 @@
  * 颜色规则：纯度>=90绿色，80-89粉色，<80红色；机房红色；风险中粉色、高红色。
  */
 
-export default async function (ctx) {
+const COUNTRY_ZH = {
+    US:'美国', CA:'加拿大', GB:'英国', DE:'德国', FR:'法国', NL:'荷兰', BE:'比利时',
+    JP:'日本', KR:'韩国', SG:'新加坡', HK:'中国香港', MO:'中国澳门', TW:'中国台湾', CN:'中国',
+    AU:'澳大利亚', NZ:'新西兰', IN:'印度', MY:'马来西亚', TH:'泰国', VN:'越南', PH:'菲律宾',
+    ID:'印度尼西亚', RU:'俄罗斯', UA:'乌克兰', CH:'瑞士', SE:'瑞典', NO:'挪威', FI:'芬兰',
+    DK:'丹麦', IT:'意大利', ES:'西班牙', PT:'葡萄牙', PL:'波兰', IE:'爱尔兰', AE:'阿联酋',
+    TR:'土耳其', BR:'巴西', MX:'墨西哥', AR:'阿根廷', CL:'智利', ZA:'南非', IL:'以色列'
+  };
+const PURE_URL="https://my.ippure.com/v1/info",QUERY_URL="https://api.ipquery.io/?format=json";
+function canonIP(x){
+  if(typeof x!=="string")return null;let s=x.trim().toLowerCase();
+  const v4=v=>/^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(v)&&v.split(".").every(n=>+n<=255);
+  if(v4(s))return s;
+  if(s.includes(".")){const i=s.lastIndexOf(":"),v=s.slice(i+1);if(i<0||!v4(v))return null;const p=v.split(".").map(Number);s=s.slice(0,i+1)+((p[0]<<8)|p[1]).toString(16)+":"+((p[2]<<8)|p[3]).toString(16)}
+  if(!/^[0-9a-f:]+$/.test(s)||!s.includes(":"))return null;
+  const halves=s.split("::");if(halves.length>2)return null;
+  const split=t=>t?t.split(":"):[];
+  const a=split(halves[0]),b=halves.length===2?split(halves[1]):[];
+  if([...a,...b].some(v=>!/^[0-9a-f]{1,4}$/.test(v))||halves.length===1&&a.length!==8||halves.length===2&&a.length+b.length>=8)return null;
+  const p=[...a,...Array(8-a.length-b.length).fill("0"),...b].map(v=>parseInt(v,16).toString(16));
+  if(p.slice(0,5).every(v=>v==="0")&&p[5]==="ffff"){const h=parseInt(p[6],16),l=parseInt(p[7],16);return [h>>8,h&255,l>>8,l&255].join(".")}
+  return p.join(":");
+}
+function score(v){return typeof v==="number"&&Number.isFinite(v)&&v>=0&&v<=100?v:null}
+function cleanIPText(v){return typeof v==="string"?v.replace(/[\u0000-\u001f\u007f]/g," ").trim().slice(0,100):""}
+async function ipJSON(ctx,url,policy){
+  try{
+    const r=await ctx.http.get(url,{headers:{"User-Agent":"Egern-NodeVitals/2.0","Accept":"application/json","Cache-Control":"no-cache"},timeout:5000,credentials:"omit",insecureTls:false,redirect:"error",...(policy?{policy}:{})});
+    if(r.status!==200)return null;const body=await r.text();if(typeof body!=="string"||body.length>200000)return null;
+    const data=JSON.parse(body);return data&&typeof data==="object"&&!Array.isArray(data)&&canonIP(data.ip)?data:null;
+  }catch(_){return null}
+}
+async function measureNode(ctx){
+  // Do not cache any IP or score; both sources observe the current connection.
+  const policy=cleanIPText(ctx.env?.NODE_POLICY),[pure,query]=await Promise.all([ipJSON(ctx,PURE_URL,policy),ipJSON(ctx,QUERY_URL,policy)]);
+  const a=canonIP(pure?.ip),b=canonIP(query?.ip),same=!!a&&a===b,different=!!a&&!!b&&!same,dual=different&&a.includes(":")!==b.includes(":");
+  const exitIP=cleanIPText(pure?.ip||query?.ip)||"获取失败";
+  if(different&&!dual)return {exitIP,region:"出口不一致",purity:null,property:"未知",riskLevel:"未知",purityLabel:"纯度",quality:"conflict"};
+  const p=a?pure:null,q=(!a||same)?query:null,r=q?.risk||{},ps=score(p?.fraudScore),qs=score(r.risk_score);
+  const purity=ps!==null?Math.round(100-ps):qs!==null?Math.round(100-qs):null;
+  const dc=p?.isDataCenter===true||r.is_datacenter===true,res=p?.isResidential===true;
+  const property=dc&&res?"有差异":dc?"机房":res?"住宅":r.is_mobile===true?"移动":p?.isResidential===false?"非住宅":"未知";
+  const complete=["is_vpn","is_proxy","is_tor","is_datacenter"].every(k=>typeof r[k]==="boolean")&&qs!==null;
+  let riskLevel="未知";
+  if(r.is_tor===true||r.is_vpn===true&&r.is_proxy===true||[ps,qs].some(v=>v!==null&&v>=65))riskLevel="高";
+  else if(dc||r.is_vpn===true||r.is_proxy===true||[ps,qs].some(v=>v!==null&&v>=25))riskLevel="中";
+  else if(complete&&property!=="有差异")riskLevel="低";
+  const cc=cleanIPText(p?.countryCode||q?.location?.country_code||q?.location?.countryCode).toUpperCase();
+  const region=dual?"双栈出口":COUNTRY_ZH[cc]||cleanIPText(q?.location?.country||p?.country)||"未知";
+  return {exitIP,region,purity,property,riskLevel,purityLabel:ps===null&&qs!==null?"参考纯度":"纯度",quality:dual?"dual":same?"verified":a||b?"single":"offline"};
+}
+export default async function (ctx,clock=Date.now()) {
   const family = String(ctx.widgetFamily || 'systemMedium').toLowerCase();
   const isSmall = family.includes('small');
   const isLarge = family.includes('large');
@@ -38,74 +89,16 @@ export default async function (ctx) {
   const spacer = length => length == null ? { type: 'spacer' } : { type: 'spacer', length };
   const divider = () => ({ type: 'stack', height: 0.5, backgroundColor: C.divider, borderRadius: 1, children: [] });
 
-  const getJson = async (url, timeout = 7000) => {
-    try {
-      const resp = await ctx.http.get(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json,text/plain,*/*' },
-        timeout
-      });
-      return { ok: true, data: JSON.parse(await resp.text()) };
-    } catch (e) {
-      return { ok: false, data: {}, error: e?.message || String(e) };
-    }
-  };
-
-  const clean = s => String(s || '').replace(/\s+/g, ' ').trim();
-  const clamp = n => Math.max(0, Math.min(100, Number(n)));
-
-  const COUNTRY_ZH = {
-    US:'美国', CA:'加拿大', GB:'英国', DE:'德国', FR:'法国', NL:'荷兰', BE:'比利时',
-    JP:'日本', KR:'韩国', SG:'新加坡', HK:'中国香港', MO:'中国澳门', TW:'中国台湾', CN:'中国',
-    AU:'澳大利亚', NZ:'新西兰', IN:'印度', MY:'马来西亚', TH:'泰国', VN:'越南', PH:'菲律宾',
-    ID:'印度尼西亚', RU:'俄罗斯', UA:'乌克兰', CH:'瑞士', SE:'瑞典', NO:'挪威', FI:'芬兰',
-    DK:'丹麦', IT:'意大利', ES:'西班牙', PT:'葡萄牙', PL:'波兰', IE:'爱尔兰', AE:'阿联酋',
-    TR:'土耳其', BR:'巴西', MX:'墨西哥', AR:'阿根廷', CL:'智利', ZA:'南非', IL:'以色列'
-  };
-
-  const internalIP = clean(ctx.device?.ipv4?.address) || '未连接';
-
-  const pureResp = await getJson('https://my.ippure.com/v1/info');
-  const pure = pureResp.data || {};
-  let exitIP = clean(pure.ip);
-  if (!exitIP) {
-    const ipResp = await getJson('https://api64.ipify.org?format=json');
-    exitIP = clean(ipResp.data?.ip);
-  }
-  if (!exitIP) exitIP = '获取失败';
-
-  let query = {};
-  if (exitIP !== '获取失败') {
-    const queryResp = await getJson(`https://api.ipquery.io/${encodeURIComponent(exitIP)}`);
-    query = queryResp.data || {};
-  }
-  const risk = query.risk || {};
-
-  const fraudScore = Number(pure.fraudScore);
-  const riskScore = Number(risk.risk_score);
-  let purity = null;
-  if (Number.isFinite(fraudScore)) purity = Math.round(100 - clamp(fraudScore));
-  else if (Number.isFinite(riskScore)) purity = Math.round(100 - clamp(riskScore));
-
-  const datacenter = pure.isDataCenter === true || risk.is_datacenter === true || pure.isResidential === false;
-  const property = datacenter ? '机房' : '住宅';
-
-  const cc = String(pure.countryCode || query.location?.country_code || query.location?.countryCode || '').toUpperCase();
-  const country = COUNTRY_ZH[cc] || clean(query.location?.country || pure.country) || '未知';
-
-  const vpn = risk.is_vpn === true;
-  const proxy = risk.is_proxy === true;
-  const tor = risk.is_tor === true;
-
-  let riskLevel = '低';
-  if (tor || (vpn && proxy) || (purity != null && purity < 35)) riskLevel = '高';
-  else if (datacenter || vpn || proxy || (purity != null && purity < 75)) riskLevel = '中';
+  const internalIP=cleanIPText(ctx.device?.ipv4?.address)||"未连接";
+  const {exitIP,region:country,purity,property,riskLevel,purityLabel,quality}=await measureNode(ctx);
+  const refreshAfter=new Date(clock+(quality==="offline"||quality==="conflict"?5:15)*60000).toISOString();
 
   const purityColor = purity == null ? C.muted : purity >= 90 ? C.green : purity >= 80 ? C.pink : C.red;
-  const propertyColor = property === '机房' ? C.red : C.green;
-  const riskColor = riskLevel === '高' ? C.red : riskLevel === '中' ? C.pink : C.green;
+  const propertyColor=property==='机房'||property==='非住宅'?C.red:property==='住宅'||property==='移动'?C.green:C.muted;
+  const riskColor=riskLevel==='高'?C.red:riskLevel==='中'?C.pink:riskLevel==='低'?C.green:C.muted;
 
   const cards = [
-    { label: '纯度', value: purity == null ? '--' : String(purity), color: purityColor },
+    { label: purityLabel, value: purity == null ? '--' : String(purity), color: purityColor },
     { label: '属性', value: property, color: propertyColor },
     { label: '风险', value: riskLevel, color: riskColor }
   ];
@@ -127,7 +120,7 @@ export default async function (ctx) {
     spacer(3),
     text('节点体检', titleSize, 'heavy', C.main),
     spacer(),
-    text(country, regionSize, 'heavy', C.green, { maxLines: 1, minScale: 0.65 })
+    text(country, regionSize, 'heavy', quality==='conflict'?C.red:quality==='offline'||quality==='dual'?C.muted:C.green, { maxLines: 1, minScale: 0.65 })
   ], 0);
 
   const ipInline = (label, value, size) => row([
@@ -148,14 +141,14 @@ export default async function (ctx) {
   if (isSmall) {
     const cfg = { radius: 10, padding: [7, 2, 7, 2], labelSize: 9, valueSize: 14, gap: 3 };
     return {
-      type: 'widget', padding: 12, backgroundGradient,
+      type: 'widget', refreshAfter, padding: 12, backgroundGradient,
       children: [
         header(14, 13, 10),
         centeredBody(cfg, 6, 62),
         row([
           ipInline('内网 IP', internalIP, 7),
           spacer(),
-          ipInline('出口 IP', exitIP, 7)
+          ipInline(quality==='conflict'||quality==='dual'?'IPPure IP':'出口 IP', exitIP, 7)
         ], 0)
       ]
     };
@@ -164,14 +157,14 @@ export default async function (ctx) {
   if (isLarge) {
     const cfg = { radius: 14, padding: [16, 6, 16, 6], labelSize: 14, valueSize: 28, gap: 8 };
     return {
-      type: 'widget', padding: 16, backgroundGradient,
+      type: 'widget', refreshAfter, padding: 16, backgroundGradient,
       children: [
         header(18, 17, 14),
         centeredBody(cfg, 12, 140),
         row([
           ipInline('内网 IP', internalIP, 11),
           spacer(),
-          ipInline('出口 IP', exitIP, 11)
+          ipInline(quality==='conflict'||quality==='dual'?'IPPure IP':'出口 IP', exitIP, 11)
         ], 0)
       ]
     };
@@ -179,14 +172,14 @@ export default async function (ctx) {
 
   const cfg = { radius: 12, padding: [11, 5, 11, 5], labelSize: 11, valueSize: 21, gap: 4 };
   return {
-    type: 'widget', padding: 13, backgroundGradient,
+    type: 'widget', refreshAfter, padding: 13, backgroundGradient,
     children: [
       header(16, 15, 12),
       centeredBody(cfg, 8, 78),
       row([
         ipInline('内网 IP', internalIP, 9),
         spacer(),
-        ipInline('出口 IP', exitIP, 9)
+        ipInline(quality==='conflict'||quality==='dual'?'IPPure IP':'出口 IP', exitIP, 9)
       ], 0)
     ]
   };
