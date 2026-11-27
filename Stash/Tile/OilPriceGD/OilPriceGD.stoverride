@@ -194,6 +194,8 @@ script-providers:
       const DATA="https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/OilPriceGD/prices.json";
       const INFO="https://drc.gd.gov.cn/ywgg/";
       const KEY="stash.oilpricegd.v2.snapshot";
+      const BACKUP="https://api.github.com/repos/DwanWu/codex-upload-files/contents/Egern/Widget/OilPriceGD/prices.json?ref=main";
+      const RETRY_KEY=KEY+".backupRetryAt";
       const ICON="fuelpump.fill";
       const COLORS={down:"#1E7E44",up:"#C0392B",normal:"#2C5F8A",unknown:"#8E8E93"};
       function readCache(today){
@@ -202,22 +204,56 @@ script-providers:
       function saveCache(snapshot){
         try{$persistentStore.write(JSON.stringify(snapshot),KEY)}catch(_){}
       }
-      function fetchSnapshot(now){
-        return new Promise(resolve=>{
+      function decodeContents(value){
+       if(value?.type!=="file"||value.encoding!=="base64"||
+          value.path!=="Egern/Widget/OilPriceGD/prices.json"||
+          typeof value.content!=="string"||value.content.length>200000)return null;
+       const raw=value.content.replace(/\s/g,"");
+       if(raw.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(raw))return null;
+       const alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+       let out="",bits=0,n=0;
+       for(const ch of raw.replace(/=+$/,"")){
+        bits=(bits<<6)|alphabet.indexOf(ch);n+=6;
+        if(n>=8){n-=8;out+="%"+((bits>>n)&255).toString(16).padStart(2,"0");bits&=(1<<n)-1}
+       }
+       try{return JSON.parse(decodeURIComponent(out))}catch(_){return null}
+      }
+      function fetchSnapshot(now,backup=false){
+       return new Promise(resolve=>{
+        let finished=false;
+        const finish=(snapshot=null,retryAt=0)=>{if(!finished){finished=true;resolve({snapshot,retryAt})}};
+        try{
+         if(typeof setTimeout==="function")setTimeout(()=>finish(),8100);
+         $httpClient.get({
+          url:backup?BACKUP:DATA+"?slot="+Math.floor(now/1800000),
+          headers:{"Accept":backup?"application/vnd.github.raw+json":"application/json","Cache-Control":"no-cache","User-Agent":"Stash-OilPriceGD/2.0"},
+          timeout:8,insecure:false,"auto-redirect":false,"auto-cookie":false
+         },(error,response,body)=>{
           try{
-            $httpClient.get({
-              url:DATA+"?slot="+Math.floor(now/1800000),
-              headers:{"Accept":"application/json","Cache-Control":"no-cache"},
-              timeout:7,insecure:false,"auto-redirect":false,"auto-cookie":false
-            },(error,response,body)=>{
-              try{
-                const status=Number(response?.status??response?.statusCode);
-                if(error||status!==200||typeof body!=="string"||!body.trim()||body.length>200000)return resolve(null);
-                resolve(normalize(JSON.parse(body),bj(now)));
-              }catch(_){resolve(null)}
-            });
-          }catch(_){resolve(null)}
-        });
+           const status=Number(response?.status??response?.statusCode);
+           if(backup&&[403,429].includes(status)){
+            const headers=response?.headers||{};
+            const read=name=>Object.entries(headers).find(([k])=>k.toLowerCase()===name)?.[1];
+            const raw=read("retry-after"),numeric=typeof raw==="number"||typeof raw==="string"&&/^\s*\d+\s*$/.test(raw);
+            const seconds=numeric?Number(raw):NaN,date=!numeric&&typeof raw==="string"?Date.parse(raw):NaN;
+            const reset=Number(read("x-ratelimit-reset"))*1000;
+            const hint=Math.max(Number.isFinite(seconds)&&seconds>=0?now+seconds*1000:0,Number.isFinite(date)?date:0,Number.isFinite(reset)?reset:0);
+            return finish(null,Math.min(now+DAY,Math.max(now+3600000,hint)));
+           }
+           if(error||status!==200||typeof body!=="string"||!body.trim()||body.length>200000)return finish();
+           const parsed=JSON.parse(body);
+           const snapshot=normalize(parsed,bj(now))||(backup?normalize(decodeContents(parsed),bj(now)):null);
+           finish(snapshot);
+          }catch(_){finish()}
+         });
+        }catch(_){finish()}
+       });
+      }
+      function backupAllowed(now){
+       try{const t=Number($persistentStore.read(RETRY_KEY));return !Number.isFinite(t)||t<=now||t>now+DAY}catch(_){return true}
+      }
+      function saveRetry(at){
+       try{if(at>0)$persistentStore.write(String(at),RETRY_KEY)}catch(_){}
       }
       function money(n){return price(n)?n.toFixed(2):"--"}
       function shortDate(s){return s.slice(5).replace("-","/")}
@@ -238,10 +274,16 @@ script-providers:
         };
       }
       async function run(now=Date.now()){
-        const today=bj(now),cached=readCache(today),remote=await fetchSnapshot(now);
-        const snapshot=mergeSnapshots(cached,remote,today);
+        const today=bj(now),cached=readCache(today),primary=(await fetchSnapshot(now)).snapshot;
+        let snapshot=mergeSnapshots(cached,primary,today),backup=null;
+        const matches=(remote,best)=>!!remote&&!!best&&remote.records[0].date===best.records[0].date&&equal(remote.records[0],best.records[0])&&remote.records[0].rank===best.records[0].rank;
+        if((!primary||!matches(primary,snapshot)||state(snapshot,today).stale)&&backupAllowed(now)){
+          const result=await fetchSnapshot(now,true);backup=result.snapshot;
+          saveRetry(result.retryAt);
+          snapshot=mergeSnapshots(snapshot,backup,today);
+        }
         if(!snapshot)return renderTile(null,now,false);
-        const connected=!!remote&&remote.records[0].date===snapshot.records[0].date&&equal(remote.records[0],snapshot.records[0])&&remote.records[0].rank===snapshot.records[0].rank;
+        const connected=matches(primary,snapshot)||matches(backup,snapshot);
         saveCache(snapshot);
         return renderTile(snapshot,now,connected);
       }
