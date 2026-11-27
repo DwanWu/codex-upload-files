@@ -1,13 +1,13 @@
 import {readFile} from "node:fs/promises";
 import assert from "node:assert/strict";
 const apis={};
-for(const [name,helpers] of Object.entries({"AIHotNews":"loadNews,normalizeNews,safeLink,fitNews,layoutProfile,textWidth,wrapText","HuangliQuery":"validCalendarDay,lunarMonthText,lunarDayText,BUNDLED_CALENDAR,fullDay","NodeVitals":""})){
+for(const [name,helpers] of Object.entries({"AIHotNews":"loadNews,normalizeNews,safeLink,fitNews,layoutProfile,textWidth,wrapText","DailyHuangli":"validCalendarDay,lunarMonthText,lunarDayText,BUNDLED_CALENDAR,fullDay","NodeVitals":""})){
  const code=await readFile(new URL("../Egern/Widget/"+name+"/"+name+".js",import.meta.url),"utf8");
  const a=await import("data:text/javascript;base64,"+Buffer.from(code+"\nexport {"+helpers+"};").toString("base64"));
  apis[name]={...a,widget:a.default};
 }
 
-const N=apis.AIHotNews,H={...apis.HuangliQuery,widget:(ctx,t)=>apis.HuangliQuery.widget(ctx,t,{bundle:false,fallback:false})},V=apis.NodeVitals,T=Date.parse("2026-11-27T15:00:00+08:00"),M=60000;
+const N=apis.AIHotNews,H={...apis.DailyHuangli,widget:(ctx,t)=>apis.DailyHuangli.widget(ctx,t,{bundle:false,fallback:false})},V=apis.NodeVitals,T=Date.parse("2026-11-27T15:00:00+08:00"),M=60000;
 const resp=(status,body,headers={})=>({status,headers,text:async()=>JSON.stringify(body)}),fail=()=>{throw Error("offline")};
 function mock(fn,kv=new Map(),widgetFamily="systemMedium",env={}){
  const calls=[];return {calls,kv,widgetFamily,env,device:{ipv4:{address:"192.168.1.2"}},storage:{getJSON:k=>JSON.parse(kv.get(k)||"null"),setJSON:(k,v)=>kv.set(k,JSON.stringify(v))},http:{get:async(u,o)=>{calls.push({u,o});return fn(u,o)}}};
@@ -137,11 +137,11 @@ w=await H.widget(mock(u=>u.includes("openApiData")?resp(200,[{...prim(ds[0]),lDa
 for(const f of families){const t=Date.parse("2026-12-31T23:59:00+08:00");w=await H.widget(mock(source,new Map(),f),t);assert.equal(w.type,"widget");assert.equal(Date.parse(w.refreshAfter),t+M);assert.ok(flat(w).includes("祭祀"));w=await H.widget(mock(source,new Map(),f),Date.parse("2027-01-01T00:01:00+08:00"));assert.ok(flat(w).includes("农历"+lunar(ds[5]).m+"月"+lunar(ds[5]).d))}
 assert.equal(H.validCalendarDay({lMonth:"",lDate:"初一"}),null);assert.equal(H.lunarDayText("21"),"廿一");
 // Verified bundled calendar and API failover.
-const embedded=apis.HuangliQuery;
+const embedded=apis.DailyHuangli;
 for(const key of Object.keys(embedded.BUNDLED_CALENDAR)){
  const c=mock(fail);let data;
  const w=await embedded.widget(c,Date.parse(key+"T12:00:00+08:00"),{capture:x=>data=x});
- assert.equal(w.type,"widget");assert.equal(c.calls.length,0);assert.equal(data.source,"预载");assert.ok(embedded.fullDay(data.day));assert.ok(!flat(w).includes('"text":"预载"'));
+ assert.equal(w.type,"widget");assert.equal(c.calls.length,0);assert.equal(data.source,"预载");assert.ok(embedded.fullDay(data.day));assert.ok(!flat(w).includes('"text":"预载"'));assert.ok(flat(w).includes('"text":"每日黄历"'));
 }
 assert.ok(Object.keys(embedded.BUNDLED_CALENDAR).length>=28);
 const apiFallback=mock(u=>u.includes("raw.githubusercontent.com")?resp(503,{}):u.includes("openApiData")?resp(200,{data:[prim(ds[0])]}):resp(200,[sec(ds[0])]));

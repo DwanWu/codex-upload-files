@@ -1,6 +1,6 @@
 // Refresh the verified current and next Beijing calendar months; never overwrite with missing data.
 import {readFile,writeFile,rename} from "node:fs/promises";
-const file=new URL("../Egern/Widget/HuangliQuery/HuangliQuery.js",import.meta.url);
+const file=new URL("../Egern/Widget/DailyHuangli/DailyHuangli.js",import.meta.url);
 const code=await readFile(file,"utf8");
 const pattern=/const BUNDLED_CALENDAR = [^\r\n]*; \/\/ BUNDLED_CALENDAR_END/;
 if(!pattern.test(code))throw Error("Calendar marker missing");
@@ -30,4 +30,4 @@ if(missingCurrent)throw Error("Current month incomplete ("+missingCurrent+" days
 if(missingNext)console.warn("Next month has "+missingNext+" missing days; publishing only verified entries and retrying next run");
 const next=code.replace(pattern,()=>"const BUNDLED_CALENDAR = "+JSON.stringify(updated)+"; // BUNDLED_CALENDAR_END");
 if(next===code){console.log("No calendar changes");process.exit(0)}
-const tmp=new URL("HuangliQuery.js.tmp",file);await writeFile(tmp,next,"utf8");await rename(tmp,file);console.log("Calendar days:",Object.keys(updated).length);
+const tmp=new URL("DailyHuangli.js.tmp",file);await writeFile(tmp,next,"utf8");await rename(tmp,file);console.log("Calendar days:",Object.keys(updated).length);

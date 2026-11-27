@@ -4,7 +4,7 @@ on:
     branches: [main]
     paths:
       - 'Egern/Widget/AIHotNews/**'
-      - 'Egern/Widget/HuangliQuery/**'
+      - 'Egern/Widget/DailyHuangli/**'
       - 'Egern/Widget/NodeVitals/**'
       - 'scripts/test_egern_widgets.mjs'
       - '.github/workflows/test-egern-widgets.yml'
