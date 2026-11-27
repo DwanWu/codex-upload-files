@@ -8,7 +8,7 @@
 
 文档：https://stash.wiki/script/tile ；https://stash.wiki/script/syntax-and-interface ；https://ippure.com/MyIP-Info-API
 
-为避免旧版 Stash 磁盘脚本和 Tile 缓存，覆写改用 `node-vitals-v2-compact` 与独立脚本路径 `NodeVitalsCompact.js`。保留旧 `NodeVitals.js` 兼容已有订阅；两份脚本本次内容完全一致。旧覆写应更新或移除后重新导入，不与旧版重复启用。
+历史远程脚本 `NodeVitals.js` 与 `NodeVitalsCompact.js` 内容一致；当前内嵌覆写不再请求它们。为兼容已经安装旧版覆写的设备，暂保留两条旧脚本地址，避免缓存或旧配置请求失败。测试使用 `NodeVitalsCompact.js`，不同时启用多个同名覆写。
 
 ## 单行内嵌版
 

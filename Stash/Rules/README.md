@@ -5,3 +5,7 @@
 在配置中按 Apple → Claude → ChatGPT → Google → Other 顺序引用每类集合，其中 IP 集合使用 no-resolve。此分支是单次转换快照，并未新增自动化；不包含任何私人订阅地址、认证信息或代理节点凭证。主分支原有 Egern 文件和工作流未修改。
 
 详细条数和源文件 blob SHA 见 manifest.json。来源及许可说明见主分支 scripts/README.md，含 QuixoticHeart/rule-set (GPL-3.0) 及官方网络建议、IP 数据。
+
+## 分支维护
+
+`stash-rules` 是独立的 Stash 发布分支，只保留 `Stash/` 下的规则、面板及维护文件。Egern 源规则、组件、同步脚本和 GitHub Actions 只在 `main` 维护；本分支不再保留这些重复快照。油价面板仍直接读取主分支的实时同步数据。不要将此发布分支合并回 `main`，避免把主分支的文件误删。既有 Stash 规则和面板订阅地址保持不变。
