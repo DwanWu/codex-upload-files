@@ -1,0 +1,49 @@
+name: Sync Guangdong oil price data
+on:
+  schedule:
+    - cron: '17 */2 * * *' # every two hours, away from the top of the hour
+    - cron: '37 10,16 * * *' # 18:37 and 00:37 Beijing time
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Egern/Widget/OilPriceGD/OilPriceGD.js'
+      - 'scripts/sync_oil_price.mjs'
+      - 'scripts/test_oil_price.mjs'
+      - '.github/workflows/sync-oil-price-gd.yml'
+permissions:
+  contents: write
+concurrency:
+  group: oil-price-gd
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Regression tests
+        run: node scripts/test_oil_price.mjs
+      - name: Fetch, validate and publish changed snapshot only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            node scripts/test_oil_price.mjs
+            node scripts/sync_oil_price.mjs
+            git add -- Egern/Widget/OilPriceGD/prices.json
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m 'Sync Guangdong oil price snapshot'
+            if git push origin HEAD:main; then exit 0; fi
+            sleep 5
+          done
+          exit 1

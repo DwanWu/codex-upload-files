@@ -1,0 +1,11 @@
+# 广东油价组件 v3
+
+- 92/95：广东省最高零售限价；98：第三方参考价，缺失时标记旧日期，不推算。
+- 以北京时间计算执行日和调价窗口。国家发改委明确不作调整且上一轮已确认时才沿用价格。
+- 优先读取 GitHub prices.json；无效/过期或缺失时按退避间隔查询公告及参考源，使用 Egern 持久化缓存和内置快照。
+- 服务端每两小时检查、北京时间18:37/次日00:37补查；仅有效价格周期、报价来源或下轮日期变化时提交。若新周期无法核验则任务失败而不覆盖旧数据。
+- 调价窗口由2026年日历或跨年后两个来源一致的下轮日期决定；未核验显示待公布。iOS刷新实际由WidgetKit调度。
+- 不调用Cloudflare，无第三方运行时依赖，无API Key。GitHub Actions可能因网络、调度或站点结构变化失败。
+- 手动运行 Actions / Sync Guangdong oil price data；查看失败日志。组件订阅地址不变。
+- 回归测试：`node scripts/test_oil_price.mjs`；同步：`node scripts/sync_oil_price.mjs`。
+- 2026-11-27初始价格来源：[广东省发改委公告转载](https://m.bendibao.com/show783326.html)、[国家发改委](https://www.ndrc.gov.cn/xwdt/xwfb/202611/t20261126_1409082.html)、[搜油价](https://www.soyoujia.cn/)、[小熊油耗](https://www.xiaoxiongyouhao.com/fprice/proilprice.php?province=%E5%B9%BF%E4%B8%9C%E7%9C%81)。历史参考来自油价通。数据非个别加油站成交价。
