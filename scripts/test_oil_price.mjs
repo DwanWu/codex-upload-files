@@ -1,7 +1,7 @@
 import {readFile} from "node:fs/promises";
 import assert from "node:assert/strict";
-const dir=new URL("../Egern/Widget/OilPriceGD/",import.meta.url);
-const code=await readFile(new URL("OilPriceGD.js",dir),"utf8");
+const dir=new URL("../Egern/Widget/DailyOilPrice/",import.meta.url);
+const code=await readFile(new URL("DailyOilPrice.js",dir),"utf8");
 const api=await import("data:text/javascript;base64,"+Buffer.from(code+"\nexport {collectSnapshot,normalize,state,bj,viewData,official,parseQQ,parseSou,parseBear,mergeSnapshots,SEED,SRC,oilData,render,workingDay,rollWindow,calendarState,windowEnd,countdownText,parseHolidayNotice,holidaySearchURL,holidayLinks,refreshHolidayYears,publicationDecision,cleanHint,announcements};").toString("base64"));
 const {SEED,SRC}=api, now=Date.parse("2026-11-27T08:30:00+08:00");
 const fixture={
@@ -47,7 +47,7 @@ const offline=await api.oilData(mock("systemMedium",false),now);
 assert.equal(offline.status,"缓存");assert.equal(offline.current.p95.price,8.71);
 for(const family of ["systemSmall","systemMedium","systemLarge"]){
   const widget=await api.render(mock(family,false),now);
-  assert.equal(widget.type,"widget");assert.ok(Array.isArray(widget.children));
+  assert.equal(widget.type,"widget");assert.ok(Array.isArray(widget.children));assert.ok(JSON.stringify(widget).includes('"text":"每日油价"'));assert.ok(!JSON.stringify(widget).includes('"text":"广东油价"'));
   assert.ok(Number.isFinite(Date.parse(widget.refreshAfter)));
 }
 

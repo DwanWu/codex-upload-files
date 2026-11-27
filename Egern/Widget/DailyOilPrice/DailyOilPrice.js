@@ -1,7 +1,7 @@
-/** 广东油价 · 2026-11-27 v2.0 | 动态工作日日历、官方公告纠偏、北京时间、离线缓存、98号参考。 */
+/** 每日油价 · 2026-11-27 v2.0 | 动态工作日日历、官方公告纠偏、北京时间、离线缓存、98号参考。 */
 const DAY=86400000;
 const CAL=["2026-01-06","2026-01-20","2026-02-03","2026-02-24","2026-03-09","2026-03-23","2026-04-07","2026-04-21","2026-05-08","2026-05-21","2026-06-04","2026-06-18","2026-07-03","2026-07-17","2026-07-31","2026-08-14","2026-08-28","2026-09-11","2026-09-24","2026-10-15","2026-10-29","2026-11-12","2026-11-26","2026-12-10","2026-12-24"];
-const SRC={"gov":"https://drc.gd.gov.cn/ywgg/","mirror":"https://m.bendibao.com/show783326.html","national":"https://www.ndrc.gov.cn/xwdt/xwfb/","qq":"https://oil.qqday.com/province/440000.htm","sou":"https://www.soyoujia.cn/","bear":"https://www.xiaoxiongyouhao.com/fprice/proilprice.php?province=%E5%B9%BF%E4%B8%9C%E7%9C%81","json":"https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/OilPriceGD/prices.json"};
+const SRC={"gov":"https://drc.gd.gov.cn/ywgg/","mirror":"https://m.bendibao.com/show783326.html","national":"https://www.ndrc.gov.cn/xwdt/xwfb/","qq":"https://oil.qqday.com/province/440000.htm","sou":"https://www.soyoujia.cn/","bear":"https://www.xiaoxiongyouhao.com/fprice/proilprice.php?province=%E5%B9%BF%E4%B8%9C%E7%9C%81","json":"https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/DailyOilPrice/prices.json"};
 const SEED={
   "schema": 3,
   "region": "GD",
@@ -530,7 +530,7 @@ async function getText(ctx,url,timeout=5500){
 }
 
 async function oilData(ctx,now){
-  const today=bj(now),key="OilPriceGD.v3",attemptKey="OilPriceGD.v3.lastAttempt";
+  const today=bj(now),key="DailyOilPrice.v3",attemptKey="DailyOilPrice.v3.lastAttempt";
   let cached=null,lastAttempt=0;
   try{cached=normalize(ctx.storage.getJSON(key),today);lastAttempt=Number(ctx.storage.get(attemptKey))||0}catch(_){}
   let snapshot=mergeSnapshots(SEED,cached,today),connected=false,remote=null;
@@ -564,7 +564,7 @@ async function render(ctx, now=Date.now()) {
   const bg={type:"linear",colors:C.bg,startPoint:{x:0,y:0},endPoint:{x:1,y:1}};
   const divider={type:"stack",height:0.5,backgroundColor:C.divider,children:[]};
   const root=(children,minutes=30)=>({type:"widget",refreshAfter:new Date(now+minutes*60000).toISOString(),padding:small?12:large?16:13,url:"https://m.bendibao.com/show783326.html",backgroundGradient:bg,children});
-  const title=[icon("fuelpump.circle.fill",C.red,small?13:16),t("广东油价",small?13:15,"heavy",C.main)];
+  const title=[icon("fuelpump.circle.fill",C.red,small?13:16),t("每日油价",small?13:15,"heavy",C.main)];
   let data;
   try{data=await oilData(ctx,now)}catch(e){
     return root([row([...title,sp(),t("待重试",10,"bold",C.red)]),sp(),t("暂无油价",13,"bold",C.main),t("请检查网络后刷新",10,"medium",C.muted),sp()],30);

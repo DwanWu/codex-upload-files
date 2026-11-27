@@ -1,7 +1,7 @@
 // Node.js 24 LTS, no third-party dependencies. Same parsers as Egern.
 import {readFile,writeFile,rename} from "node:fs/promises";
-const dir = new URL("../Egern/Widget/OilPriceGD/", import.meta.url);
-const code = await readFile(new URL("OilPriceGD.js",dir),"utf8");
+const dir = new URL("../Egern/Widget/DailyOilPrice/", import.meta.url);
+const code = await readFile(new URL("DailyOilPrice.js",dir),"utf8");
 const api = await import("data:text/javascript;base64,"+Buffer.from(code+"\nexport {collectSnapshot,normalize,state,bj,SEED,refreshHolidayYears,publicationDecision};").toString("base64"));
 const file=new URL("prices.json",dir);
 const now=Date.now(),today=api.bj(now);

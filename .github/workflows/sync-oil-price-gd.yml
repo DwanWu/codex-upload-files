@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'Egern/Widget/OilPriceGD/OilPriceGD.js'
+      - 'Egern/Widget/DailyOilPrice/DailyOilPrice.js'
       - 'scripts/sync_oil_price.mjs'
       - 'scripts/test_oil_price.mjs'
       - '.github/workflows/sync-oil-price-gd.yml'
@@ -40,7 +40,7 @@ jobs:
             git reset --hard origin/main
             node scripts/test_oil_price.mjs
             node scripts/sync_oil_price.mjs
-            git add -- Egern/Widget/OilPriceGD/prices.json
+            git add -- Egern/Widget/DailyOilPrice/prices.json
             if git diff --cached --quiet; then exit 0; fi
             git commit -m 'Sync Guangdong oil price snapshot'
             if git push origin HEAD:main; then exit 0; fi
