@@ -4,7 +4,7 @@
  */
 (function(){
 "use strict";
-const CAL_KEY="stash.huangli.v2.month",DAY=86400000;
+const CAL_KEY="stash.huangli.v2.month",NEXT_KEY=CAL_KEY+".next",DAY=86400000,PREFETCH_RETRY=6*3600000;
 function validDate(s){return typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s}
 function lunarDayText(s){
   const v=String(s??"").trim(),n=/^\d{1,2}$/.test(v)?+v:null,z="一二三四五六七八九";
@@ -33,8 +33,8 @@ function readCache(raw,month,now){
   return result;
 }
 
-async function calendar(ctx,clock){
-  const now=new Date(clock+8*3600000),Y=now.getUTCFullYear(),M=now.getUTCMonth()+1,D=now.getUTCDate();
+async function calendar(ctx,clock,targetClock=clock,prefetch=false){
+  const now=new Date(targetClock+8*3600000),Y=now.getUTCFullYear(),M=now.getUTCMonth()+1,D=now.getUTCDate();
   const WEEK="日一二三四五六"[now.getUTCDay()],P=n=>String(n).padStart(2,"0"),month=Y+"-"+P(M),dateKey=month+"-"+P(D);
   const midnight=Date.parse(dateKey+"T00:00:00+08:00")+DAY;
   let refreshAfter=new Date(Math.min(clock+3*3600000,midnight)).toISOString();
@@ -179,10 +179,10 @@ async function calendar(ctx,clock){
     };
   };
 
-  const localFallback = () => {
+  const localFallback = (targetDay=D) => {
     let lMonth = '', lDate = '', gzYear = '', animal = '';
     try {
-      const date=new Date(Date.UTC(Y,M-1,D,4,0,0));
+      const date=new Date(Date.UTC(Y,M-1,targetDay,4,0,0));
       const parts = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', {
         year: 'numeric', month: 'long', day: 'numeric', timeZone:'Asia/Shanghai'
       }).formatToParts(date);
@@ -211,23 +211,57 @@ async function calendar(ctx,clock){
     out.festivalList=mergeFestivalItems(out.term,a.festivalList,b.festivalList,a.term,b.term);
     return out;
   };
-  let stored=null;try{stored=ctx.storage.getJSON(CAL_KEY)}catch(_){}
+  const keyForMonth=prefetch?NEXT_KEY:CAL_KEY;
+  let stored=null;
+  try{stored=ctx.storage.getJSON(keyForMonth)}catch(_){}
+  // During month rollover the prefetched data is promoted to the current slot.
+  if(!prefetch&&stored?.month!==month){
+    try{const next=ctx.storage.getJSON(NEXT_KEY);if(next?.month===month)stored=next}catch(_){}
+  }
   const cache=readCache(stored,month,clock);
+  const last=new Date(Date.UTC(Y,M,0)).getUTCDate();
+  const localMemo=new Map();
+  const matchesExpected=(d,n)=>{
+    if(!d)return false;
+    if(!localMemo.has(n))localMemo.set(n,validCalendarDay(localFallback(n)));
+    const local=localMemo.get(n);
+    return !local||d.lMonth===local.lMonth&&d.lDate===local.lDate;
+  };
   const urls=["https://raw.githubusercontent.com/zqzess/openApiData/main/calendar_new/"+Y+"/"+Y+P(M)+".json","https://raw.githubusercontent.com/xuqssq/calendar/main/output/"+month+".json"];
   const load=async(key,url,parse)=>{
-    const old=cache[key],today=old?.days[dateKey];
-    if(today&&clock-old.checked<DAY)return {day:today,cached:false};
-    if(old&&clock-old.attempt<30*60000)return {day:today||null,cached:!!today};
+    const old=cache[key],saved=old?.days[dateKey],today=matchesExpected(saved,D)?saved:null;
+    // A complete next-month cache is fetched only once. Missing/partial
+    // next-month data retries no sooner than six hours, not every Tile tick.
+    if(prefetch&&today&&Object.keys(old.days).length===last)return {day:today,cached:false};
+    if(!prefetch&&today&&clock-old.checked<DAY)return {day:today,cached:false};
+    if(old&&clock-old.attempt<(prefetch?PREFETCH_RETRY:30*60000))return {day:today||null,cached:!!today};
     try{
-      const json=await getJson(url),days={},last=new Date(Date.UTC(Y,M,0)).getUTCDate();
-      for(let n=1;n<=last;n++){const d=validCalendarDay(parse(json,n));if(d)days[month+"-"+P(n)]=d}
+      const json=await getJson(url),days={};
+      for(let n=1;n<=last;n++){
+        const d=validCalendarDay(parse(json,n));
+        if(d&&matchesExpected(d,n))days[month+"-"+P(n)]=d;
+      }
       if(!Object.keys(days).length)throw Error("No valid days");
-      cache[key]={days:{...old?.days,...days},checked:days[dateKey]?clock:old?.checked||0,attempt:clock};
-      return {day:cache[key].days[dateKey]||null,cached:!days[dateKey]&&!!today};
-    }catch(_){cache[key]={days:old?.days||{},checked:old?.checked||0,attempt:clock};return {day:today||null,cached:!!today}}
+      const merged={...old?.days,...days};
+      // Remove old entries that do not match their calendar date; never use
+      // an inconsistent cached value to suppress a current-date refresh.
+      for(const [date,d] of Object.entries(merged)){
+        if(!matchesExpected(d,Number(date.slice(-2))))delete merged[date];
+      }
+      cache[key]={days:merged,checked:days[dateKey]?clock:old?.checked||0,attempt:clock};
+      return {day:merged[dateKey]||null,cached:!days[dateKey]&&!!today};
+    }catch(_){
+      cache[key]={days:old?.days||{},checked:old?.checked||0,attempt:clock};
+      return {day:today||null,cached:!!today};
+    }
   };
   const [a,b]=await Promise.all([load("primary",urls[0],findPrimaryDay),load("secondary",urls[1],normalizeSecondaryDay)]);
-  try{ctx.storage.setJSON(CAL_KEY,cache)}catch(_){}
+  try{
+    const existing=ctx.storage.getJSON(keyForMonth);
+    // Do not let a late run for the previous month overwrite a newer slot.
+    if(!existing?.month||existing.month<=month)ctx.storage.setJSON(keyForMonth,cache);
+  }catch(_){}
+  if(prefetch)return null;
   const local=validCalendarDay(localFallback()),matchesLocal=d=>!local||d.lMonth===local.lMonth&&d.lDate===local.lDate;
   const p=a.day&&matchesLocal(a.day)?a.day:null,q=b.day&&matchesLocal(b.day)?b.day:null;
   const today=mergeDay(p,q)||local||localFallback();
@@ -245,10 +279,17 @@ const ctx={
     setJSON:(key,value)=>{try{$persistentStore.write(JSON.stringify(value),key)}catch(_){}}
   },
   http:{get:(url,opts)=>new Promise((resolve,reject)=>{
-    try{$httpClient.get({url,headers:opts.headers,timeout:7,insecure:false,"auto-cookie":false,"auto-redirect":false},(error,response,body)=>{
-      if(error)return reject(Error("Network failure"));
-      resolve({status:Number(response?.status??response?.statusCode),text:async()=>body});
-    })}catch(e){reject(e)}
+    let finished=false;
+    const fail=()=>{if(!finished){finished=true;reject(Error("Network failure"))}};
+    try{
+      if(typeof setTimeout==="function")setTimeout(fail,7100);
+      $httpClient.get({url,headers:opts.headers,timeout:7,insecure:false,"auto-cookie":false,"auto-redirect":false},(error,response,body)=>{
+        if(finished)return;
+        if(error)return fail();
+        finished=true;
+        resolve({status:Number(response?.status??response?.statusCode),text:async()=>body});
+      });
+    }catch(_){fail()}
   })}
 };
 function compact(value){
@@ -280,14 +321,26 @@ function fallback(clock){
   const dateKey=new Date(clock+8*3600000).toISOString().slice(0,10);
   return render({today:{},dateKey,sourceLabel:"本地"});
 }
+function nextMonthTarget(clock){
+  const now=new Date(clock+8*3600000),y=now.getUTCFullYear(),m=now.getUTCMonth();
+  const last=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+  if(last-now.getUTCDate()>2)return null;
+  return Date.UTC(y,m+1,1,0,0,0)-8*3600000;
+}
+async function prefetchNext(clock){
+  const target=nextMonthTarget(clock);
+  if(target===null)return;
+  try{await calendar(ctx,clock,target,true)}catch(_){}
+}
 async function run(){
   const clock=Date.now();
-  let data=await calendar(ctx,clock);
-  // If the network requests straddle Beijing midnight, recompute for the
-  // actual new date instead of rendering yesterday's auspicious activities.
+  // Parallel prefetch into an independent slot; it cannot replace today's data.
+  const [initial]=await Promise.all([calendar(ctx,clock),prefetchNext(clock)]);
+  let data=initial;
   const end=Date.now();
   if(new Date(clock+8*3600000).toISOString().slice(0,10)!==new Date(end+8*3600000).toISOString().slice(0,10)){
-    data=await calendar(ctx,end);
+    const [current]=await Promise.all([calendar(ctx,end),prefetchNext(end)]);
+    data=current;
   }
   return render(data);
 }

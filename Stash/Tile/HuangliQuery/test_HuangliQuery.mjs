@@ -35,8 +35,8 @@ eq(r.value.content,"宜·打扫·破屋\n忌·结婚·安葬");eq(r.calls.length
 eq(r.value.backgroundColor,"#B7791F");ok(r.kv.has(key));
 const cache=r.kv;
 r=await execute(T+60000,offline,cache);eq(r.calls.length,0);eq(r.value.content,"宜·打扫·破屋\n忌·结婚·安葬");
-r=await execute(Date.parse("2026-11-28T00:00:01+08:00"),offline,cache);eq(r.calls.length,0);eq(r.value.title,"每日黄历·十月二十·丙午日");
-r=await execute(T+2*D,offline,cache);eq(r.calls.length,2);eq(r.value.content,"宜·暂无数据\n忌·暂无数据");
+r=await execute(Date.parse("2026-11-28T00:00:01+08:00"),offline,cache);eq(r.calls.length,2);ok(r.calls.every(x=>x.url.includes("202612.json")||x.url.includes("2026-12.json")));eq(r.value.title,"每日黄历·十月二十·丙午日");
+r=await execute(T+2*D,offline,cache);eq(r.calls.length,4);eq(r.value.content,"宜·暂无数据\n忌·暂无数据");
 r=await execute(T+60000,offline,new Map());eq(r.calls.length,2);eq(r.value.title,"每日黄历·十月十九");eq(r.value.content,"宜·暂无数据\n忌·暂无数据");eq(r.value.backgroundColor,"#8E8E93");
 r=await execute(T,offline,new Map(),undefined); // Node's Intl default.
 eq(r.value.content,"宜·暂无数据\n忌·暂无数据");
@@ -58,4 +58,31 @@ r=await execute(T,u=>u.includes("/calendar_new/")?response({days:[p(27,"十九",
 eq(r.value.content,"宜·祭祀·治病\n忌·诸事不宜");
 r=await execute(T,normal,new Map(),Intl,[Date.parse("2026-11-27T23:59:59+08:00"),Date.parse("2026-11-28T00:00:01+08:00")]);eq(r.value.title,"每日黄历·十月二十·丙午日");
 r=await execute(T,normal,new Map(),null);eq(r.value.title,"每日黄历·十月十九·乙巳日");
+
+// A complete next-month fixture, with lunar dates derived from Intl.
+// Yi/ji strings are test fixtures only, not published almanac data.
+const decPrimary=[],decSecondary=[];
+const fmt=new Intl.DateTimeFormat("zh-CN-u-ca-chinese",{year:"numeric",month:"long",day:"numeric",timeZone:"Asia/Shanghai"});
+for(let n=1;n<=31;n++){
+ const parts=fmt.formatToParts(new Date(Date.UTC(2026,11,n,4)));
+ const part=type=>parts.find(x=>x.type===type)?.value||"";
+ const month=part("month"),day=part("day");
+ decPrimary.push({year:"2026",month:"12",day:String(n),lMonth:month,lDate:day,gzYear:part("yearName"),suit:"祭祀.打扫",avoid:"安葬"});
+ decSecondary.push({title:"2026年 12月",day:String(n),lunar:month+day,yi:["祭祀","解除"],ji:["嫁娶"]});
+}
+const late=Date.parse("2026-11-30T19:00:00+08:00");
+const latePrimary={days:[p(30,"廿二")]},lateSecondary=[q(30,"廿二")];
+const across=u=>u.includes("202612.json")?response({days:decPrimary}):u.includes("2026-12.json")?response(decSecondary):u.includes("/calendar_new/")?response(latePrimary):response(lateSecondary);
+r=await execute(late,across,new Map());
+eq(r.calls.length,4);eq(r.value.title,"每日黄历·十月廿二·丙午日");
+const prefetchCache=r.kv,nextKey=key+".next",next=JSON.parse(prefetchCache.get(nextKey));
+eq(next.month,"2026-12");eq(Object.keys(next.primary.days).length,31);eq(Object.keys(next.secondary.days).length,31);
+eq(next.primary.checked,late);eq(JSON.parse(prefetchCache.get(key)).month,"2026-11");
+r=await execute(late+30*60000,across,prefetchCache);eq(r.calls.length,0);
+r=await execute(Date.parse("2026-12-01T00:00:01+08:00"),offline,prefetchCache);
+eq(r.calls.length,0);eq(r.value.title,"每日黄历·十月廿三");eq(r.value.content,"宜·祭祀·打扫\n忌·安葬");eq(JSON.parse(r.kv.get(key)).month,"2026-12");
+r=await execute(late,u=>u.includes("202612.json")||u.includes("2026-12.json")?offline():across(u),new Map());eq(r.calls.length,4);
+const failedPrefetch=r.kv;
+r=await execute(late+30*60000,across,failedPrefetch);eq(r.calls.length,0);
+r=await execute(late+6*3600000,across,failedPrefetch);eq(r.calls.length,2);eq(JSON.parse(r.kv.get(key)).month,"2026-12");
 console.log("Stash HuangliQuery: "+checks+" assertions passed");

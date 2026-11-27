@@ -7,3 +7,7 @@
 安装 `HuangliQuery.stoverride`，使用 Stash 原生内嵌 payload（iOS/tvOS 3.2.5+）；保留独立源文件供维护。模拟测试：`node Stash/Tile/HuangliQuery/test_HuangliQuery.mjs`。已用2026-11-27两份真实月度数据回放。实际手机多行文字显示和调度尚需验证。
 
 参考：https://stash.wiki/script/tile 、https://stash.wiki/script/syntax-and-interface 、https://stash.wiki/script/manage-script
+
+## 长期稳定性优化
+
+每月最后3天自动预取下个月的双源月历，单独保存到 next 缓存槽；完整月份不重复预取，缺失或不完整数据间隔至少6小时再试。跨月时优先读取预取缓存，按北京时间和本地农历逐日核验，不复用其他日期宜忌。当前月正常的24小时缓存、失败30分钟退避、7秒请求超时及原显示样式保持不变；月末最多4个并发请求，平时缓存有效时不联网。不新增后台 cron。若月末 Stash 未运行或上游尚未发布数据，仍只能在实际运行时补取。
