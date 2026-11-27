@@ -13,3 +13,7 @@
 - https://platform.openai.com/docs/api-reference/models/list
 - https://platform.claude.com/docs/en/api/models/list
 - https://ai.google.dev/api/models
+
+## 长期稳定性优化
+
+保留15秒单次请求上限；各服务并发检测，30秒总预算内，每个服务最多一次网络错误、408或5xx（含529）重试。地区限制、429、认证响应及其他不明确响应不重试或伪装为成功。日志仅记录服务名称、HTTP状态、尝试次数和判定，不记录节点名、请求凭证或响应正文。正常情况仍只请求3次。样式、策略组、刷新周期及原订阅地址不变；实际客户端运行时限由 Stash 控制。

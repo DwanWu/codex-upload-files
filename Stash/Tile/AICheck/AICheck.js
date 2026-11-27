@@ -71,24 +71,49 @@ function classify(name,status,body){
  if(status>=500||status===408)return "failed";
  return "unknown";
 }
-function probe(service,group){
+const REQUEST_TIMEOUT=15,TOTAL_MS=30000;
+function diagnostic(service,attempt,status,result,retryable){
+ // Log only service, status and outcome. Never record account data, node
+ // names, response bodies or authorization material.
+ try{if(typeof console!=="undefined"&&typeof console.log==="function")
+  console.log(JSON.stringify({panel:"AICheck",service:service.name,attempt,status,result,retryable}));
+ }catch(_){}
+}
+function probeOnce(service,group,deadline,attempt){
+ const remaining=Math.floor((deadline-Date.now())/1000);
+ if(remaining<1)return Promise.resolve({result:"failed",retryable:false});
+ const timeout=Math.min(REQUEST_TIMEOUT,remaining);
  return new Promise(resolve=>{
   let finished=false;
-  const finish=result=>{if(!finished){finished=true;resolve(result)}};
+  const finish=(result,status=0,retryable=false)=>{
+   if(finished)return;finished=true;
+   if(result!=="ok"||attempt>1)diagnostic(service,attempt,status,result,retryable);
+   resolve({result,retryable});
+  };
   try{
-   // Explicitly use the respective existing business policy group. Stash
-   // consumes this documented header; it is not an API authorization token.
+   if(typeof setTimeout==="function")setTimeout(()=>finish("failed",0,true),timeout*1000+100);
    $httpClient.get({
     url:service.url,headers:{"Accept":"application/json","Cache-Control":"no-cache",...service.headers,"X-Stash-Selected-Proxy":encodeURIComponent(group)},
-    timeout:15,insecure:false,"auto-cookie":false,"auto-redirect":false
+    timeout,insecure:false,"auto-cookie":false,"auto-redirect":false
    },(error,response,body)=>{
     try{
-     if(error)return finish("failed");
-     finish(classify(service.name,Number(response?.status??response?.statusCode),body));
+     if(error)return finish("failed",0,true);
+     const status=Number(response?.status??response?.statusCode);
+     const result=classify(service.name,status,body);
+     // Do not retry region restrictions, authentication errors, 429 or
+     // arbitrary unrecognized responses. Retry transient failures only.
+     finish(result,Number.isFinite(status)?status:0,
+       result==="failed"&&(status===408||status>=500&&status<=599));
     }catch(_){finish("unknown")}
    });
-  }catch(_){finish("failed")}
+  }catch(_){finish("failed",0,true)}
  });
+}
+async function probe(service,group,deadline){
+ const first=await probeOnce(service,group,deadline,1);
+ if(first.retryable&&deadline-Date.now()>=3000)
+  return (await probeOnce(service,group,deadline,2)).result;
+ return first.result;
 }
 function panel(results){
  const count=results.filter(x=>x==="ok").length;
@@ -100,7 +125,8 @@ function panel(results){
 async function run(){
  const groups=groupMap();
  if(!groups)return panel(SERVICES.map(()=>"unknown"));
- const results=await Promise.all(SERVICES.map(s=>probe(s,groups[s.name])));
+ const deadline=Date.now()+TOTAL_MS;
+ const results=await Promise.all(SERVICES.map(s=>probe(s,groups[s.name],deadline)));
  return panel(results);
 }
 run().then(x=>$done(x),()=>$done(panel(SERVICES.map(()=>"unknown"))));

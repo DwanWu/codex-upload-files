@@ -12,12 +12,13 @@ const gAuth={status:403,body:{error:{code:403,status:"PERMISSION_DENIED",message
 const normal={[O]:oAuth,[C]:cAuth,[G]:gAuth};
 const standard='{"ChatGPT":"ChatGPT","Claude":"Claude","Gemini":"Google"}';
 async function execute(routes,arg=standard,expectedGroups=["ChatGPT","Claude","Google"],expectedCalls=3){
- const calls=[];
+ const calls=[],seen={};
  let doneCount=0;
  const result=await new Promise(resolve=>{
   vm.runInNewContext(source,{$argument:arg,$httpClient:{get(req,cb){
    calls.push(req);
-   const res=routes[req.url];
+   const n=seen[req.url]=(seen[req.url]||0)+1;
+   const route=routes[req.url],res=Array.isArray(route)?route[Math.min(n-1,route.length-1)]:route;
    if(!res)throw Error("Unexpected request "+req.url);
    const body=typeof res.body==="string"?res.body:JSON.stringify(res.body??{});
    cb(res.error??null,{status:res.status},body);
@@ -27,9 +28,10 @@ async function execute(routes,arg=standard,expectedGroups=["ChatGPT","Claude","G
  ok(!result.content.includes("\n"));
  ok(/^智能检测·[0-3]\/3$/.test(result.title));
  ok(/^ChatGPT[✓!×?]·Claude[✓!×?]·Gemini[✓!×?]$/.test(result.content));
- calls.forEach((r,i)=>{
-  eq(r.url,[O,C,G][i]);eq(r.headers["X-Stash-Selected-Proxy"],encodeURIComponent(expectedGroups[i]));
-  eq(r.insecure,false);eq(r.timeout,15);eq(r["auto-cookie"],false);eq(r["auto-redirect"],false);
+ const visited=new Set();
+ calls.forEach((r)=>{
+  const i=[O,C,G].indexOf(r.url);ok(i>=0);eq(r.headers["X-Stash-Selected-Proxy"],encodeURIComponent(expectedGroups[i]));
+  eq(r.insecure,false);ok(r.timeout>=1&&r.timeout<=15);if(!visited.has(r.url)){eq(r.timeout,15);visited.add(r.url)}eq(r["auto-cookie"],false);eq(r["auto-redirect"],false);
   ok(!Object.keys(r.headers).some(k=>/^(authorization|x-api-key|cookie)$/i.test(k)));
  });
  return result;
@@ -45,9 +47,9 @@ r=await execute({...normal,[G]:{status:400,body:{error:{code:400,status:"INVALID
 eq(r.title,"智能检测·3/3");
 r=await execute({...normal,[O]:{status:401,body:{error:{message:"Unexpected failure"}}},[C]:{status:200,body:"<html>challenge</html>"},[G]:{status:302,body:""}});
 eq(r.title,"智能检测·0/3");eq(r.content,"ChatGPT?·Claude?·Gemini?");eq(r.backgroundColor,"#8E8E93");
-r=await execute({...normal,[O]:{status:429,body:{}},[C]:{status:503,body:{}},[G]:{status:200,body:{models:[]}}});
+r=await execute({...normal,[O]:{status:429,body:{}},[C]:{status:503,body:{}},[G]:{status:200,body:{models:[]}}},standard,["ChatGPT","Claude","Google"],4);
 eq(r.content,"ChatGPT!·Claude×·Gemini✓");
-r=await execute({[O]:{error:"timeout"},[C]:{error:"TLS"},[G]:{error:"offline"}});
+r=await execute({[O]:{error:"timeout"},[C]:{error:"TLS"},[G]:{error:"offline"}},standard,["ChatGPT","Claude","Google"],6);
 eq(r.title,"智能检测·0/3");eq(r.backgroundColor,"#C0392B");eq(r.content,"ChatGPT×·Claude×·Gemini×");
 r=await execute(normal,'{"ChatGPT":"美国节点","Claude":"Claude","Gemini":"Google"}',["美国节点","Claude","Google"]);eq(r.title,"智能检测·3/3");
 r=await execute(normal,'{"ChatGPT":""}',[],0);eq(r.content,"ChatGPT?·Claude?·Gemini?");
@@ -58,4 +60,13 @@ r=await execute({...normal,[O]:{status:200,body:{data:[]}},[C]:{status:200,body:
 eq(r.title,"智能检测·3/3");
 r=await execute({...normal,[G]:{status:403,body:{error:{code:403,status:"PERMISSION_DENIED",message:"Access denied"}}}});
 eq(r.content,"ChatGPT✓·Claude✓·Gemini!");
+
+r=await execute({...normal,[C]:[{status:529,body:{}},cAuth],[G]:[{error:"timeout"},gAuth]},standard,["ChatGPT","Claude","Google"],5);
+eq(r.title,"智能检测·3/3");eq(r.content,"ChatGPT✓·Claude✓·Gemini✓");
+r=await execute({...normal,[G]:[{status:503,body:{}},{status:503,body:{}}]},standard,["ChatGPT","Claude","Google"],4);
+eq(r.content,"ChatGPT✓·Claude✓·Gemini×");
+r=await execute({...normal,[G]:{status:429,body:{}},[C]:{status:403,body:{error:{message:"Region not supported"}}}});
+eq(r.content,"ChatGPT✓·Claude!·Gemini!");
+r=await execute({...normal,[O]:[{status:408,body:{}},oAuth]},standard,["ChatGPT","Claude","Google"],4);
+eq(r.title,"智能检测·3/3");
 console.log("Stash AICheck: "+checks+" assertions passed");
