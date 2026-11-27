@@ -5,7 +5,7 @@
 # ==========================================
 
 name: "广东油价"
-description: "固定广东省油价；92/95/98 三张居中卡，多源自动选最新调价周期，支持涨跌、倒计时及历史走势。"
+description: "固定广东省油价；92/95/98 三卡居中，官方调价优先、98号参考价、独立来源校验、北京时间及离线缓存。"
 
 auto_update:
   interval: 3600
@@ -13,9 +13,9 @@ auto_update:
 scriptings:
   - generic:
       name: 广东油价
-      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/OilPriceGD/OilPriceGD.js?v=20260926-1
+      script_url: https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/OilPriceGD/OilPriceGD.js?v=20261127-1
       update_interval: 1800
-      timeout: 20
+      timeout: 30
 
 widgets:
   - name: 广东油价
