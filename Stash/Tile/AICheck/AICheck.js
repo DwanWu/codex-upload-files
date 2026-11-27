@@ -80,7 +80,7 @@ function probe(service,group){
    // consumes this documented header; it is not an API authorization token.
    $httpClient.get({
     url:service.url,headers:{"Accept":"application/json","Cache-Control":"no-cache",...service.headers,"X-Stash-Selected-Proxy":encodeURIComponent(group)},
-    timeout:6,insecure:false,"auto-cookie":false,"auto-redirect":false
+    timeout:15,insecure:false,"auto-cookie":false,"auto-redirect":false
    },(error,response,body)=>{
     try{
      if(error)return finish("failed");

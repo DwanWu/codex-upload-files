@@ -29,7 +29,7 @@ async function execute(routes,arg=standard,expectedGroups=["ChatGPT","Claude","G
  ok(/^ChatGPT[✓!×?]·Claude[✓!×?]·Gemini[✓!×?]$/.test(result.content));
  calls.forEach((r,i)=>{
   eq(r.url,[O,C,G][i]);eq(r.headers["X-Stash-Selected-Proxy"],encodeURIComponent(expectedGroups[i]));
-  eq(r.insecure,false);eq(r.timeout,6);eq(r["auto-cookie"],false);eq(r["auto-redirect"],false);
+  eq(r.insecure,false);eq(r.timeout,15);eq(r["auto-cookie"],false);eq(r["auto-redirect"],false);
   ok(!Object.keys(r.headers).some(k=>/^(authorization|x-api-key|cookie)$/i.test(k)));
  });
  return result;
