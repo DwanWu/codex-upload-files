@@ -134,8 +134,7 @@ export default async function (ctx,clock=Date.now()) {
     orange: { light: '#F59E0B', dark: '#FFB340' },
     gold: { light: '#B7791F', dark: '#FFD60A' },
     blue: { light: '#2563EB', dark: '#64D2FF' },
-    chip: { light: '#F2F2F7', dark: '#2C2C2E' },
-    divider: { light: '#E9E9ED', dark: '#38383A' }
+    chip: { light: '#F2F2F7', dark: '#2C2C2E' }
   };
 
   const bg = {
@@ -162,12 +161,6 @@ export default async function (ctx,clock=Date.now()) {
   const icon = (name, color, size = 13) => ({
     type: 'image', src: `sf-symbol:${name}`, color, width: size, height: size
   });
-  // Use an actual flexible horizontal rule; empty unbounded stacks can
-  // collapse to zero width in the widget renderer.
-  const divider=()=>row([
-    spacer(profile.badge+4),
-    {type:'stack',direction:'row',height:0.5,flex:1,backgroundColor:C.divider,children:[spacer()]}
-  ],0,{height:0.5});
   const chip = (label, color = C.blue) => ({
     type: 'stack', direction: 'row', padding: [3, 7, 3, 7], backgroundColor: C.chip,
     children: [text(label, 9, 'bold', color, { maxLines: 1 })]
@@ -221,7 +214,7 @@ export default async function (ctx,clock=Date.now()) {
   const shown=items.slice(0,profile.count);
   return {type:'widget',refreshAfter,padding:profile.padding,url:shown.length===1?shown[0].url:HOME_URL,backgroundGradient:bg,gap:0,children:[
     header(profile.header),spacer(profile.gap),
-    col(shown.flatMap((item,i)=>[hotRow(item),...(i<shown.length-1?[divider()]:[])]),0,{alignItems:'start'}),
+    col(shown.map(hotRow),0,{alignItems:'start'}),
     spacer(),footer(profile.footer)
   ]};
 }

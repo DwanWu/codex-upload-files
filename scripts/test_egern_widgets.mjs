@@ -89,11 +89,14 @@ for(const f of families){
   assert.ok(t.font.size>=p.minFont-0.00001);
  }
  const list=widget.children.find(x=>x.type==="stack"&&x.direction==="column"&&x.children.some(r=>r.url));assert.ok(list);assert.equal(list.alignItems,"start");
- const rules=list.children.filter(x=>x.height===0.5);assert.equal(rules.length,rows.length-1);
- for(const rule of rules){assert.equal(rule.children[0].length,p.badge+4);assert.equal(rule.children[1].flex,1);assert.equal(rule.children[1].height,0.5);assert.equal(rule.children[1].children[0].type,"spacer")}
+ const rules=list.children.filter(x=>x.height===0.5);assert.equal(rules.length,0);
+ assert.equal(list.children.length,rows.length);
+ assert.ok(list.children.every(x=>x.url&&x.height===p.rowHeight));
+ function hasRule(x){return x?.height===0.5||x?.underline===true||(x?.children||[]).some(hasRule)}
+ assert.ok(!hasRule(widget));
  assert.ok(textNodes(widget).every(x=>!/(?:…|⋯|\.{3,}|．{3,})/.test(x)));
  assert.equal(ctx2.calls.length,1);
- const [top,right,bottom,left]=p.padding,expectedHeight=p.count*p.rowHeight+(p.count-1)*0.5+top+bottom+(p.header+4)+(p.footer+3)+p.gap;
+ const [top,right,bottom,left]=p.padding,expectedHeight=p.count*p.rowHeight+top+bottom+(p.header+4)+(p.footer+3)+p.gap;
  assert.ok(expectedHeight<=(f==="systemLarge"?382:170));
  assert.ok(p.budget*p.font+p.badge+8+left+right<(f==="systemSmall"?170:364));
  const invalidHot={...fullHot,items:[{...newsItem(1),title:"太长的标题".repeat(70)},{...newsItem(2),title:"源标题……"},...fullHot.items.slice(2)]};
