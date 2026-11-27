@@ -1,0 +1,136 @@
+{
+  "schema": 3,
+  "region": "GD",
+  "records": [
+    {
+      "date": "2026-11-27",
+      "p92": 8.04,
+      "p95": 8.71,
+      "p98": 10.71,
+      "p98Date": "2026-11-27",
+      "p98Source": "搜油价/萤炬参考",
+      "rank": 3,
+      "source": "广东省发展改革委",
+      "url": "https://drc.gd.gov.cn/ywgg/content/post_4985529.html"
+    },
+    {
+      "date": "2026-11-13",
+      "p92": 8.39,
+      "p95": 9.09,
+      "p98": 11.09,
+      "p98Date": "2026-11-13",
+      "p98Source": "油价通参考",
+      "rank": 3,
+      "source": "英德市政府转载广东省发展改革委",
+      "url": "https://www.yingde.gov.cn/yqydfgw/gkmlpt/content/2/2208/post_2208291.html"
+    },
+    {
+      "date": "2026-10-30",
+      "p92": 8.91,
+      "p95": 9.65,
+      "p98": 11.65,
+      "p98Date": "2026-10-30",
+      "p98Source": "油价通参考",
+      "rank": 1,
+      "source": "油价通历史参考",
+      "url": "https://9662.net/guangdong/25259.html"
+    },
+    {
+      "date": "2026-10-16",
+      "p92": 8.63,
+      "p95": 9.35,
+      "p98": 11.35,
+      "p98Date": "2026-10-16",
+      "p98Source": "油价通参考",
+      "rank": 1,
+      "source": "油价通历史参考",
+      "url": "https://9662.net/guangdong/25259.html"
+    },
+    {
+      "date": "2026-09-25",
+      "p92": 8.63,
+      "p95": 9.35,
+      "p98": 11.35,
+      "p98Date": "2026-09-25",
+      "p98Source": "油价通参考",
+      "rank": 1,
+      "source": "油价通历史参考",
+      "url": "https://9662.net/guangdong/25259.html"
+    },
+    {
+      "date": "2026-09-12",
+      "p92": 8.31,
+      "p95": 9,
+      "p98": 11,
+      "p98Date": "2026-09-12",
+      "p98Source": "油价通参考",
+      "rank": 1,
+      "source": "油价通历史参考",
+      "url": "https://9662.net/guangdong/25259.html"
+    },
+    {
+      "date": "2026-08-29",
+      "p92": 8.1,
+      "p95": 8.78,
+      "p98": 10.78,
+      "p98Date": "2026-08-29",
+      "p98Source": "油价通参考",
+      "rank": 1,
+      "source": "油价通历史参考",
+      "url": "https://9662.net/guangdong/25259.html"
+    },
+    {
+      "date": "2026-08-15",
+      "p92": 7.8,
+      "p95": 8.45,
+      "p98": 10.45,
+      "p98Date": "2026-08-15",
+      "p98Source": "油价通参考",
+      "rank": 1,
+      "source": "油价通历史参考",
+      "url": "https://9662.net/guangdong/25259.html"
+    },
+    {
+      "date": "2026-08-01",
+      "p92": 7.99,
+      "p95": 8.65,
+      "p98": 10.65,
+      "p98Date": "2026-08-01",
+      "p98Source": "油价通参考",
+      "rank": 1,
+      "source": "油价通历史参考",
+      "url": "https://9662.net/guangdong/25259.html"
+    },
+    {
+      "date": "2026-07-18",
+      "p92": 7.44,
+      "p95": 8.06,
+      "p98": 10.06,
+      "p98Date": "2026-07-18",
+      "p98Source": "油价通参考",
+      "rank": 1,
+      "source": "油价通历史参考",
+      "url": "https://9662.net/guangdong/25259.html"
+    },
+    {
+      "date": "2026-07-04",
+      "p92": 7.2,
+      "p95": 7.8,
+      "p98": 9.8,
+      "p98Date": "2026-07-04",
+      "p98Source": "油价通参考",
+      "rank": 1,
+      "source": "油价通历史参考",
+      "url": "https://9662.net/guangdong/25259.html"
+    }
+  ],
+  "nextWindow": "2026-12-10",
+  "pendingCycle": null,
+  "calendarNotice": {
+    "date": "2026-11-26",
+    "kind": "cycle",
+    "url": "https://www.ndrc.gov.cn/xwdt/xwfb/202611/t20261126_1409082.html"
+  },
+  "calendarHint": null,
+  "holidayYears": {}
+}

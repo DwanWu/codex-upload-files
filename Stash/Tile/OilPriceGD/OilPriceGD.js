@@ -1,0 +1,233 @@
+/** 广东油价 · Stash 折叠面板 v2.0
+ * 价格及调价日历复用 Egern 的主分支 prices.json。
+ * 校验、缓存合并、周期与价格展示模型源自 425f534658322edec4b834951f91a92ab2769208。
+ * 95号优先；所有时间以北京时间计算。无额外定时任务。
+ */
+(function(){
+"use strict";
+const DAY=86400000;
+const CAL=["2026-01-06","2026-01-20","2026-02-03","2026-02-24","2026-03-09","2026-03-23","2026-04-07","2026-04-21","2026-05-08","2026-05-21","2026-06-04","2026-06-18","2026-07-03","2026-07-17","2026-07-31","2026-08-14","2026-08-28","2026-09-11","2026-09-24","2026-10-15","2026-10-29","2026-11-12","2026-11-26","2026-12-10","2026-12-24"];
+function dateOK(s){return typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s}
+
+function bj(now){return new Date(now+8*3600000).toISOString().slice(0,10)}
+
+function iso(y,m,d){const s=`${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;return dateOK(s)?s:null}
+
+function add(s,n){return dateOK(s)?new Date(Date.parse(s)+n*DAY).toISOString().slice(0,10):null}
+
+function days(a,b){return (Date.parse(a)-Date.parse(b))/DAY}
+
+
+/* Official workday schedules, not an official annual oil-price calendar.
+ * 2026: 国办发明电〔2025〕7号; 2027: 国办发明电〔2026〕10号.
+ * Unknown years must be discovered from official notices; never assume weekdays alone. */
+const HOLIDAY_SOURCE="https://www.gov.cn/zhengce/content/202611/content_7085101.htm";
+const BUILTIN_WORKDAYS={
+  2026:{off:[["01-01","01-03"],["02-15","02-23"],["04-04","04-06"],["05-01","05-05"],["06-19","06-21"],["09-25","09-27"],["10-01","10-07"]],work:["01-04","02-14","02-28","05-09","09-20","10-10"]},
+  2027:{off:[["01-01","01-03"],["02-05","02-13"],["04-03","04-05"],["05-01","05-05"],["06-09","06-09"],["09-15","09-15"],["10-01","10-07"]],work:["01-31","02-14","05-08","09-26","10-09"]}
+};
+function policyURL(u){return typeof u==="string"&&/^https:\/\/www\.gov\.cn\/zhengce\/content\/20\d{4}\/content_\d+\.htm$/.test(u)}
+function cleanHoliday(h,year){
+  if(!h||!policyURL(h.url)||!/^国办发明电〔20\d{2}〕\d+号$/.test(h.doc||"")||!Array.isArray(h.off)||!Array.isArray(h.work)||h.off.length!==7||h.work.length>15)return null;
+  const inYear=d=>dateOK(d)&&d>=String(year-1)+"-12-28"&&d<=String(year)+"-12-31";
+  if(h.off.some(r=>!Array.isArray(r)||r.length!==2||!r.every(inYear)||days(r[1],r[0])<0||days(r[1],r[0])>12)||!h.work.every(inYear))return null;
+  const off=h.off.map(r=>r.slice()).sort((a,b)=>a[0].localeCompare(b[0])),work=[...new Set(h.work)].sort();
+  if(off.some((r,i)=>i>0&&r[0]<=off[i-1][1])||work.some(d=>off.some(([a,b])=>d>=a&&d<=b)))return null;
+  if(off.reduce((n,r)=>n+days(r[1],r[0])+1,0)<7||off.reduce((n,r)=>n+days(r[1],r[0])+1,0)>45)return null;
+  return {url:h.url,doc:h.doc,off,work};
+}
+function cleanHolidayYears(input,today){
+  const out={};if(!input||typeof input!=="object"||Array.isArray(input))return out;
+  const y=+today.slice(0,4);
+  for(const k of Object.keys(input).sort()){
+    if(!/^20\d{2}$/.test(k)||+k<Math.max(2028,y-1)||+k>y+1)continue;
+    const h=cleanHoliday(input[k],+k);if(h)out[k]=h;
+  }
+  return out;
+}
+function holidayFor(year,years={}){
+  const b=BUILTIN_WORKDAYS[year];
+  if(b)return {off:b.off.map(r=>r.map(d=>year+"-"+d)),work:b.work.map(d=>year+"-"+d)};
+  return years[year]||null;
+}
+function workingDay(d,years={}){
+  if(!dateOK(d))return null;
+  const year=+d.slice(0,4),h=holidayFor(year,years);
+  // New Year holiday notices may explicitly include dates in the previous December.
+  const adjacent=holidayFor(year+1,years);
+  const schedules=[h,adjacent].filter(Boolean);
+  if(schedules.some(x=>x.work.includes(d)))return true;
+  if(schedules.some(x=>x.off.some(([a,b])=>d>=a&&d<=b)))return false;
+  if(!h)return null;
+  const w=new Date(d+"T00:00:00Z").getUTCDay();return w!==0&&w!==6;
+}
+function rollWindow(anchor,years={}){
+  if(!dateOK(anchor))return null;
+  let count=0;
+  for(let i=1;i<=35;i++){
+    const d=add(anchor,i),w=workingDay(d,years);
+    if(w===null)return null;if(w&&++count===10)return d;
+  }
+  return null;
+}
+function cleanNotice(n,today){
+  if(!n||!dateOK(n.date)||n.date>today||!["cycle","pause"].includes(n.kind)||typeof n.url!=="string"||!/^https:\/\/www\.ndrc\.gov\.cn\/xwdt\/xwfb\/20\d{4}\/t20\d{6}_\d+\.html$/.test(n.url))return null;
+  if(!n.url.includes("/t"+n.date.replace(/-/g,"")+"_"))return null;
+  return {date:n.date,kind:n.kind,url:n.url};
+}
+function cleanHint(h,today){
+  if(!h||!dateOK(h.anchor)||!Number.isSafeInteger(h.checkedAt)||h.checkedAt<=0)return null;
+  const checked=bj(h.checkedAt);
+  if(checked>today||checked<=h.anchor||days(checked,h.anchor)>35)return null;
+  if(h.date!==null&&(!dateOK(h.date)||h.date<checked||h.date<=h.anchor||days(h.date,h.anchor)>35))return null;
+  return {date:h.date,anchor:h.anchor,checkedAt:h.checkedAt};
+}
+function newerNotice(a,b){
+  return [a,b].filter(Boolean).sort((x,y)=>y.date.localeCompare(x.date)||Number(y.kind==="pause")-Number(x.kind==="pause"))[0]||null;
+}
+function newerHint(a,b){
+  return [a,b].filter(Boolean).sort((x,y)=>y.anchor.localeCompare(x.anchor)||y.checkedAt-x.checkedAt||Number(y.date===null)-Number(x.date===null))[0]||null;
+}
+function calendarState(s,today){
+  const notice=cleanNotice(s.calendarNotice,today),years=s.holidayYears||{};
+  const rowAnchor=s.records.filter(r=>r.rank>=2&&r.date<=today).map(r=>add(r.date,-1)).sort().pop()||null;
+  const official=[rowAnchor,notice?.kind==="cycle"&&notice.date<today?notice.date:null].filter(Boolean).sort().pop()||null;
+  const expected=[official?add(official,1):null,s.pendingCycle].filter(Boolean);
+  if(notice?.kind==="pause"&&(!official||notice.date>=official))return {next:null,kind:"paused",anchor:official,expected};
+  if(notice?.kind==="cycle"&&notice.date===today)return {next:today,kind:"official",anchor:official,expected};
+  const aligned=!official||CAL.includes(official);
+  const last=aligned?CAL.filter(d=>d<today).slice(-1)[0]:null;
+  if(last)expected.push(add(last,1));
+  const anchor=[official,last].filter(Boolean).sort().pop()||null;
+  const known=aligned?CAL.find(d=>d>=today&&(!anchor||d>anchor)):null;
+  if(known)return {next:known,kind:"calendar",anchor,expected};
+  const prediction=rollWindow(anchor,years);
+  const hint=cleanHint(s.calendarHint,today),matching=hint?.anchor===anchor?hint.date:null;
+  if(prediction&&prediction<today)expected.push(add(prediction,1));
+  if(matching&&matching<today)expected.push(add(matching,1));
+  if(prediction)return {next:prediction>=today?prediction:null,kind:prediction>=today?"estimated":null,anchor,expected};
+  return {next:matching&&matching>=today?matching:null,kind:matching&&matching>=today?"corroborated":null,anchor,expected};
+}
+function windowEnd(d){return dateOK(d)?Date.parse(d+"T00:00:00+08:00")+DAY:NaN}
+function price(n){return typeof n==="number"&&Number.isFinite(n)&&n>=3&&n<=25&&Math.abs(n*100-Math.round(n*100))<0.000001}
+
+function pair(r){return r&&price(r.p92)&&price(r.p95)&&r.p95>=r.p92&&r.p95-r.p92<=4}
+
+function equal(a,b){return a&&b&&Math.round(a.p92*100)===Math.round(b.p92*100)&&Math.round(a.p95*100)===Math.round(b.p95*100)}
+
+function rowOK(r,today){return pair(r)&&dateOK(r.date)&&r.date<=today&&Number.isInteger(r.rank)&&r.rank>=1&&r.rank<=3&&typeof r.source==="string"&&r.source.length>0&&r.source.length<=120&&typeof r.url==="string"&&r.url.length<=500&&/^https:\/\//.test(r.url)}
+
+function quoteOK(r,today){return price(r.p98)&&r.p98>=r.p95&&dateOK(r.p98Date)&&r.p98Date>=r.date&&r.p98Date<=today&&typeof r.p98Source==="string"&&r.p98Source.length>0&&r.p98Source.length<=120}
+
+function clean(r,today){return {date:r.date,p92:r.p92,p95:r.p95,p98:quoteOK(r,today)?r.p98:null,p98Date:quoteOK(r,today)?r.p98Date:null,p98Source:quoteOK(r,today)?r.p98Source:null,rank:r.rank,source:r.source,url:r.url}}
+
+function normalize(s,today){
+  if(!s||s.schema!==3||s.region!=="GD"||!Array.isArray(s.records)||s.records.length>40||s.records.length===0||!s.records.every(r=>rowOK(r,today)))return null;
+  const records=s.records.map(r=>clean(r,today)).sort((a,b)=>b.date.localeCompare(a.date));
+  if(new Set(records.map(r=>r.date)).size!==records.length)return null;
+  const nextWindow=dateOK(s.nextWindow)&&days(s.nextWindow,today)<=40?s.nextWindow:null;
+  const pendingCycle=dateOK(s.pendingCycle)&&s.pendingCycle<=today?s.pendingCycle:null;
+  return {schema:3,region:"GD",records,nextWindow,pendingCycle,calendarNotice:cleanNotice(s.calendarNotice,today),calendarHint:cleanHint(s.calendarHint,today),holidayYears:cleanHolidayYears(s.holidayYears,today)};
+}
+function mergeSnapshots(first,second,today){
+  const a=normalize(first,today),b=normalize(second,today);
+  if(!a||!b){const one=a||b;if(one)one.nextWindow=calendarState(one,today).next;return one}
+  const map=new Map(a.records.map(r=>[r.date,r]));
+  for(const r of b.records){
+    const old=map.get(r.date);
+    let best=!old||r.rank>=old.rank?r:old;
+    if(old&&equal(old,r)){
+      const quotes=[old,r].filter(x=>quoteOK(x,today)).sort((x,z)=>z.p98Date.localeCompare(x.p98Date));
+      if(quotes.length)best={...best,p98:quotes[0].p98,p98Date:quotes[0].p98Date,p98Source:quotes[0].p98Source};
+    }
+    map.set(r.date,best);
+  }
+  const records=[...map.values()].sort((x,z)=>z.date.localeCompare(x.date)).slice(0,24);
+  const pending=[a.pendingCycle,b.pendingCycle].filter(d=>d&&d>records[0].date).sort().pop()||null;
+  const merged={schema:3,region:"GD",records,nextWindow:null,pendingCycle:pending,calendarNotice:newerNotice(a.calendarNotice,b.calendarNotice),calendarHint:newerHint(a.calendarHint,b.calendarHint),holidayYears:{...a.holidayYears,...b.holidayYears}};
+  merged.holidayYears=cleanHolidayYears(merged.holidayYears,today);
+  merged.nextWindow=calendarState(merged,today).next;
+  return merged;
+}
+
+function state(s,today){
+  const row=s.records[0],cal=calendarState(s,today);
+  const expected=cal.expected.filter(Boolean).sort().pop()||null;
+  const stale=Boolean(expected&&row.date<expected)||(cal.kind!=="paused"&&!cal.next&&days(today,row.date)>23);
+  return {row,expected,stale,next:cal.next,nextKind:cal.kind};
+}
+function viewData(s,now,connected){
+  const today=bj(now),{row,stale,next,nextKind}=state(s,today),previous=s.records[1];
+  const priorWindow=CAL.filter(d=>add(d,1)<row.date).slice(-1)[0];
+  const adjacent=previous&&days(row.date,previous.date)<=23&&(!priorWindow||row.date.slice(0,4)!=="2026"||previous.date===add(priorWindow,1));
+  const current={};
+  for(const k of ["p92","p95","p98"]){
+    const value=row[k];
+    current[k]={price:price(value)?value:null,delta:adjacent&&price(value)&&price(previous[k])?Math.round((value-previous[k])*100)/100:null};
+  }
+  if(!quoteOK(row,today)){
+    const old=s.records.find(r=>r.date<row.date&&quoteOK(r,today));
+    if(old)current.p98={price:old.p98,delta:null,oldDate:old.p98Date};
+  }else if(stale){current.p98.delta=null;current.p98.oldDate=row.p98Date}
+  if(stale){current.p92.delta=null;current.p95.delta=null}
+  return {current,history:s.records,date:row.date,next,nextKind,status:stale?"待更新":!connected?"缓存":row.rank===1?"参考":"已核验",stale,source:row.source};
+}
+
+const DATA="https://raw.githubusercontent.com/DwanWu/codex-upload-files/main/Egern/Widget/OilPriceGD/prices.json";
+const INFO="https://drc.gd.gov.cn/ywgg/";
+const KEY="stash.oilpricegd.v2.snapshot";
+const ICON="fuelpump.fill";
+const COLORS={down:"#1E7E44",up:"#C0392B",normal:"#2C5F8A",unknown:"#8E8E93"};
+function readCache(today){
+  try{return normalize(JSON.parse($persistentStore.read(KEY)||"null"),today)}catch(_){return null}
+}
+function saveCache(snapshot){
+  try{$persistentStore.write(JSON.stringify(snapshot),KEY)}catch(_){}
+}
+function fetchSnapshot(now){
+  return new Promise(resolve=>{
+    try{
+      $httpClient.get({
+        url:DATA+"?slot="+Math.floor(now/1800000),
+        headers:{"Accept":"application/json","Cache-Control":"no-cache"},
+        timeout:7,insecure:false,"auto-redirect":false,"auto-cookie":false
+      },(error,response,body)=>{
+        try{
+          const status=Number(response?.status??response?.statusCode);
+          if(error||status!==200||typeof body!=="string"||!body.trim()||body.length>200000)return resolve(null);
+          resolve(normalize(JSON.parse(body),bj(now)));
+        }catch(_){resolve(null)}
+      });
+    }catch(_){resolve(null)}
+  });
+}
+function money(n){return price(n)?n.toFixed(2):"--"}
+function shortDate(s){return s.slice(5).replace("-","/")}
+function renderTile(snapshot,now,connected){
+  if(!snapshot)return {title:"广东油价·95号--",content:"暂无数据·待更新",icon:ICON,backgroundColor:COLORS.unknown,url:INFO};
+  const d=viewData(snapshot,now,connected);
+  const a=d.current;
+  const status=d.stale?"·旧价":!connected?"·缓存":snapshot.records[0].rank===1?"·参考":"";
+  const q98=money(a.p98.price)+(a.p98.oldDate?"旧":"");
+  const next=d.nextKind==="paused"?"暂缓调价":d.stale?"待更新":d.next?
+    (d.nextKind==="estimated"||d.nextKind==="corroborated"?"预计":"")+shortDate(d.next)+"调":"待公布";
+  const delta=a.p95.delta;
+  return {
+    title:"广东油价·95号"+money(a.p95.price)+"元/L"+status,
+    content:"92号"+money(a.p92.price)+"·98号"+q98+"·"+next,
+    icon:ICON,
+    backgroundColor:d.stale||!connected||snapshot.records[0].rank===1?COLORS.unknown:
+      Number.isFinite(delta)&&delta<0?COLORS.down:Number.isFinite(delta)&&delta>0?COLORS.up:COLORS.normal,
+    url:INFO
+  };
+}
+async function run(now=Date.now()){
+  const today=bj(now),cached=readCache(today),remote=await fetchSnapshot(now);
+  const snapshot=mergeSnapshots(cached,remote,today);
+  if(!snapshot)return renderTile(null,now,false);
+  const connected=!!remote&&remote.records[0].date===snapshot.records[0].date&&equal(remote.records[0],snapshot.records[0])&&remote.records[0].rank===snapshot.records[0].rank;
+  saveCache(snapshot);
+  return renderTile(snapshot,now,connected);
+}
+run().then(result=>$done(result),()=>$done(renderTile(null,Date.now(),false)));
+})();
